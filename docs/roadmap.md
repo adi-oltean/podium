@@ -10,8 +10,9 @@ next starts.
 - [x] Fixed-step integrators (RK4, Euler)
 - [x] Glideslope guidance (Hablani), LQR synthesis/application split
 - [x] Contract layer (`rpod.verify`): interval contracts + `prove()`
-- [ ] Tschauner-Hempel / **Yamanaka-Ankersen STM** (no open implementation
-      exists anywhere — immediate differentiator)
+- [x] Tschauner-Hempel / **Yamanaka-Ankersen STM** (no other open
+      implementation exists — immediate differentiator); validated against
+      nonlinear elliptic relative dynamics up to e = 0.35 and the CW limit
 - [ ] Nonlinear relative-motion truth model + J2 + exponential drag;
       quantified CW/TH validity envelopes in CI
 - [ ] Sim engine: fixed-step master clock, event detection, scenario config

@@ -4,7 +4,7 @@
 
 rpod-lib is an open-source framework for *developing, testing, and formally validating* guidance, navigation & control algorithms for spacecraft rendezvous and docking. It is Python-first for iteration speed, but the algorithm core is written in a deliberately restricted style (the *static subset*) so that flight algorithms translate mechanically to C and can be proven safe by an external abstract-interpretation tool.
 
-> Status: pre-alpha scaffold. The CW kernel, quaternion kernel, glideslope guidance, and LQR synthesis/application are implemented and tested; the rest of the tree is designed but stubbed. See [`docs/roadmap.md`](docs/roadmap.md).
+> Status: pre-alpha scaffold. The CW kernel, **Yamanaka-Ankersen STM** (elliptic relative motion — no other open implementation exists), quaternion kernel, glideslope guidance, and LQR synthesis/application are implemented and tested; the rest of the tree is designed but stubbed. See [`docs/roadmap.md`](docs/roadmap.md).
 
 ## Why another space simulator?
 
@@ -20,7 +20,8 @@ Mature tools exist — Basilisk, NASA 42, Trick, Orekit, GMAT — and rpod-lib d
 ```
 src/rpod/
   core/        Verifiable algorithm core (static subset): CW dynamics & STM,
-               quaternion kernel, fixed-step integrators
+               Yamanaka-Ankersen STM (elliptic orbits), quaternion kernel,
+               fixed-step integrators
   dynamics/    Truth models: Tschauner-Hempel, nonlinear relative motion,
                J2 + drag, rigid-body attitude
   guidance/    Glideslope, multi-impulse targeting, convex/SCP trajectory

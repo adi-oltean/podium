@@ -15,4 +15,4 @@ Higher-level, Python-only orchestration (simulation harness, plotting,
 Monte Carlo) lives outside this package and may use the full language.
 """
 
-from rpod.core import cw, integrators, quat  # noqa: F401
+from rpod.core import cw, integrators, quat, ya  # noqa: F401
