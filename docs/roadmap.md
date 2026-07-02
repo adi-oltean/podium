@@ -20,7 +20,9 @@ next starts.
       < C(e)·sep²/a per orbit with C ≈ 40 (e ≤ 0.05) / 200 (e = 0.2),
       quadratic scaling asserted; CW-vs-YA degradation ratios documented
 - [ ] Sim engine: fixed-step master clock, event detection, scenario config
-- [ ] `sim.to_viewer_json()` + matplotlib analysis plots
+- [x] v0 web viewer on GitHub Pages (#2): canvas playback of the V-bar
+      approach, follow camera, burn timeline, log-range scrubber
+- [ ] `sim.to_viewer_json()` export API + matplotlib analysis plots
 
 ## v0.2 — "Convex guidance" (Layer 0)
 

@@ -1,6 +1,6 @@
 # 01 — Nonlinear truth model with J2 and drag
 
-GitHub issue: https://github.com/adi-oltean/rpod-lib/issues/1
+GitHub issue: https://github.com/adi-oltean/podium/issues/1
 
 ## Problem
 

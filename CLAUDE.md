@@ -63,8 +63,9 @@ Podium is a physics-precise RPOD (rendezvous, proximity operations &
 docking) GNC library, simulation sandbox, and visualization for LEO/MEO.
 MIT-licensed, Python-first, with a designed path to C flight code validated
 by an external abstract-interpretation tool. Repo:
-https://github.com/adi-oltean/rpod-lib (private; **keep repos private unless
-the user explicitly says public**).
+https://github.com/adi-oltean/podium (public since 2026-07-02 by owner
+decision; the general rule stands: **keep repos private unless the user
+explicitly says public**).
 
 Key docs: `docs/architecture.md` (two-layer design, frames, sim engine),
 `docs/verification.md` (static subset + contract pipeline),
@@ -231,8 +232,8 @@ See `CLAUDE-issue.md` for the detailed process and plan file template.
 Conventions for issue tracking:
 - **Title prefix**: `NN — Title` (zero-padded issue number, em dash). Example: `05 — Fix widget`
 - **Body plan link**: clickable markdown link, not backtick text.
-  Use `[NN-slug.md](https://github.com/adi-oltean/rpod-lib/blob/main/docs/plans/NN-slug.md)`
-- **Matrix summary tables**: `#` column uses `[#N](https://github.com/adi-oltean/rpod-lib/issues/N)` format
+  Use `[NN-slug.md](https://github.com/adi-oltean/podium/blob/main/docs/plans/NN-slug.md)`
+- **Matrix summary tables**: `#` column uses `[#N](https://github.com/adi-oltean/podium/issues/N)` format
 
 ## Permissions
 

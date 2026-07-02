@@ -42,8 +42,8 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/adi-oltean/rpod-lib"
-Issues = "https://github.com/adi-oltean/rpod-lib/issues"
+Homepage = "https://github.com/adi-oltean/podium"
+Issues = "https://github.com/adi-oltean/podium/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/podium"]
