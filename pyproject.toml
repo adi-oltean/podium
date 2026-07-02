@@ -1,0 +1,67 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rpod-lib"
+version = "0.0.1"
+description = "Physics-precise RPOD (rendezvous, proximity operations & docking) GNC library, simulation sandbox, and visualization for LEO/MEO"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+authors = [{ name = "Adi Oltean" }]
+keywords = [
+    "spacecraft", "rendezvous", "docking", "GNC", "guidance",
+    "trajectory-optimization", "clohessy-wiltshire", "simulation",
+]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Astronomy",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+dependencies = [
+    "numpy>=1.24",
+]
+
+[project.optional-dependencies]
+# Trajectory optimization (convex / successive convexification)
+opt = ["cvxpy>=1.4", "clarabel>=0.7"]
+# Interactive 3-D visualization
+viz = ["matplotlib>=3.7"]
+# High-fidelity cross-validation against established astrodynamics stacks
+validate = ["spiceypy>=6.0"]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov",
+    "mypy>=1.8",
+    "ruff>=0.4",
+    "hypothesis>=6.90",
+]
+
+[project.urls]
+Homepage = "https://github.com/adi-oltean/rpod-lib"
+Issues = "https://github.com/adi-oltean/rpod-lib/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rpod"]
+
+[tool.ruff]
+line-length = 100
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "NPY", "PL"]
+# The verifiable core deliberately favors explicit loops and scalar math
+# over "pythonic" idioms, so silence complexity nags there.
+ignore = ["PLR0913", "PLR2004"]
+
+[tool.mypy]
+strict = true
+files = ["src/rpod"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
