@@ -13,8 +13,12 @@ next starts.
 - [x] Tschauner-Hempel / **Yamanaka-Ankersen STM** (no other open
       implementation exists — immediate differentiator); validated against
       nonlinear elliptic relative dynamics up to e = 0.35 and the CW limit
-- [ ] Nonlinear relative-motion truth model + J2 + exponential drag;
-      quantified CW/TH validity envelopes in CI
+- [x] Nonlinear relative-motion truth model (dual ECI propagation, exact
+      LVLH transform incl. frame-precession term) + J2 + exponential drag
+      with differential ballistic coefficients (#1)
+- [x] Quantified CW/YA validity envelopes in CI: YA position error
+      < C(e)·sep²/a per orbit with C ≈ 40 (e ≤ 0.05) / 200 (e = 0.2),
+      quadratic scaling asserted; CW-vs-YA degradation ratios documented
 - [ ] Sim engine: fixed-step master clock, event detection, scenario config
 - [ ] `sim.to_viewer_json()` + matplotlib analysis plots
 

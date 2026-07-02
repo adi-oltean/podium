@@ -13,3 +13,4 @@ attitude    Rigid-body rotational dynamics (Euler equations) with reaction
 """
 
 from podium.core import cw, ya  # noqa: F401
+from podium.dynamics import nonlinear  # noqa: F401
