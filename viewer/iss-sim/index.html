@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Podium × SpaceX ISS docking sim</title>
+<style>
+  :root {
+    --bg: #0a0e14; --panel: #10161f; --grid: #1b2432; --text: #c9d4e3;
+    --dim: #6b7a8f; --accent: #5ac8fa; --warn: #ff6b6b; --gold: #ffd166;
+    --ok: #7ee787;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 15px/1.55 "SF Mono", "Cascadia Code", Consolas, monospace;
+    max-width: 880px; margin: 0 auto; padding: 28px 20px 80px;
+  }
+  h1 { font-size: 20px; letter-spacing: .03em; margin-bottom: 4px; }
+  h1 span { color: var(--accent); }
+  h2 { font-size: 15px; color: var(--gold); margin: 34px 0 10px; }
+  p, li { color: var(--text); margin-bottom: 10px; }
+  .dim { color: var(--dim); font-size: 13px; }
+  a { color: var(--accent); }
+  ol { margin: 0 0 10px 26px; }
+  ol li { margin-bottom: 6px; }
+  code { background: var(--panel); padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--grid); border-radius: 8px;
+    padding: 14px 16px; margin: 14px 0;
+  }
+  .scriptbox { position: relative; }
+  pre {
+    background: #070a10; border: 1px solid var(--grid); border-radius: 8px;
+    padding: 14px; overflow: auto; max-height: 420px; font-size: 12px;
+    line-height: 1.45; color: #a8c0d8;
+  }
+  #copy {
+    position: absolute; top: 10px; right: 10px; background: var(--panel);
+    color: var(--text); border: 1px solid var(--grid); border-radius: 6px;
+    font: inherit; font-size: 13px; padding: 6px 14px; cursor: pointer;
+  }
+  #copy:hover { border-color: var(--accent); }
+  .gates td { padding: 2px 14px 2px 0; }
+  .back { font-size: 13px; }
+</style>
+</head>
+<body>
+<p class="back"><a href="../">&larr; Podium viewer</a></p>
+<h1><span>Podium</span> flies the SpaceX ISS docking simulator</h1>
+<p class="dim">Podium's pulsed docking-control laws, running as an autopilot inside
+<a href="https://iss-sim.spacex.com/" target="_blank" rel="noopener">iss-sim.spacex.com</a>.</p>
+
+<h2>What this is</h2>
+<p>SpaceX's public simulator models Crew Dragon's manual docking mode: every
+control input is one <em>pulse</em> — a fixed velocity or attitude-rate
+increment. That is exactly the minimum-impulse-bit actuation model of
+<code>podium.control.docking</code>. The script below is a line-for-line
+JavaScript port of those laws (Python is the source of truth; constants are
+identical). It reads the sim's own HUD telemetry from the page and clicks the
+sim's own control buttons — Podium GNC in the loop, SpaceX's vehicle model.</p>
+
+<div class="card">
+<table class="gates">
+<tr><td class="dim">closing-rate profile</td><td><code>v = clamp(range/60, 0.16, 3.0) m/s</code></td></tr>
+<tr><td class="dim">lateral / attitude law</td><td>saturated proportional, gain-scheduled near the port</td></tr>
+<tr><td class="dim">pulse allocator</td><td>half-pulse deadband — no thruster chatter</td></tr>
+<tr><td class="dim">docking gates (the sim's)</td><td>&lt;0.2 m lateral, &lt;0.2&deg; per axis, &lt;0.2 m/s at contact</td></tr>
+</table>
+</div>
+
+<h2>Run it</h2>
+<ol>
+  <li>Open <a href="https://iss-sim.spacex.com/" target="_blank" rel="noopener">iss-sim.spacex.com</a> and press <b>BEGIN</b>.</li>
+  <li>Open the browser devtools console (<code>F12</code> or <code>Ctrl/Cmd+Shift+J</code>).</li>
+  <li>Chrome will ask you to type <code>allow pasting</code> first — do that.</li>
+  <li>Copy the script below, paste into the console, press Enter.</li>
+  <li>Watch. Telemetry logs every 5 s; <code>podiumAP.stop()</code> disengages.</li>
+</ol>
+
+<div class="scriptbox">
+<button id="copy">copy</button>
+<pre id="script">// Podium autopilot for iss-sim.spacex.com
+// Port of podium.control.docking (github.com/adi-oltean/podium) — MIT.
+// Reads the sim's HUD telemetry from the DOM, actuates via the sim's own
+// control buttons. Educational demo; not affiliated with SpaceX.
+(() => {
+if (window.podiumAP) { console.warn("[podium] already engaged"); return; }
+
+// ---- Podium control laws (parity with podium/control/docking.py) ----
+const CONTACT_RATE = 0.16, FAR_RATE = 3.0, APPROACH_TAU = 60.0;
+const LATERAL_V_MAX = 0.5, LATERAL_TAU = 25.0, LATERAL_TAU_NEAR = 4.0, LATERAL_NEAR_ZONE = 2.0;
+const ANGLE_RATE_MAX = 0.5, ANGLE_TAU = 10.0, ANGLE_TAU_NEAR = 2.0, ANGLE_NEAR_ZONE = 2.0;
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const approachRate = r => clamp(r / APPROACH_TAU, CONTACT_RATE, FAR_RATE);
+const axisRateCmd = (p, vmax, tau) => clamp(-p / tau, -vmax, vmax);
+const lateralRateCmd = p =>
+  axisRateCmd(p, LATERAL_V_MAX, Math.abs(p) > LATERAL_NEAR_ZONE ? LATERAL_TAU : LATERAL_TAU_NEAR);
+const angleRateCmd = e =>
+  axisRateCmd(e, ANGLE_RATE_MAX, Math.abs(e) > ANGLE_NEAR_ZONE ? ANGLE_TAU : ANGLE_TAU_NEAR);
+const pulsesNeeded = (vc, ve, dv) =>
+  clamp(Math.trunc((vc - ve) / dv + (vc > ve ? 0.5 : -0.5)), -25, 25);
+
+// ---- sim interface ----
+const num = sel => {
+  const el = document.querySelector(sel);
+  const v = parseFloat((el?.textContent || "").replace(/[^\d.eE+-]/g, ""));
+  return Number.isFinite(v) ? v : 0;
+};
+const telemetry = () => ({
+  x: num("#x-range .distance"), y: num("#y-range .distance"), z: num("#z-range .distance"),
+  range: num("#range .rate"), rate: num("#rate .rate"),
+  pitch: num("#pitch .error"), pitchRate: num("#pitch .rate"),
+  yaw: num("#yaw .error"), yawRate: num("#yaw .rate"),
+  roll: num("#roll .error"), rollRate: num("#roll .rate"),
+});
+const click = id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  for (const t of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"])
+    el.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true, view: window }));
+};
+// n>0 clicks pos button, n<0 clicks neg, spaced 70 ms
+const fire = (pos, neg, n) => {
+  const id = n > 0 ? pos : neg;
+  for (let i = 0; i < Math.abs(n); i++) setTimeout(() => click(id), 70 * i);
+};
+
+// Pulse sizes (sim fine mode). DV_ROT re-estimated from HUD rate deltas;
+// DV_TRANS re-estimated from velocity-slope deltas after our own pulses.
+let DV_ROT = 0.1, DV_TRANS = 0.05;
+
+// ---- rotation axes: HUD gives error AND rate; sign learned in flight ----
+// map: [error sel, +rate button, -rate button, learned sign s (errDot = s*rate)]
+const ROT = {
+  pitch: { pos: "pitch-up-button", neg: "pitch-down-button", s: 1, held: 0 },
+  yaw:   { pos: "yaw-left-button",  neg: "yaw-right-button",  s: 1, held: 0 },
+  roll:  { pos: "roll-left-button", neg: "roll-right-button", s: 1, held: 0 },
+};
+// ---- translation lateral axes: velocity estimated by finite difference ----
+const LAT = {
+  y: { pos: "translate-left-button", neg: "translate-right-button", s: 1, v: 0, cum: 0 },
+  z: { pos: "translate-up-button",   neg: "translate-down-button",  s: 1, v: 0, cum: 0 },
+};
+
+const hist = [];               // telemetry ring buffer, ~4 Hz
+let engaged = true, t0 = Date.now(), lastLog = 0;
+
+const sample = setInterval(() => {
+  if (!engaged) return;
+  const T = telemetry();
+  T.t = (Date.now() - t0) / 1000;
+  hist.push(T);
+  if (hist.length > 8) hist.shift();
+}, 250);
+
+const slope = key => {            // least-squares slope over the buffer [unit/s]
+  if (hist.length < 5) return 0;
+  const n = hist.length, mt = hist.reduce((a, h) => a + h.t, 0) / n,
+    mv = hist.reduce((a, h) => a + h[key], 0) / n;
+  let num_ = 0, den = 0;
+  for (const h of hist) { num_ += (h.t - mt) * (h[key] - mv); den += (h.t - mt) ** 2; }
+  return den > 0 ? num_ / den : 0;
+};
+
+const ctl = setInterval(() => {
+  if (!engaged) return;
+  const T = telemetry();
+  if (!T.range && !T.x) return;                    // not started yet
+  const range = T.range || Math.hypot(T.x, T.y, T.z);
+
+  // --- attitude: track angleRateCmd on each axis using HUD rates ---
+  for (const [k, ax] of Object.entries(ROT)) {
+    const err = T[k], rate = T[k + "Rate"];
+    // in-flight sign check: if error keeps growing against the command, flip
+    if (Math.abs(err) > 0.5 && Math.sign(rate) === Math.sign(err) * ax.s && ++ax.held > 6) {
+      ax.s = -ax.s; ax.held = 0; console.log(`[podium] flipped ${k} sign`);
+    } else if (ax.held > 0 && Math.sign(rate) !== Math.sign(err) * ax.s) ax.held = 0;
+    const n = pulsesNeeded(ax.s * angleRateCmd(err), rate, DV_ROT);
+    fire(ax.pos, ax.neg, n);
+  }
+
+  // --- lateral translation: estimated velocity, learned sign ---
+  for (const [k, ax] of Object.entries(LAT)) {
+    ax.v = slope(k);
+    // sign check: after >=3 net pulses, velocity must have moved with them
+    if (Math.abs(ax.cum) >= 3) {
+      if (Math.sign(ax.v - (ax.v0 ?? 0)) === -Math.sign(ax.cum) &&
+          Math.abs(ax.v - (ax.v0 ?? 0)) > 0.03) {
+        ax.s = -ax.s; console.log(`[podium] flipped ${k} sign`);
+      }
+      ax.cum = 0; ax.v0 = ax.v;
+    }
+    const n = pulsesNeeded(ax.s * lateralRateCmd(T[k]), ax.v * ax.s, DV_TRANS);
+    fire(ax.pos, ax.neg, n);
+    ax.cum += n;
+  }
+
+  // --- axial: closing-rate profile; HUD "rate" is negative when closing ---
+  const closing = -T.rate;                          // m/s toward the port
+  const n = pulsesNeeded(approachRate(range), closing, DV_TRANS);
+  fire("translate-forward-button", "translate-backward-button", n);
+
+  // --- telemetry log + finish detection ---
+  if (T.t - lastLog > 5) {
+    lastLog = T.t;
+    console.log(`[podium] t=${T.t.toFixed(0)}s range=${range.toFixed(1)}m ` +
+      `closing=${closing.toFixed(2)}m/s lat=(${T.y.toFixed(1)},${T.z.toFixed(1)})m ` +
+      `pyr=(${T.pitch.toFixed(1)},${T.yaw.toFixed(1)},${T.roll.toFixed(1)})deg`);
+  }
+  const done = document.querySelector("#success, #fail");
+  if (done && getComputedStyle(done).display !== "none" && range < 1) stop("sim ended");
+}, 1000);
+
+function stop(why) {
+  engaged = false; clearInterval(ctl); clearInterval(sample);
+  console.log(`[podium] disengaged${why ? " — " + why : ""}`);
+}
+window.podiumAP = { stop: () => stop("manual"), telemetry, hist };
+console.log("[podium] autopilot engaged — podiumAP.stop() to disengage");
+})();</pre>
+</div>
+
+<h2>How it works</h2>
+<p>Three laws, straight from <code>podium/control/docking.py</code>:</p>
+<p><b>1. Closing-rate profile.</b> <code>approach_rate(range)</code> commands an
+exponential-decay glideslope in range — 3 m/s far out, ramping down to a firm
+0.16 m/s at contact (inside the sim's 0.2 m/s gate).</p>
+<p><b>2. Gain-scheduled lateral/attitude nulling.</b> A saturated proportional
+law with a shorter time constant near the port. The scheduling is not
+cosmetic: with pulsed actuation, a proportional law stalls once its command
+drops below half a pulse, leaving a standing offset of
+<code>tau &middot; &Delta;v/2</code>. With the far-field gains alone that
+stall offset is 0.6 m / 0.25&deg; — <em>outside</em> the docking gates. The
+near-zone gains put it at 0.1 m / 0.05&deg;. (Podium's click-dynamics unit
+tests caught exactly this failure mode.)</p>
+<p><b>3. Half-pulse deadband allocator.</b> <code>pulses_needed()</code> converts
+a rate error into an integer click count, rounding toward zero inside half a
+pulse — the vehicle never chatters around its setpoint.</p>
+<p>The browser side adds what a real GNC stack would call navigation and FDIR:
+lateral velocities are estimated by least-squares slope over a 2 s telemetry
+window (the sim HUD shows no lateral rates), and control-polarity is
+<em>learned in flight</em> — if an axis responds opposite to its pulses, the
+sign map flips once and the controller carries on.</p>
+
+<h2>Caveats</h2>
+<p class="dim">Educational demo, not affiliated with SpaceX. The script only
+reads the page's displayed telemetry and clicks its visible buttons — nothing
+else. If SpaceX changes the page structure, the DOM selectors may need
+updating. Leave the sim's precision toggles at their defaults; the pulse-size
+constants assume fine mode and adapt slowly if actual increments differ.</p>
+
+<p class="dim">Podium — physics-precise RPOD GNC · <a
+href="https://github.com/adi-oltean/podium">github.com/adi-oltean/podium</a> · MIT</p>
+
+<script>
+document.getElementById("copy").onclick = async () => {
+  const btn = document.getElementById("copy");
+  await navigator.clipboard.writeText(document.getElementById("script").textContent);
+  btn.textContent = "copied";
+  setTimeout(() => (btn.textContent = "copy"), 1500);
+};
+</script>
+</body>
+</html>

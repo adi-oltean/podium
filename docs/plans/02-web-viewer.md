@@ -28,8 +28,12 @@ public URL now that the repo is public.
   trail, burn glyphs, HUD (t, range, range rate, cumulative delta-v),
   play/pause + speed + scrubber. Render loop (requestAnimationFrame)
   decoupled from the playback clock (fermi pattern).
-- Enable Pages: main branch, root path. URL:
-  https://adi-oltean.github.io/podium/viewer/
+- Pages: Actions-based deploy (`.github/workflows/pages.yml`) serving the
+  `viewer/` directory as the site root. URL: https://adi-oltean.github.io/podium/
+  (Note: the legacy Jekyll build path wedged — the Pages site was first
+  created while the repo was private, then GitHub Pages had a
+  degraded-performance incident; deleted/recreated the site with
+  build_type=workflow.)
 
 ## Tests
 
@@ -38,9 +42,9 @@ overkill for v0. Data generator is exercised when regenerating.
 
 ## Acceptance Criteria
 
-- [ ] Page renders and plays back the approach
-- [ ] Pages URL live
-- [ ] Roadmap/README link it
+- [x] Page renders and plays back the approach (script smoke-tested headless)
+- [x] Pages URL live (200 OK, 2026-07-02)
+- [x] Roadmap/README link it
 
 ## Push/merge instructions
 

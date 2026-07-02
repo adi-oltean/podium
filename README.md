@@ -39,7 +39,9 @@ docs/          Architecture, comparative analysis, trajectory optimization,
                verification approach, roadmap
 ```
 
-**Live demo:** [V-bar approach viewer](https://adi-oltean.github.io/podium/) — a 1 km glideslope approach propagated through the nonlinear truth model, in a self-contained page (fermi-style: no build system, no external requests).
+**Live demos:**
+- [V-bar approach viewer](https://adi-oltean.github.io/podium/) — a 1 km glideslope approach propagated through the nonlinear truth model, in a self-contained page (fermi-style: no build system, no external requests).
+- [ISS-sim autopilot](https://adi-oltean.github.io/podium/iss-sim/) — Podium's pulsed docking-control laws (`podium.control.docking`) flying [SpaceX's ISS docking simulator](https://iss-sim.spacex.com/) via a paste-in-console autopilot.
 
 ## Quick start
 
