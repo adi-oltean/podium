@@ -39,7 +39,7 @@ docs/          Architecture, comparative analysis, trajectory optimization,
                verification approach, roadmap
 ```
 
-**Live demo:** [V-bar approach viewer](https://adi-oltean.github.io/podium/viewer/) — a 1 km glideslope approach propagated through the nonlinear truth model, in a self-contained page (fermi-style: no build system, no external requests).
+**Live demo:** [V-bar approach viewer](https://adi-oltean.github.io/podium/) — a 1 km glideslope approach propagated through the nonlinear truth model, in a self-contained page (fermi-style: no build system, no external requests).
 
 ## Quick start
 
