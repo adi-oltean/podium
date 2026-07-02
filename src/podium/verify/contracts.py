@@ -19,8 +19,8 @@ import numpy as np
 
 F = TypeVar("F", bound=Callable[..., Any])
 
-# Checked by default in the sandbox; set RPOD_NO_CONTRACTS=1 for speed.
-_ENFORCE = os.environ.get("RPOD_NO_CONTRACTS", "0") != "1"
+# Checked by default in the sandbox; set PODIUM_NO_CONTRACTS=1 for speed.
+_ENFORCE = os.environ.get("PODIUM_NO_CONTRACTS", "0") != "1"
 
 
 @dataclass(frozen=True)
@@ -51,7 +51,7 @@ def contract(**arg_intervals: Interval) -> Callable[[F], F]:
     >>> @contract(n=Interval(1e-4, 1e-2), tof=Interval(1.0, 20_000.0))
     ... def two_impulse(x0, target, n, tof): ...
 
-    The declared intervals are stored on ``func.__rpod_contract__`` for the
+    The declared intervals are stored on ``func.__podium_contract__`` for the
     C emitter, and checked at call time while running in the sandbox.
     """
 
@@ -73,7 +73,7 @@ def contract(**arg_intervals: Interval) -> Callable[[F], F]:
                         )
             return func(*args, **kwargs)
 
-        wrapper.__rpod_contract__ = dict(arg_intervals)  # type: ignore[attr-defined]
+        wrapper.__podium_contract__ = dict(arg_intervals)  # type: ignore[attr-defined]
         return wrapper  # type: ignore[return-value]
 
     return decorate

@@ -1,6 +1,6 @@
 # Trajectory optimization: G-FOLD lineage and the convex RPOD stack
 
-How rpod-lib incorporates convexification, from the G-FOLD heritage to a
+How Podium incorporates convexification, from the G-FOLD heritage to a
 layered RPOD formulation. References collected at the end of each section.
 
 ## What G-FOLD contributes, and what transfers
@@ -36,7 +36,7 @@ already linear time-varying:
   (Luo et al. 2024) and validity checks (controllability/normality) must be
   part of the library, not an exercise for the user.
 
-## Layered formulation in rpod-lib
+## Layered formulation in Podium
 
 **Layer 0 — one-shot convex (LP/QP/SOCP).** CW or Yamanaka-Ankersen STMs give
 *exact* discretization, so dynamics are linear equality constraints with zero
@@ -92,7 +92,7 @@ jonnyhyman/G-FOLD. SCPToolbox.jl and the CSM 2022 survey are the *algorithm
 references* (read, don't port). The ART repo (Stanford, MIT license) is
 legally liftable for RPOD SCP pipeline patterns. **OpenSCvx** (Apache-2.0,
 active, JAX-based) is the closest existing SCP core — we interoperate with or
-depend on it rather than duplicating; rpod-lib's differentiated value is the
+depend on it rather than duplicating; Podium's differentiated value is the
 **RPOD domain layer** (CW/YA dynamics, corridors, KOZ, plume, passive/abort
 safety, docking phase logic), which nothing open-source currently packages.
 
@@ -107,7 +107,7 @@ path is open to us.
 ## Honest caveats
 
 - LCvx guarantees can silently break under interval-active state constraints
-  and after discretization — rpod-lib ships validity checks and treats the
+  and after discretization — Podium ships validity checks and treats the
   discrete-time repair as part of the implementation.
 - PTR has no formal convergence guarantee; SCvx* mode exists for when that
   matters.
@@ -116,7 +116,7 @@ path is open to us.
 - No public evidence confirms SCP running closed-loop in operational orbital
   RPOD; the certification argument rests on descent heritage (G-FOLD, SPLICE)
   plus fixed-iteration determinism. Visiting-vehicle RPOD flown to date is
-  classically glideslope/corridor-based — which is why rpod-lib implements
+  classically glideslope/corridor-based — which is why Podium implements
   those laws first and treats optimization as the upgrade path.
 
 ## Key references

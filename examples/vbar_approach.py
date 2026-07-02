@@ -7,8 +7,8 @@ matplotlib is installed.
 
 import numpy as np
 
-from rpod.core import cw
-from rpod.guidance.glideslope import glideslope_pulses
+from podium.core import cw
+from podium.guidance.glideslope import glideslope_pulses
 
 MU_EARTH = 3.986004418e14  # m^3/s^2
 A_TARGET = 6_778_137.0  # 400 km circular

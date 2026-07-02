@@ -6,7 +6,7 @@ import math
 import numpy as np
 import pytest
 
-from rpod.core import cw, ya
+from podium.core import cw, ya
 
 MU = 3.986004418e14
 

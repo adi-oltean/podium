@@ -3,7 +3,7 @@
 Modules
 -------
 glideslope  Classical glideslope approach guidance (Hablani), core-compliant.
-targeting   Multi-impulse CW/TH targeting wrappers around rpod.core.cw.
+targeting   Multi-impulse CW/TH targeting wrappers around podium.core.cw.
 convex      Convex trajectory optimization: direct SOCP transcription of the
             CW/TH relative dynamics with approach-cone, keep-out-zone (via
             successive convexification), thrust, and plume constraints.

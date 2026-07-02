@@ -11,7 +11,7 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
 
-from rpod.core import cw
+from podium.core import cw
 
 F64 = NDArray[np.float64]
 

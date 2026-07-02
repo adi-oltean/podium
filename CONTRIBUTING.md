@@ -6,7 +6,7 @@ and documentation all help.
 
 ## Ground rules
 
-- **`src/rpod/core` follows the static subset** documented in
+- **`src/podium/core` follows the static subset** documented in
   [`docs/verification.md`](docs/verification.md): pure functions, fixed
   shapes, compile-time loop bounds, contracts on every scalar input. PRs into
   `core` that break these rules will be asked to move the code to the sandbox
@@ -34,4 +34,4 @@ kernel math. Keep functions small; the verification story depends on it.
 
 ## License
 
-By contributing you agree your contributions are licensed under Apache-2.0.
+By contributing you agree your contributions are licensed under MIT.

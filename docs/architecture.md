@@ -27,7 +27,7 @@ The single most important boundary in the codebase:
 │        │ sensor outputs         │ actuator commands          │
 │        ▼                        │                            │
 │  ┌──────────────────────────────────────────┐                │
-│  │  FLIGHT CORE (static subset, rpod.core)  │ → C + external │
+│  │  FLIGHT CORE (static subset, podium.core)  │ → C + external │
 │  │  pure step functions, fixed shapes,      │   abstract-    │
 │  │  bounded loops, contracts                │   interpretation│
 │  └──────────────────────────────────────────┘   validation   │

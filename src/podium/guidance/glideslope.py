@@ -15,8 +15,8 @@ import math
 import numpy as np
 from numpy.typing import NDArray
 
-from rpod.core import cw
-from rpod.verify import Interval, contract
+from podium.core import cw
+from podium.verify import Interval, contract
 
 F64 = NDArray[np.float64]
 

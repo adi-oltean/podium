@@ -1,6 +1,6 @@
 """Contracts and validation-export harness.
 
-Algorithms in :mod:`rpod.core` declare machine-readable contracts with
+Algorithms in :mod:`podium.core` declare machine-readable contracts with
 :func:`contract`. The contracts serve three purposes:
 
 1. **Simulation-time checking** — in the sandbox, violated pre/postconditions
@@ -13,6 +13,6 @@ Algorithms in :mod:`rpod.core` declare machine-readable contracts with
    ``docs/verification.md`` for the annotation mapping.
 """
 
-from rpod.verify.contracts import Interval, contract, prove
+from podium.verify.contracts import Interval, contract, prove
 
 __all__ = ["Interval", "contract", "prove"]

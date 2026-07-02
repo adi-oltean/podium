@@ -9,7 +9,7 @@ next starts.
 - [x] Quaternion kernel (scalar-first, static subset)
 - [x] Fixed-step integrators (RK4, Euler)
 - [x] Glideslope guidance (Hablani), LQR synthesis/application split
-- [x] Contract layer (`rpod.verify`): interval contracts + `prove()`
+- [x] Contract layer (`podium.verify`): interval contracts + `prove()`
 - [x] Tschauner-Hempel / **Yamanaka-Ankersen STM** (no other open
       implementation exists — immediate differentiator); validated against
       nonlinear elliptic relative dynamics up to e = 0.35 and the CW limit

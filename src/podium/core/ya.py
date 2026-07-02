@@ -5,7 +5,7 @@ Closed-form STM for relative motion about an **elliptic** target orbit
 Ankersen, "New State Transition Matrix for Relative Motion on an Arbitrary
 Elliptical Orbit," JGCD 25(1):60-66, 2002.
 
-Frame and state as in :mod:`rpod.core.cw`: target-centered LVLH, x radial
+Frame and state as in :mod:`podium.core.cw`: target-centered LVLH, x radial
 (zenith), y along-track, z cross-track; state [rx, ry, rz, vx, vy, vz], SI.
 
 Method: physical states map to Tschauner-Hempel "tilde" variables
@@ -30,7 +30,7 @@ import math
 import numpy as np
 from numpy.typing import NDArray
 
-from rpod.verify import Interval, contract
+from podium.verify import Interval, contract
 
 F64 = NDArray[np.float64]
 

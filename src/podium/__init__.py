@@ -1,4 +1,4 @@
-"""rpod-lib: physics-precise RPOD GNC library and simulation sandbox for LEO/MEO.
+"""Podium: physics-precise RPOD GNC library and simulation sandbox for LEO/MEO.
 
 Subpackages
 -----------

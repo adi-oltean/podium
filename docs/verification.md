@@ -1,6 +1,6 @@
 # Formal validation approach
 
-rpod-lib assumes an **external abstract-interpretation tool** validates the
+Podium assumes an **external abstract-interpretation tool** validates the
 flight-translated C code (we do not build an analyzer). The library's job is to
 produce code and contracts that such a tool can actually prove things about.
 This document defines the rules and the contract pipeline.
@@ -16,7 +16,7 @@ This document defines the rules and the contract pipeline.
 - **ARCH-COMP spacecraft rendezvous benchmark** (Chan & Mitra 2017): CW
   dynamics + mode-switched LQR (approach / rendezvous-attempt / abort), with
   a 30° line-of-sight cone, a docking-velocity ceiling, and passive-abort
-  keep-out verified by reachability tools (CORA, JuliaReach, SpaceEx). rpod-lib
+  keep-out verified by reachability tools (CORA, JuliaReach, SpaceEx). Podium
   will ship this scenario as an executable example with model export, so
   closed-loop verification is a regression test, not an afterthought.
 - **Feron-style credible autocoding:** controllers carry their Lyapunov
@@ -26,12 +26,12 @@ This document defines the rules and the contract pipeline.
   `math.h` as the only dependency, fixed iteration counts — the analyzer sweet
   spot, demonstrated by embedded solvers already flown.
 
-## The static subset (rules for `rpod.core`)
+## The static subset (rules for `podium.core`)
 
 Interval-domain abstract interpretation (the domain family used by the target
 class of tools, including the fastcheck-style analyzers this project is
 designed against) proves range, bounds, and RTE-freedom properties precisely
-when code is written in a restricted style. All code in `rpod.core` must obey:
+when code is written in a restricted style. All code in `podium.core` must obey:
 
 **Memory & structure**
 1. Pure step functions: outputs depend only on inputs; no globals, no I/O, no
@@ -64,7 +64,7 @@ when code is written in a restricted style. All code in `rpod.core` must obey:
 
 ## Contract pipeline
 
-Contracts are declared once, in Python, as data (`rpod.verify`):
+Contracts are declared once, in Python, as data (`podium.verify`):
 
 ```python
 @contract(n=Interval(1e-5, 1e-2), tof=Interval(1.0, 20_000.0))
@@ -75,7 +75,7 @@ and consumed four ways:
 
 | Consumer | Form |
 |---|---|
-| Sandbox simulation | Runtime checks (raise on violation; disable with `RPOD_NO_CONTRACTS=1`) |
+| Sandbox simulation | Runtime checks (raise on violation; disable with `PODIUM_NO_CONTRACTS=1`) |
 | C translation | Comment-annotation block per function for the abstract-interpretation tool: direction/nullness/size tags on pointers (`[in]`, `[notnull]`, `[len(6)]`), `[range(lo,hi)]` on every scalar that indexes, sizes, or is physically bounded |
 | Invariants | `prove(cond, label)` calls become `PROVE(...)` obligations at the same program points, yielding per-invariant proof artifacts |
 | Docs | Ranges and units rendered into API reference |
@@ -91,7 +91,7 @@ declared ranges) is generated from the same metadata.
 No existing Python compiler (Cython, Numba, Pythran) emits analyzer-friendly
 C — they produce CPython glue, C++ templates, or JIT machine code. The plan,
 following the CVXPYgen precedent, is a small AST-walking emitter over the
-static subset that rpod-lib owns:
+static subset that Podium owns:
 
 - typed, fixed-shape float64 functions → flat C arrays with compile-time
   extents and explicit index arithmetic;

@@ -5,7 +5,7 @@ import math
 import numpy as np
 import pytest
 
-from rpod.core import cw, integrators
+from podium.core import cw, integrators
 
 MU = 3.986004418e14
 A_LEO = 6_778_137.0  # ~400 km altitude

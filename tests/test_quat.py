@@ -6,7 +6,7 @@ import numpy as np
 from hypothesis import given
 from hypothesis import strategies as st
 
-from rpod.core import quat
+from podium.core import quat
 
 unit_q = st.builds(
     lambda a, b, c, d: quat.normalize(np.array([a, b, c, d])),

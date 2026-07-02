@@ -2,9 +2,9 @@
 
 import numpy as np
 
-from rpod.control import lqr
-from rpod.core import cw
-from rpod.guidance.glideslope import glideslope_pulses
+from podium.control import lqr
+from podium.core import cw
+from podium.guidance.glideslope import glideslope_pulses
 
 MU = 3.986004418e14
 N = cw.mean_motion(MU, 6_778_137.0)

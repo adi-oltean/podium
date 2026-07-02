@@ -32,3 +32,6 @@ docs/_build/
 out/
 *.h5
 *.npz
+
+# Scratch scripts and generated messages (see CLAUDE.md)
+tmp/

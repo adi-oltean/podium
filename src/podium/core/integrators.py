@@ -2,7 +2,7 @@
 
 Only fixed-step schemes are provided here: adaptive step control introduces
 data-dependent loop bounds, which the static subset forbids. The simulation
-truth models in :mod:`rpod.sim` may use SciPy adaptive integrators for
+truth models in :mod:`podium.sim` may use SciPy adaptive integrators for
 cross-validation, but flight-representative propagation uses these.
 """
 

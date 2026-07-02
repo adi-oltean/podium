@@ -3,7 +3,7 @@
 Survey date: July 2026. Full framework-by-framework details in the table
 below; conclusions first.
 
-## The gap rpod-lib fills
+## The gap Podium fills
 
 No maintained open-source tool combines all of:
 
@@ -19,7 +19,7 @@ No maintained open-source tool combines all of:
 6. **a deliberate path to flight C code** with formal validation.
 
 State of practice remains STK/FreeFlyer/MATLAB-Simulink cobbled together, or
-Basilisk plus custom code. The open niches rpod-lib targets: RPOD guidance
+Basilisk plus custom code. The open niches Podium targets: RPOD guidance
 primitives as library objects (glideslope, hops, safety ellipses, KOZ/passive-
 abort, plume constraints), analytic relative-motion rigor, and the
 verification-ready codegen path — under a permissive license (the incumbents
