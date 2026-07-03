@@ -69,6 +69,9 @@ ignore = ["PLR0913", "PLR2004"]
 # Convex-problem builders are naturally long constructors (one constraint
 # family per block); splitting them harms readability.
 "src/podium/guidance/convex.py" = ["PLR0912", "PLR0915"]
+# cvxpy is imported lazily inside synthesize(): the trusted checker must
+# stay importable (and float-free) without the optional SDP stack.
+"src/podium/verify/barrier.py" = ["PLC0415"]
 
 [tool.mypy]
 strict = true
@@ -81,6 +84,14 @@ files = ["src/podium"]
 module = "podium.guidance.convex"
 disallow_untyped_calls = false
 disable_error_code = ["attr-defined", "call-arg", "no-any-return"]
+
+# Same cvxpy stub gaps in the (untrusted) barrier synthesis path; the
+# trusted checker half of the module stays fully typed.
+[[tool.mypy.overrides]]
+module = "podium.verify.barrier"
+disallow_untyped_calls = false
+disallow_untyped_defs = false
+disable_error_code = ["attr-defined", "union-attr", "arg-type", "type-arg"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -182,14 +182,21 @@ headline addition is the ROE module, #5.)
 - [ ] Contact/capture via MuJoCo backend; capture-envelope MC analysis
 - [ ] Tumbling-target terminal guidance (rotating corridor, variable-
       horizon endpoint) — scoped study
-- [ ] **Infinite-horizon abort-safety certificates**: sum-of-squares
-      barrier functions for the polynomial closed-loop dynamics (CW,
-      quaternion feedback), synthesized offline by SDP (untrusted) and
-      re-verified in CI by an exact algebraic/interval check of the
-      certificate identity — upgrading the reachability gate's
-      bounded-horizon flowpipe proofs to invariants that hold for all
-      time, with the same synthesize-untrusted / verify-cheap split the
-      rest of the verification story uses
+- [x] **Infinite-horizon abort-safety certificates** (#20,
+      `podium.verify.barrier`): barrier functions over the CW flow
+      invariants in time-scaled coordinates (integer dynamics matrix →
+      fully rational problem), synthesized by an untrusted SDP
+      (cvxpy/Clarabel S-procedure) and re-verified by a TRUSTED checker
+      in exact fractions arithmetic (all-principal-minors PSD test, Lie
+      derivative exactly zero — no floats in the trusted path). Certifies
+      "passive abort drift keeps RN separation outside the keep-out
+      radius for ALL time", along-track-independent (the machine-checked
+      e/i-separation heritage argument). Receipts: end-to-end synth →
+      rationalize → exact verify; hand-derived certificate whose algebra
+      closes on paper; tamper detection; V-bar hold correctly infeasible
+      (not passively safe); dense-propagation corroboration. Follow-ups:
+      quartic barriers for tighter sets, J2-perturbed variant, attitude
+      closed loop
 
 ## v0.5 — "Flight path"
 
