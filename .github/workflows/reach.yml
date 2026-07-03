@@ -35,9 +35,9 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -e .
-      - name: Export hybrid models
+      - name: Export hybrid models (reference + podium-synthesized gains)
         run: |
-          python -c "from podium.guidance import arch; arch.write_model('arch_srna01.json', -1.0); arch.write_model('arch_sra01.json', 120.0)"
+          python -c "from podium.guidance import arch; arch.write_model('arch_srna01.json', -1.0); arch.write_model('arch_sra01.json', 120.0); arch.write_model('arch_srna01_podium.json', -1.0, 'podium'); arch.write_model('arch_sra01_podium.json', 120.0, 'podium')"
       - uses: julia-actions/setup-julia@v2
         with:
           version: "1.11"
@@ -45,4 +45,4 @@ jobs:
       - name: Instantiate ReachabilityAnalysis
         run: julia --project=tools/reach -e 'using Pkg; Pkg.instantiate()'
       - name: Prove safety properties
-        run: julia --project=tools/reach tools/reach/arch_rendezvous.jl arch_srna01.json arch_sra01.json
+        run: julia --project=tools/reach tools/reach/arch_rendezvous.jl arch_srna01.json arch_sra01.json arch_srna01_podium.json arch_sra01_podium.json

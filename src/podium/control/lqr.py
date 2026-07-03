@@ -51,6 +51,37 @@ def dlqr(a: F64, b: F64, q: F64, r: F64, iters: int = 500) -> F64:
     return np.linalg.solve(r + btp @ b, btp @ a)
 
 
+def care(a: F64, b: F64, q: F64, r: F64) -> F64:
+    """Continuous algebraic Riccati equation solver (sandbox side).
+
+    Solves A'P + PA - P B R^-1 B' P + Q = 0 via the Hamiltonian
+    stable-invariant-subspace method: eigendecompose
+    H = [[A, -B R^-1 B'], [-Q, -A']], stack the eigenvectors of the
+    stable eigenvalues as [X1; X2], and return the symmetrized real part
+    of P = X2 X1^-1. Standard assumptions: (A, B) stabilizable,
+    (A, Q^1/2) detectable, R > 0 — under which H has exactly n stable
+    eigenvalues and X1 is invertible. The tests assert the Riccati
+    residual at machine precision, so a violated assumption is loud.
+    """
+    nn = a.shape[0]
+    r_inv = np.linalg.inv(r)
+    ham = np.block([[a, -b @ r_inv @ b.T], [-q, -a.T]])
+    eigval, eigvec = np.linalg.eig(ham)
+    stable = np.argsort(eigval.real)[:nn]
+    x1 = eigvec[0:nn, stable]
+    x2 = eigvec[nn : 2 * nn, stable]
+    p: F64 = np.real(x2 @ np.linalg.inv(x1))
+    sym: F64 = 0.5 * (p + p.T)
+    return sym
+
+
+def clqr(a: F64, b: F64, q: F64, r: F64) -> F64:
+    """Continuous LQR gain K (u = -K x) from the CARE solution."""
+    p = care(a, b, q, r)
+    out: F64 = np.linalg.inv(r) @ b.T @ p
+    return out
+
+
 def apply_gain(k: F64, x: F64, u_max: float) -> F64:
     """Flight-side control law: u = clip(-K x). Static-subset compliant."""
     u = -(k @ x)

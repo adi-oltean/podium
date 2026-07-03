@@ -33,6 +33,9 @@ import math
 import numpy as np
 from numpy.typing import NDArray
 
+from podium.control import lqr as _lqr
+from podium.core import cw as _cw
+
 F64 = NDArray[np.float64]
 
 # mean motion of the GEO target orbit [rad/min], from the benchmark's
@@ -96,11 +99,74 @@ def _in_attempt_box(s: F64) -> bool:
     )
 
 
+# --- Podium-synthesized controller variant ----------------------------
+# Plant: planar CW at the benchmark's GEO mean motion, built from
+# podium.core.cw (never transcribed); inputs are accelerations along
+# x, y. Gains from podium.control.lqr.clqr with the Q/R below — chosen
+# so the closed-loop bandwidth/damping land in the same regime the
+# published (verified) controller occupies, but the numbers are OURS.
+_B_ACCEL = np.array([[0.0, 0.0], [0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+Q_APPROACH = np.diag([0.0033, 0.0044, 8.3, 8.3])
+Q_ATTEMPT = np.diag([0.33, 0.33, 369.0, 369.0])
+R_CTRL = np.eye(2)
+
+
+def cw_planar(n: float) -> F64:
+    """Planar CW system matrix (columns via podium.core.cw.cw_deriv)."""
+    a = np.zeros((4, 4))
+    for j, e in enumerate(np.eye(4)):
+        full = np.array([e[0], e[1], 0.0, e[2], e[3], 0.0])
+        d = _cw.cw_deriv(full, n, np.zeros(3))
+        a[:, j] = [d[0], d[1], d[3], d[4]]
+    return a
+
+
+def podium_gains() -> tuple[F64, F64]:
+    """(K_approach, K_attempt) acceleration gains from Podium's CARE."""
+    a = cw_planar(N_RAD_MIN)
+    k1 = _lqr.clqr(a, _B_ACCEL, Q_APPROACH, R_CTRL)
+    k2 = _lqr.clqr(a, _B_ACCEL, Q_ATTEMPT, R_CTRL)
+    return k1, k2
+
+
+def podium_mode_matrices() -> tuple[F64, F64, F64]:
+    """Closed-loop 5-state matrices with Podium-synthesized gains.
+
+    The abort mode is passive CW in both variants by construction.
+    """
+    a = cw_planar(N_RAD_MIN)
+    k1, k2 = podium_gains()
+    out = []
+    for k in (k1, k2):
+        acl = np.zeros((5, 5))
+        acl[:4, :4] = a - _B_ACCEL @ k
+        out.append(acl)
+    return out[0], out[1], A_ABORT.copy()
+
+
+def implied_reference_gains() -> tuple[F64, F64]:
+    """Acceleration gains implied by the published closed loops
+    (A_published - A_cw), for comparison/documentation."""
+    a = cw_planar(N_RAD_MIN)
+    k1 = -(A_APPROACH[2:4, :4] - a[2:4, :4])
+    k2 = -(A_ATTEMPT[2:4, :4] - a[2:4, :4])
+    return k1, k2
+
+
+def _matrices(gains: str) -> tuple[F64, F64, F64]:
+    if gains == "reference":
+        return A_APPROACH, A_ATTEMPT, A_ABORT
+    if gains == "podium":
+        return podium_mode_matrices()
+    raise ValueError("gains must be 'reference' or 'podium'")
+
+
 def simulate(
     x0: F64,
     abort_time: float = -1.0,
     dt: float = 0.01,
     horizon: float = HORIZON,
+    gains: str = "reference",
 ) -> tuple[F64, F64, NDArray[np.int64]]:
     """Deterministic hybrid simulation (RK4, urgent guard semantics).
 
@@ -109,6 +175,7 @@ def simulate(
     spec-margin checks, and the reachability tool owns the exact story.
     Returns (times, states (M,5), modes (M,)) with modes in {1,2,3}.
     """
+    mats = _matrices(gains)
     steps = int(round(horizon / dt))
     times = np.zeros(steps + 1)
     states = np.zeros((steps + 1, 5))
@@ -127,7 +194,7 @@ def simulate(
         modes[k] = mode
         if k == steps:
             break
-        a = _MATS[mode - 1]
+        a = mats[mode - 1]
 
         def f(y: F64) -> F64:
             out: F64 = a @ y + _B_CLOCK
@@ -179,10 +246,15 @@ def initial_corners() -> list[F64]:
     return pts
 
 
-def export_model(abort_time: float = -1.0) -> dict[str, object]:
+def export_model(
+    abort_time: float = -1.0, gains: str = "reference"
+) -> dict[str, object]:
     """Hybrid-automaton export for the external reachability tool.
 
     Halfspaces are (a, b) meaning a . s <= b over the 5-state vector.
+    gains: "reference" (published benchmark controller) or "podium"
+    (gains synthesized by podium.control.lqr.clqr — same FSM, guards,
+    initial set, and properties).
     """
     def hs(idx: list[int], coef: list[float], b: float) -> dict[str, object]:
         a = [0.0] * 5
@@ -203,22 +275,23 @@ def export_model(abort_time: float = -1.0) -> dict[str, object]:
         inv1.append(hs([4], [1.0], abort_time))
         inv2.append(hs([4], [1.0], abort_time))
 
+    a1, a2, a3 = _matrices(gains)
     modes = [
-        {"name": "approaching", "A": A_APPROACH.tolist(),
+        {"name": "approaching", "A": a1.tolist(),
          "b": _B_CLOCK.tolist(), "invariant": inv1},
-        {"name": "attempt", "A": A_ATTEMPT.tolist(),
+        {"name": "attempt", "A": a2.tolist(),
          "b": _B_CLOCK.tolist(), "invariant": inv2},
     ]
     transitions = [{"from": 1, "to": 2, "guard": attempt_box}]
     if aborting:
-        modes.append({"name": "aborting", "A": A_ABORT.tolist(),
+        modes.append({"name": "aborting", "A": a3.tolist(),
                       "b": _B_CLOCK.tolist(), "invariant": []})
         abort_guard = [hs([4], [-1.0], -abort_time)]
         transitions.append({"from": 1, "to": 3, "guard": abort_guard})
         transitions.append({"from": 2, "to": 3, "guard": abort_guard})
 
     return {
-        "name": "ARCH spacecraft rendezvous (SRNA01/SRA01 family)",
+        "name": f"ARCH spacecraft rendezvous ({gains} gains)",
         "units": {"position": "m", "velocity": "m/min", "time": "min"},
         "state": ["x", "y", "vx", "vy", "t"],
         "horizon": HORIZON,
@@ -238,6 +311,8 @@ def export_model(abort_time: float = -1.0) -> dict[str, object]:
     }
 
 
-def write_model(path: str, abort_time: float = -1.0) -> None:
+def write_model(
+    path: str, abort_time: float = -1.0, gains: str = "reference"
+) -> None:
     with open(path, "w") as fh:
-        json.dump(export_model(abort_time), fh, indent=1)
+        json.dump(export_model(abort_time, gains), fh, indent=1)

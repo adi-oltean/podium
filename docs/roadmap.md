@@ -72,8 +72,14 @@ headline addition is the ROE module, #5.)
       hybrid-automaton export, JuliaReach proof of the LOS-cone, velocity-
       octagon, and abort-avoidance properties (SRNA01 + SRA01, ~14 s reach
       time, PROVEN locally and gated in `.github/workflows/reach.yml` on
-      guidance/control/dynamics changes + weekly). Follow-up: Podium-
-      synthesized gains and STL-property checking (CORA lane)
+      guidance/control/dynamics changes + weekly). Follow-up: STL-property
+      checking (CORA lane)
+- [x] **Podium-synthesized gains through the gate** (#11): continuous
+      LQR via a CARE solver (`control.lqr.care`/`clqr`, Hamiltonian
+      stable-subspace method, residual pinned at machine precision);
+      switched-controller gains synthesized on the `core.cw` planar plant
+      and PROVEN by JuliaReach for both scenarios alongside the reference
+      controller — the full synthesize→export→prove workflow, gated in CI
 - [x] Spec registry v0 (#7, `podium.sim.spec`): named requirements with
       STL robust semantics over trace channels (PUS-12-shaped base
       fragment: always/eventually/final with windows), margins as pytest
