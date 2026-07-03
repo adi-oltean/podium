@@ -38,7 +38,8 @@ src/podium/
   sim/         Deterministic engine (with actuator MIB/execution-error
                truth), spec registry (STL robust semantics), IDSS
                contact-box checkers, seeded Monte Carlo, analysis plots
-  viz/         Interactive three.js viewer (planned; canvas viewer live)
+  viz/         (viewer/ on Pages): canvas 2-D viewer, three.js 3-D viewer,
+               ISS-sim autopilot page — all zero-build, self-contained
   verify/      Contracts (input ranges, invariants) + export to the external
                abstract-interpretation validation tool
 tools/reach/   JuliaReach reachability regression (CI gate)
@@ -51,6 +52,7 @@ docs/          Architecture, comparative analysis, trajectory optimization,
 
 **Live demos:**
 - [V-bar approach viewer](https://adi-oltean.github.io/podium/) — a 1 km glideslope approach propagated through the nonlinear truth model, in a self-contained page (fermi-style: no build system, no external requests).
+- [3-D viewer](https://adi-oltean.github.io/podium/3d/) — the same approach in an interactive three.js LVLH scene: approach corridor, keep-out sphere, burn glyphs, follow/orbit cameras (vendored three.js, zero build).
 - [ISS-sim autopilot](https://adi-oltean.github.io/podium/iss-sim/) — Podium's pulsed docking-control laws (`podium.control.docking`) flying [SpaceX's ISS docking simulator](https://iss-sim.spacex.com/) via a paste-in-console autopilot.
 
 

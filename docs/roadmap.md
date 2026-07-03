@@ -120,7 +120,7 @@ headline addition is the ROE module, #5.)
       oracles, co-designed with the engine. Follow-ups: rtamt backend for
       full STL, robustness-guided falsification lane in CI
 
-## v0.3 — "Full loop"
+## v0.3 — "Full loop" (COMPLETE, 2026-07-03)
 
 - [x] Relative-nav EKF (#14, `podium.nav.ekf`): fixed 6-state, Joseph-form
       update (symmetry/PD preserved under roundoff, tested over 500-step
@@ -159,9 +159,17 @@ headline addition is the ROE module, #5.)
       spawned per-run seeds, structured-array output with per-run seeds
       for post-mortem replay; 20-run dispersed docking campaign 100%
       in-box with bit-identical campaign reproducibility asserted
-- [ ] three.js interactive viewer (fermi patterns; docs/visualization.md)
+- [x] three.js interactive viewer (#18, `viewer/3d/`): zero-build page
+      with vendored three.js r172 (MIT); LVLH scene (station + docking
+      ring, KOZ wireframe, approach-corridor cone, V-bar grid),
+      preallocated-buffer trail, burn glyphs, follow + free-orbit
+      cameras, play/scrub/HUD sharing the 2-D viewer's DATA schema;
+      Playwright receipts (WebGL renders non-blank, playback/scrub,
+      physics end-state, zero console errors). Deferred: ECI/LVLH frame
+      blending (needs target-ECI export), log-time map, attitude
+      keyframes
 
-## v0.4 — "SCP docking" (Layer 1)
+## v0.4 — "SCP docking" (Layer 1, current)
 
 - [ ] PTR successive convexification for 6-DOF approach+docking; SCvx* mode
 - [ ] Continuous-time constraint satisfaction (CTCS) so corridor/KOZ hold
