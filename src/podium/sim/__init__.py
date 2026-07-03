@@ -15,6 +15,8 @@ Design (see docs/architecture.md):
   actuator errors; results as structured arrays for batch analysis.
 - **Specs.** Named requirements (STL robust semantics, PUS-12-shaped base
   fragment) evaluated over trace channels; margins double as pytest oracles.
+- **Plots.** `podium.sim.plots` (import explicitly; matplotlib optional):
+  trajectory plane view, channel time series, dv timeline.
 """
 
 from podium.sim import spec  # noqa: F401

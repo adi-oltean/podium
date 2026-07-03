@@ -32,21 +32,80 @@ from podium.core import integrators
 F64 = NDArray[np.float64]
 
 
-@dataclass(frozen=True)
+class DensityPerturbation:
+    """Seeded mean-reverting (Ornstein-Uhlenbeck) log-density factor.
+
+    The perturbation is discretized EXACTLY (p_{k+1} = phi p_k + noise
+    with phi = exp(-dt/tau)) on a fixed grid at construction and linearly
+    interpolated afterwards, so density(t) is a deterministic function of
+    time: RK4 propagation and bit-identical replay are preserved — the
+    seed is the only source of randomness.
+
+    Calibration: the multiplicative factor is exp(p) with stationary
+    std sigma_log. The default sigma_log = 0.35 puts the +2-sigma
+    excursion at exp(0.7) ~ 2.0x (+100%), inside the +50-125% band
+    observed at 200-400 km in May-2024-class storms; tau defaults to
+    6 h (storm-driver correlation time). Beyond the grid the last value
+    holds (clamped), loudly documented rather than silently wrapped.
+    """
+
+    def __init__(
+        self,
+        seed: int,
+        duration: float,
+        dt: float = 60.0,
+        sigma_log: float = 0.35,
+        tau: float = 21_600.0,
+    ) -> None:
+        self.dt = dt
+        self.sigma_log = sigma_log
+        self.tau = tau
+        rng = np.random.default_rng(seed)
+        m = int(math.ceil(duration / dt)) + 2
+        phi = math.exp(-dt / tau)
+        innov = sigma_log * math.sqrt(max(0.0, 1.0 - phi * phi))
+        p = np.zeros(m)
+        p[0] = sigma_log * rng.standard_normal()  # stationary start
+        xi = rng.standard_normal(m - 1)
+        for k in range(m - 1):
+            p[k + 1] = phi * p[k] + innov * xi[k]
+        self._p = p
+
+    def log_factor(self, t: float) -> float:
+        u = t / self.dt
+        if u <= 0.0:
+            return float(self._p[0])
+        i = int(u)
+        if i >= len(self._p) - 1:
+            return float(self._p[-1])
+        frac = u - i
+        return float((1.0 - frac) * self._p[i] + frac * self._p[i + 1])
+
+    def factor(self, t: float) -> float:
+        return math.exp(self.log_factor(t))
+
+
+@dataclass
 class DragConfig:
     """Exponential atmosphere, co-rotating with Earth.
 
     Defaults are representative of ~400 km altitude at moderate solar
     activity; density there varies by an order of magnitude over the solar
-    cycle, so treat rho0 as a scenario parameter, not a constant.
+    cycle, so treat rho0 as a scenario parameter, not a constant. An
+    optional DensityPerturbation multiplies the baseline (seeded,
+    deterministic in time).
     """
 
     rho0: float = 3.0e-12  # density at h0 [kg/m^3]
     h0: float = 400e3  # reference altitude [m]
     scale_height: float = 60e3  # [m]
+    perturbation: DensityPerturbation | None = None
 
-    def density(self, altitude: float) -> float:
-        return self.rho0 * math.exp(-(altitude - self.h0) / self.scale_height)
+    def density(self, altitude: float, t: float = 0.0) -> float:
+        rho = self.rho0 * math.exp(-(altitude - self.h0) / self.scale_height)
+        if self.perturbation is not None:
+            rho *= self.perturbation.factor(t)
+        return rho
 
 
 @dataclass(frozen=True)
@@ -113,7 +172,7 @@ def elements_from_rv(r: F64, v: F64, mu: float) -> F64:
     return np.array([a, e, inc, raan, argp, mean_anom])
 
 
-def perturb_accel(r: F64, v: F64, cfg: ForceConfig, bc: float) -> F64:
+def perturb_accel(r: F64, v: F64, cfg: ForceConfig, bc: float, t: float = 0.0) -> F64:
     """Perturbing (non-central) acceleration in ECI: J2 + drag."""
     a = np.zeros(3)
     rn = float(np.linalg.norm(r))
@@ -125,7 +184,7 @@ def perturb_accel(r: F64, v: F64, cfg: ForceConfig, bc: float) -> F64:
         a[1] += k * r[1] * (1.0 - 5.0 * z2r2)
         a[2] += k * r[2] * (3.0 - 5.0 * z2r2)
     if cfg.drag is not None:
-        rho = cfg.drag.density(rn - cfg.r_body)
+        rho = cfg.drag.density(rn - cfg.r_body, t)
         # Atmosphere co-rotates: v_rel = v - omega_e x r.
         v_rel = v - np.array(
             [-cfg.omega_earth * r[1], cfg.omega_earth * r[0], 0.0]
@@ -134,9 +193,9 @@ def perturb_accel(r: F64, v: F64, cfg: ForceConfig, bc: float) -> F64:
     return a
 
 
-def total_accel(r: F64, v: F64, cfg: ForceConfig, bc: float) -> F64:
+def total_accel(r: F64, v: F64, cfg: ForceConfig, bc: float, t: float = 0.0) -> F64:
     rn = float(np.linalg.norm(r))
-    return -cfg.mu / rn**3 * r + perturb_accel(r, v, cfg, bc)
+    return -cfg.mu / rn**3 * r + perturb_accel(r, v, cfg, bc, t)
 
 
 def lvlh_rotation(r: F64, v: F64) -> F64:
@@ -184,12 +243,12 @@ def lvlh_to_eci(rv_target: F64, x_lvlh: F64, cfg: ForceConfig, bc_target: float)
 
 
 def _deriv(cfg: ForceConfig, bc_target: float, bc_chaser: float) -> integrators.Deriv:
-    def f(_t: float, y: F64) -> F64:
+    def f(t: float, y: F64) -> F64:
         out = np.empty(12)
         out[0:3] = y[3:6]
-        out[3:6] = total_accel(y[0:3], y[3:6], cfg, bc_target)
+        out[3:6] = total_accel(y[0:3], y[3:6], cfg, bc_target, t)
         out[6:9] = y[9:12]
-        out[9:12] = total_accel(y[6:9], y[9:12], cfg, bc_chaser)
+        out[9:12] = total_accel(y[6:9], y[9:12], cfg, bc_chaser, t)
         return out
 
     return f

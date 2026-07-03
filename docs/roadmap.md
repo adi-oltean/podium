@@ -4,7 +4,7 @@ Focus: LEO/MEO RPOD. Each milestone is shippable and validated before the
 next starts. (Revised 2026-07-03 after a literature/practice sweep; the
 headline addition is the ROE module, #5.)
 
-## v0.1 — "CW sandbox" (current)
+## v0.1 — "CW sandbox" (COMPLETE, 2026-07-03)
 
 - [x] CW kernel: dynamics, closed-form STM, two-impulse targeting
 - [x] Quaternion kernel (scalar-first, static subset)
@@ -27,17 +27,21 @@ headline addition is the ROE module, #5.)
       glideslope and CW-synthesized LQR flown against the nonlinear truth
       through the engine. Continuous-thrust interface and bisection event
       refinement deferred
-- [ ] Stochastic atmosphere option for the truth model: seeded
-      mean-reverting density perturbation on the exponential baseline,
-      envelope calibrated to observed storm excursions (+50–125% at
-      200–400 km, May 2024 class events) — deterministic replay preserved
+- [x] Stochastic atmosphere option (#13, `DensityPerturbation`): seeded
+      mean-reverting (OU) log-density factor on the exponential baseline,
+      exactly discretized on a fixed grid (deterministic in time — RK4 +
+      bit-identical replay preserved and enforced by test); default
+      calibration puts +2σ at ~2.0× inside the +50–125% storm band;
+      σ=0 reduces exactly to the baseline; OU statistics pinned
 - [x] v0 web viewer on GitHub Pages (#2): canvas playback of the V-bar
       approach, follow camera, burn timeline, log-range scrubber
 - [x] `Trace.to_viewer_json()` export API (schema-compatible with the live
       viewer)
-- [ ] matplotlib analysis plots
+- [x] matplotlib analysis plots (#13, `podium.sim.plots`): trajectory
+      plane view with burns, channel time-series grid, dv timeline —
+      object-API figures (headless/thread-safe), matplotlib optional
 
-## v0.2 — "Relative motion complete + convex guidance" (Layer 0)
+## v0.2 — "Relative motion complete + convex guidance" (Layer 0, current)
 
 - [x] **ROE module (#5)**: quasi-nonsingular relative orbital elements,
       ROE↔elements and ROE↔LVLH maps, Koenig closed-form Keplerian and J2
