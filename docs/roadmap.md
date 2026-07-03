@@ -171,14 +171,34 @@ headline addition is the ROE module, #5.)
 
 ## v0.4 — "SCP docking" (Layer 1, current)
 
-- [ ] PTR successive convexification for 6-DOF approach+docking; SCvx* mode
-- [ ] Continuous-time constraint satisfaction (CTCS) so corridor/KOZ hold
-      between nodes, not only at them; state-triggered constraints (plume,
-      min-impulse-bit)
+- [x] PTR/SCvx* SCP core (#21, `podium.guidance.scp`): penalized trust
+      region over the exact-STM transcription; TRUE nonconvex keep-out
+      sphere (re-linearized per iteration), virtual buffers, SCvx*-style
+      penalty ramp on infeasibility stall, trust-region expansion on
+      validated feasible iterates, flat-valley-aware convergence (fuel
+      stationarity). Receipts: reduces to Layer-0 on convex problems;
+      passage problems converged with virtual buffers at zero and cost
+      within 0.1% of the hyperplane heuristic while satisfying the true
+      sphere; penalty ramp from 1e-6 demonstrated; deterministic; plan
+      flown against the nonlinear truth. 6-DOF (attitude-coupled) PTR
+      remains open with the contact layer
+- [x] CTCS, exact-flow form (#21): coast arcs follow the exact STM flow,
+      so intermediate-time positions are LINEAR in the decision
+      variables — continuous-time KOZ violations become exact linear
+      cuts (times persistent, directions re-linearized each iteration;
+      stale fixed cuts provably wedge the loop and are avoided by
+      design), iterated to a clean independent 1000-sample dense check.
+      Receipt: a coarse grid whose coast dips inside the sphere between
+      nodes is caught and cut. Integral-augmentation CTCS (for future
+      non-coast dynamics) and state-triggered constraints stay open
 - [ ] Temporal-logic mission constraints in the SCP stack via smooth
       robustness encodings, with mixed-integer reference solutions as
       offline validation
-- [ ] Evaluate OpenSCvx as the SCP core vs. in-house loop
+- [x] Evaluate OpenSCvx vs in-house (#21, decision recorded): in-house —
+      the Layer-0 cvxpy transcription/receipt infrastructure carries
+      directly, problem sizes are tiny, and the exact-flow cut mechanism
+      is specific to our coast-arc structure. Revisit at 6-DOF where
+      OpenSCvx's discretization machinery earns its keep
 - [ ] Contact/capture via MuJoCo backend; capture-envelope MC analysis
 - [ ] Tumbling-target terminal guidance (rotating corridor, variable-
       horizon endpoint) — scoped study
