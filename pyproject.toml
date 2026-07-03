@@ -39,6 +39,9 @@ dev = [
     "mypy>=1.8",
     "ruff>=0.4",
     "hypothesis>=6.90",
+    # Layer-0 guidance tests (tests skip gracefully if absent, but CI runs them)
+    "cvxpy>=1.4",
+    "clarabel>=0.7",
 ]
 
 [project.urls]
@@ -61,10 +64,21 @@ ignore = ["PLR0913", "PLR2004"]
 [tool.ruff.lint.per-file-ignores]
 # UI test harnesses embed JavaScript snippets whose lines don't wrap.
 "tools/ui/*" = ["E501"]
+# Convex-problem builders are naturally long constructors (one constraint
+# family per block); splitting them harms readability.
+"src/podium/guidance/convex.py" = ["PLR0912", "PLR0915"]
 
 [tool.mypy]
 strict = true
 files = ["src/podium"]
+
+# cvxpy ships py.typed with incomplete stubs (cp.norm/cp.sum/solve and the
+# is_dcp(dpp=...) signature are missing); silence only those error classes
+# in the one module that uses it. Everything else stays strict.
+[[tool.mypy.overrides]]
+module = "podium.guidance.convex"
+disallow_untyped_calls = false
+disable_error_code = ["attr-defined", "call-arg", "no-any-return"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -51,14 +51,21 @@ headline addition is the ROE module, #5.)
       (along-track-drift-independent lower bound), validated against
       brute-force scans; Breger-How Cartesian constraints remain the
       planned terminal-phase complement
-- [ ] Direct transcription on CW/YA/ROE STMs: LP (L1 fuel), SOCP (L2), QP
-      (tracking) via CVXPY, DPP-parametrized from day one
-- [ ] Constraint library: approach cone, rotating-hyperplane KOZ, plume
-      half-space, passive-safety scenarios
+- [x] Direct transcription on exact STMs (#8): `RendezvousPlanner`
+      (CW/YA, Cartesian) and `RoePlanner` (Keplerian/J2 ROE dynamics +
+      control matrix), L1/LP and L2/SOCP fuel objectives, per-burn caps,
+      DPP-compiled once with STMs/boundaries/normals as Parameters;
+      QP tracking objective deferred
+- [x] Constraint library v0 (#8): approach cone (exact SOC),
+      rotating-hyperplane KOZ (bounded two-pass reference refinement;
+      hyperplane implies true distance), plume half-space (arrival burn
+      exempt by design, active constraints recorded on the Plan);
+      Breger-How passive-safety scenarios deferred (#9)
 - [ ] LCvx thrust-annulus option with validity checks — including the
       discrete-time lossless-convexification conditions (continuous-time
-      guarantees do not survive discretization unconditionally)
-- [ ] Clarabel default solver; QOCO alternate
+      guarantees do not survive discretization unconditionally) (#9)
+- [x] Clarabel default solver (QOCO alternate deferred to the embedded
+      path)
 - [ ] **ARCH-COMP rendezvous benchmark** as an executable example with
       model export for reachability tools (CORA/JuliaReach), designed for
       later use as a CI regression gate
