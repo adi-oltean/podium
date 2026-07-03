@@ -1,0 +1,83 @@
+"""ARCH rendezvous benchmark receipts (python side).
+
+The reachability proof itself runs in the Julia gate (tools/reach); here
+we pin the model to Podium's kernel, sanity-check stability, validate the
+export schema, and run falsification-style spec checks from the initial
+set — necessary conditions that catch model transcription errors before
+the expensive proof ever runs.
+"""
+
+import json
+import math
+
+import numpy as np
+
+from podium.core import cw
+from podium.guidance import arch
+
+
+def test_abort_mode_is_planar_cw():
+    """The abort matrix must equal Podium's CW linearization at the GEO
+    mean motion implied by its own 2n entry — ties the benchmark to
+    podium.core.cw rather than trusting transcribed constants."""
+    n = arch.N_RAD_MIN
+    # build the planar sub-block of cw_deriv as a matrix (per-minute units)
+    a_cw = np.zeros((4, 4))
+    for j, e in enumerate(np.eye(4)):
+        full = np.array([e[0], e[1], 0.0, e[2], e[3], 0.0])
+        d = cw.cw_deriv(full, n, np.zeros(3))
+        a_cw[:, j] = [d[0], d[1], d[3], d[4]]
+    assert np.allclose(arch.A_ABORT[:4, :4], a_cw, atol=1e-12)
+
+
+def test_controlled_modes_are_stable():
+    for a in (arch.A_APPROACH, arch.A_ATTEMPT):
+        eig = np.linalg.eigvals(a[:4, :4])
+        assert np.all(eig.real < 0.0)
+
+
+def test_export_schema_and_roundtrip():
+    model = arch.export_model(abort_time=120.0)
+    js = json.loads(json.dumps(model))
+    assert [m["name"] for m in js["modes"]] == list(arch.MODE_NAMES)
+    assert len(js["transitions"]) == 3
+    assert js["initial"]["center"][0] == -900.0
+    a2 = np.array(js["modes"][1]["A"])
+    assert np.allclose(a2, arch.A_ATTEMPT)
+    # every halfspace has a 5-vector and a bound
+    for m in js["modes"]:
+        for h in m["invariant"]:
+            assert len(h["a"]) == 5
+    # no-abort variant has two modes only
+    assert len(arch.export_model(-1.0)["modes"]) == 2
+
+
+def test_simulation_specs_srna01():
+    """No-abort scenario: every corner of the initial set must reach the
+    attempt mode and satisfy LOS + velocity throughout — a necessary
+    condition for the set-based proof."""
+    for x0 in arch.initial_corners():
+        times, states, modes = arch.simulate(x0, abort_time=-1.0)
+        assert modes[-1] == 2  # reached and stayed in attempt mode
+        m = arch.spec_margins(states, modes)
+        assert m["los_cone"] > 0.0
+        assert m["velocity"] > 0.0
+        # progress: ends close to the origin
+        assert np.hypot(states[-1, 0], states[-1, 1]) < 5.0
+
+
+def test_simulation_specs_sra01():
+    """Abort at t=120 min: all three properties must hold from every
+    corner, and the abort mode must actually be entered."""
+    for x0 in arch.initial_corners():
+        times, states, modes = arch.simulate(x0, abort_time=120.0)
+        assert modes[-1] == 3
+        m = arch.spec_margins(states, modes)
+        assert m["los_cone"] > 0.0
+        assert m["velocity"] > 0.0
+        assert m["abort_avoidance"] > 0.0
+
+
+def test_clock_is_time():
+    _, states, _ = arch.simulate(arch.X0_CENTER, dt=0.02, horizon=10.0)
+    assert math.isclose(states[-1, 4], 10.0, rel_tol=1e-9)

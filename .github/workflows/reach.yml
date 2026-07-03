@@ -1,0 +1,48 @@
+name: reach
+
+# Reachability regression: re-prove the ARCH rendezvous safety properties
+# (LOS cone, velocity octagon, passive-abort target avoidance) from the
+# Podium-exported hybrid model whenever guidance/control/dynamics change.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/podium/core/**"
+      - "src/podium/guidance/**"
+      - "src/podium/control/**"
+      - "src/podium/sim/**"
+      - "tools/reach/**"
+      - ".github/workflows/reach.yml"
+  pull_request:
+    paths:
+      - "src/podium/core/**"
+      - "src/podium/guidance/**"
+      - "src/podium/control/**"
+      - "src/podium/sim/**"
+      - "tools/reach/**"
+      - ".github/workflows/reach.yml"
+  workflow_dispatch:
+  schedule:
+    - cron: "17 6 * * 1"  # weekly drift check
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+      - name: Export hybrid models
+        run: |
+          python -c "from podium.guidance import arch; arch.write_model('arch_srna01.json', -1.0); arch.write_model('arch_sra01.json', 120.0)"
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "1.11"
+      - uses: julia-actions/cache@v2
+      - name: Instantiate ReachabilityAnalysis
+        run: julia --project=tools/reach -e 'using Pkg; Pkg.instantiate()'
+      - name: Prove safety properties
+        run: julia --project=tools/reach tools/reach/arch_rendezvous.jl arch_srna01.json arch_sra01.json

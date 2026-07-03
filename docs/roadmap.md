@@ -66,9 +66,14 @@ headline addition is the ROE module, #5.)
       guarantees do not survive discretization unconditionally) (#9)
 - [x] Clarabel default solver (QOCO alternate deferred to the embedded
       path)
-- [ ] **ARCH-COMP rendezvous benchmark** as an executable example with
-      model export for reachability tools (CORA/JuliaReach), designed for
-      later use as a CI regression gate
+- [x] **ARCH-COMP rendezvous benchmark as a CI reachability gate** (#10):
+      executable Podium model (`guidance.arch`, abort mode verified to be
+      planar CW at GEO mean motion against `core.cw`), machine-readable
+      hybrid-automaton export, JuliaReach proof of the LOS-cone, velocity-
+      octagon, and abort-avoidance properties (SRNA01 + SRA01, ~14 s reach
+      time, PROVEN locally and gated in `.github/workflows/reach.yml` on
+      guidance/control/dynamics changes + weekly). Follow-up: Podium-
+      synthesized gains and STL-property checking (CORA lane)
 - [x] Spec registry v0 (#7, `podium.sim.spec`): named requirements with
       STL robust semantics over trace channels (PUS-12-shaped base
       fragment: always/eventually/final with windows), margins as pytest
