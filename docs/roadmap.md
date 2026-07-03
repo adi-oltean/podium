@@ -139,8 +139,14 @@ headline addition is the ROE module, #5.)
       open-loop pulse plans miss by hundreds of meters under 2% execution
       error while feedback through the same actuator converges).
       Thruster rise/tail-off shaping deferred to the 6-DOF layer (v0.4)
-- [ ] Attitude dynamics + quaternion-feedback controller; thruster
-      allocation with explicit minimum-impulse-bit handling
+- [x] Attitude dynamics + quaternion-feedback controller (#16):
+      rigid-body Euler equations + quaternion kinematics (RK4,
+      renormalized; torque-free energy and inertial angular momentum
+      conserved to 1e-9 through an intermediate-axis tumble);
+      shortest-way quaternion-feedback regulator with saturation —
+      detumble receipt and a 20-degree slew pinned to the second-order
+      design prediction (overshoot and settling of wn=0.1, zeta=0.9).
+      Thruster torque allocation deferred to the 6-DOF layer (v0.4)
 - [ ] Docking acceptance tests against the IDSS IDD Rev G contact-condition
       box (closing 0.05–0.10 m/s, lateral rate 0.04 m/s, angular rates
       0.20 deg/s, lateral offset 0.10 m, angular misalignment 4 deg)

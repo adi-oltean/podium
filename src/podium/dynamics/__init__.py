@@ -11,9 +11,10 @@ roe         Re-export of the relative-orbital-elements kernel
 nonlinear   Nonlinear two-body relative dynamics in the target LVLH frame,
             with optional J2 and exponential-atmosphere drag — the LEO/MEO
             truth model for validating linearized guidance.
-attitude    Rigid-body rotational dynamics (Euler equations) with reaction
-            wheel and thruster torque inputs.
+attitude    Rigid-body rotational dynamics (Euler equations, quaternion
+            kinematics, RK4) with body-frame torque input; conservation
+            receipts in tests/test_attitude.py.
 """
 
 from podium.core import cw, roe, ya  # noqa: F401
-from podium.dynamics import nonlinear  # noqa: F401
+from podium.dynamics import attitude, nonlinear  # noqa: F401
