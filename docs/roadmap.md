@@ -122,7 +122,14 @@ headline addition is the ROE module, #5.)
 
 ## v0.3 — "Full loop"
 
-- [ ] Relative-nav EKF (fixed-dimension, Joseph form, static subset)
+- [x] Relative-nav EKF (#14, `podium.nav.ekf`): fixed 6-state, Joseph-form
+      update (symmetry/PD preserved under roundoff, tested over 500-step
+      random sequences), white-noise-acceleration process model, CW STM
+      prediction with commanded burns fed through as known inputs.
+      Receipts: NIS within the chi-square band against the engine's
+      seeded truth; convergence from 100 m initial error; LQR flying on
+      EKF estimates from 5 m position-only measurements stabilizes the
+      nonlinear truth closed-loop
 - [ ] Sensor models: relative GNSS, docking camera, lidar; actuator MIB/rise
 - [ ] Attitude dynamics + quaternion-feedback controller; thruster
       allocation with explicit minimum-impulse-bit handling

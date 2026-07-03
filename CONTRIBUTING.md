@@ -36,6 +36,30 @@ Multi-orbit truth-model propagations are marked `slow`; use
 `pytest -m "not slow"` for the fast lane (<5 s) during development. CI
 runs the full suite.
 
+## Documentation upkeep
+
+Code changes are not done until the docs that describe them are current.
+These files describe the *state* of the project and must be refreshed
+whenever the code they summarize changes:
+
+| Document | Refresh when... | Staleness risk |
+|---|---|---|
+| `README.md` (status line, pillar list, layout tree, doc table) | any module lands, a milestone completes, a live demo changes | high — it is the front door |
+| `docs/roadmap.md` | every issue closes (check the box, record measured results honestly, note deferrals with issue numbers) | high |
+| `docs/architecture.md` | module boundaries, dataflow, truth-model fidelity, or conventions change | medium |
+| `docs/verification.md` | static-subset rules, contract semantics, or the verification pipeline change | medium |
+| `docs/comparative-analysis.md` | periodically (quarterly): competitor releases, ecosystem-gap claims ("no other open implementation") must be re-verified before repeating them | medium, time-driven |
+| `docs/trajectory-optimization.md` | guidance-layer capabilities or solver choices change | medium |
+| `docs/visualization.md` | viewer architecture changes | low |
+| `docs/plans/NN-*.md` | written at issue start, acceptance boxes checked at close; historical afterwards (do not retro-edit closed plans except to fix errors) | low after close |
+| Package docstrings (`src/podium/*/__init__.py`) | a module in that package lands or changes scope — these are the API-level docs | medium |
+| `pyproject.toml` extras + `CONTRIBUTING.md` commands | dependencies or dev workflow change | low |
+| `viewer/` demo pages | exported-data schema or control laws they embed change | low |
+
+Rule of thumb for PRs: touch code in `src/podium/X/`, then check the
+README layout tree, the roadmap item that covers X, `X/__init__.py`, and
+`docs/architecture.md` in that order.
+
 ## License
 
 By contributing you agree your contributions are licensed under MIT.

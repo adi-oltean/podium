@@ -4,7 +4,7 @@
 
 Podium is an open-source framework for *developing, testing, and formally validating* guidance, navigation & control algorithms for spacecraft rendezvous and docking. It is Python-first for iteration speed, but the algorithm core is written in a deliberately restricted style (the *static subset*) so that flight algorithms translate mechanically to C and can be proven safe by an external abstract-interpretation tool.
 
-> Status: pre-alpha. Implemented and tested: the CW kernel, **Yamanaka-Ankersen STM** and **relative-orbital-elements kernel** (Koenig Keplerian/J2 STMs, e/i-vector passive safety — no other open implementations exist), the nonlinear truth model (J2 + differential drag), quaternion kernel, glideslope guidance, LQR, and pulsed docking control. See [`docs/roadmap.md`](docs/roadmap.md).
+> Status: alpha — v0.1 and v0.2 complete, v0.3 in progress. Implemented and tested: the CW kernel, **Yamanaka-Ankersen STM** and **relative-orbital-elements kernel** (Koenig Keplerian/J2/J2+drag STMs, e/i-vector passive safety — no other open implementations exist), the nonlinear truth model (J2 + differential drag + seeded stochastic atmosphere), the deterministic sim engine with an STL-semantics spec registry, **convex Layer-0 guidance** (DPP-compiled impulsive planning on CW/YA/ROE, LCvx finite-burn with losslessness audit and primer certificate, approach-cone/KOZ/plume/passive-safety constraints, MIB quantization bridge), LQR (discrete + continuous CARE), pulsed docking control, a Joseph-form **relative-nav EKF**, and the **ARCH-COMP rendezvous benchmark wired as a CI reachability gate** — every guidance/control/dynamics commit re-proves LOS-cone, velocity, and abort-avoidance safety with JuliaReach, for both the published reference controller and Podium-synthesized gains. See [`docs/roadmap.md`](docs/roadmap.md).
 
 ## Why another space simulator?
 
@@ -12,8 +12,9 @@ Mature tools exist — Basilisk, NASA 42, Trick, Orekit, GMAT — and Podium doe
 
 1. **RPOD as the first-class problem.** Relative motion (CW/Tschauner-Hempel), approach corridors, keep-out zones, plume impingement, passive abort safety, and docking contact — not an afterthought bolted onto an orbit propagator.
 2. **A verification-ready algorithm core.** GNC algorithms written as pure, statically-shaped, bounded-loop step functions with machine-readable contracts — the style that abstract interpretation (Astrée-class tools) can actually prove things about, and that translates line-for-line to embedded C.
-3. **Convex trajectory optimization built in.** Direct SOCP transcription of relative dynamics plus successive convexification for the nonconvex constraints (keep-out zones, plume), following the G-FOLD / SCvx lineage (planned; see the roadmap).
-4. **A sandbox you can trust.** Deterministic fixed-step simulation (bit-identical replays), truth/flight separation, seeded Monte Carlo, and cross-validation hooks against established stacks.
+3. **Convex trajectory optimization built in.** Direct LP/SOCP transcription on the exact CW/YA/ROE discretizations (DPP-compiled, Clarabel), lossless-convexification finite-burn planning shipped with validity audits rather than assumptions, and a constraint library (approach cone, rotating-hyperplane KOZ, plume, Breger-How passive-safety scenarios) — successive convexification for the remaining nonconvexities is the v0.4 layer.
+4. **A sandbox you can trust.** Deterministic fixed-step simulation (bit-identical replays, enforced by test), truth/flight separation, seeded noise and stochastic atmosphere, STL-robustness spec oracles, and cross-validation hooks against established stacks.
+5. **Verification as a regression, not a ceremony.** The ARCH-COMP rendezvous benchmark runs as a CI gate: reachability analysis re-proves closed-loop safety properties on every relevant commit — including for controllers synthesized by Podium's own LQR machinery.
 
 ## Layout
 
@@ -21,23 +22,29 @@ Mature tools exist — Basilisk, NASA 42, Trick, Orekit, GMAT — and Podium doe
 src/podium/
   core/        Verifiable algorithm core (static subset): CW dynamics & STM,
                Yamanaka-Ankersen STM (elliptic orbits), relative orbital
-               elements (Koenig Keplerian/J2 STMs, LVLH maps, control
-               matrix), quaternion kernel, fixed-step integrators
-  dynamics/    Truth models: Tschauner-Hempel, nonlinear relative motion,
-               J2 + drag, rigid-body attitude
-  guidance/    Glideslope, multi-impulse targeting, convex/SCP trajectory
-               optimization, passive-safety checks
-  control/     LQR (offline synthesis / flight-side gain application),
-               attitude control, thruster allocation
-  nav/         Relative-navigation EKF, sensor models (RGPS, camera, lidar)
-  sim/         Deterministic engine, events (contact/KOZ/abort), Monte Carlo
-  viz/         Analysis plots + interactive three.js viewer
+               elements (Koenig Keplerian/J2/J2+drag STMs, LVLH maps,
+               control matrix), quaternion kernel, fixed-step integrators
+  dynamics/    Truth models: nonlinear dual-ECI relative motion, J2 + drag
+               (+ seeded stochastic atmosphere), eccentric-valid ROE map,
+               rigid-body attitude (planned)
+  guidance/    Glideslope, convex Layer-0 (impulsive DPP planners on
+               CW/YA/ROE, LCvx finite-burn + audits, constraint library,
+               MIB bridge), passive-safety metrics, ARCH benchmark model
+  control/     LQR (discrete Riccati + continuous CARE synthesis,
+               flight-side gain application), pulsed docking control,
+               CW/YA ZOH discretizations
+  nav/         Relative-navigation EKF (Joseph form); sensor models next
+  sim/         Deterministic engine, spec registry (STL robust semantics),
+               analysis plots; Monte Carlo campaigns next
+  viz/         Interactive three.js viewer (planned; canvas viewer live)
   verify/      Contracts (input ranges, invariants) + export to the external
                abstract-interpretation validation tool
-tests/         pytest + hypothesis property tests
+tools/reach/   JuliaReach reachability regression (CI gate)
+tests/         pytest receipts (truth-model validations, closed-loop
+               flights, statistical consistency, audits)
 examples/      Runnable scenarios (V-bar approach, ...)
 docs/          Architecture, comparative analysis, trajectory optimization,
-               verification approach, roadmap
+               verification approach, roadmap, per-issue plans
 ```
 
 **Live demos:**
@@ -77,7 +84,8 @@ dv1, dv2 = cw.two_impulse(x0, np.zeros(6), n, 1500.0)
 | [`docs/comparative-analysis.md`](docs/comparative-analysis.md) | Survey of existing simulators; build-on vs interop decisions |
 | [`docs/verification.md`](docs/verification.md) | Static subset rules, contract→annotation mapping, validation flow |
 | [`docs/visualization.md`](docs/visualization.md) | Rendering architecture (patterns adopted from fermi) |
-| [`docs/roadmap.md`](docs/roadmap.md) | Milestones toward v0.1 |
+| [`docs/roadmap.md`](docs/roadmap.md) | Milestones and per-release status (v0.1/v0.2 complete, v0.3 current) |
+| [`docs/plans/`](docs/plans/) | One design/receipt plan per numbered issue |
 
 ## License
 

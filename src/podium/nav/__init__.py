@@ -8,3 +8,5 @@ sensors  Measurement models with error budgets: relative GNSS (carrier-phase
          differential), vision-based bearing/range (docking camera + fiducial
          markers), lidar/rangefinder, and star-tracker/gyro attitude.
 """
+
+from podium.nav import ekf  # noqa: F401

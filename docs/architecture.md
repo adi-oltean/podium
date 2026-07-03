@@ -47,7 +47,7 @@ Some algorithms straddle the line deliberately — e.g. LQR: the Riccati recursi
 
 ## Truth models (sandbox side)
 
-- Nonlinear two-body relative motion in the target LVLH frame (exact, no linearization), with **J2** and **exponential-atmosphere drag** — the dominant LEO perturbations for RPOD timescales. Differential drag matters for dissimilar chaser/target ballistic coefficients.
+- Nonlinear two-body relative motion in the target LVLH frame (exact, no linearization), with **J2** and **exponential-atmosphere drag** — the dominant LEO perturbations for RPOD timescales. Differential drag matters for dissimilar chaser/target ballistic coefficients. An optional seeded mean-reverting (OU) density perturbation covers storm-class dispersion while preserving bit-identical replay (exact discretization on a fixed time grid).
 - Tschauner-Hempel (Yamanaka-Ankersen STM) for eccentric targets; CW for near-circular.
 - Relative orbital elements (quasi-nonsingular ROE) with Koenig closed-form Keplerian/J2 STMs for perturbed multi-orbit relative motion, plus the e/i-vector passive-safety geometry (`podium.guidance.safety`). ROE STMs propagate mean elements; the osculating/mean distinction is handled truth-side and documented in the tests.
 - Rigid-body attitude with reaction-wheel and thruster torques; thruster minimum-impulse-bit and rise/tail-off shaping.
@@ -64,6 +64,8 @@ sensors(truth) → nav filter (EKF, core) → guidance (waypoint/optimal traj, c
 ```
 
 Each core block is a pure function of `(state, measurement/reference, params)`. Blocks are individually replaceable — swapping a glideslope for an SCP-generated trajectory changes one constructor argument in the scenario config.
+
+Implemented so far along this dataflow: the deterministic engine (`podium.sim.engine`, impulsive flight-block interface v0), the relative-nav EKF (`podium.nav.ekf`: Joseph-form update, white-noise-acceleration process model, commanded burns fed through prediction as known inputs; NEES/NIS consistency enforced by test), LQR/glideslope/pulsed-docking control, and the convex Layer-0 planners. Sensor truth models and the continuous-thrust interface are the open v0.3 items.
 
 ## Mission phases (typical LEO profile)
 
