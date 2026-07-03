@@ -191,6 +191,10 @@ headline addition is the ROE module, #5.)
       Receipt: a coarse grid whose coast dips inside the sphere between
       nodes is caught and cut. Integral-augmentation CTCS (for future
       non-coast dynamics) and state-triggered constraints stay open
+- [ ] 6-DOF attitude-coupled PTR (body-frame thrust, contact attitude,
+      angular corridors) — the consciously deferred remainder of the
+      PTR and contact items above; pairs with the thruster torque
+      allocation deferred from v0.3
 - [x] Temporal-logic mission constraints in SCP (#22,
       `EventuallyBoxSpec`): timed-window reach specs via smooth
       robustness with a SOUND encoding split — node box margins enter
