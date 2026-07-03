@@ -60,6 +60,44 @@ def min_rn_separation(roe: F64, a: float) -> float:
     return a * math.sqrt(min_sep2)
 
 
+def min_rn_separation_analytic(roe: F64, a: float) -> float:
+    """Exact minimum RN-plane separation [m] (no scan).
+
+    The RN-plane trajectory is r(u) = c + P [cos u, sin u]^T with
+    c = (da, 0), P = [[-dex, -dey], [-diy, dix]] (units of a). Stationary
+    points of ||r(u)||^2 satisfy Re(alpha z + beta z^2) = 0 on |z| = 1
+    (z = e^{iu}), i.e. the quartic beta z^4 + alpha z^3 + conj(alpha) z
+    + conj(beta) = 0 with alpha = b1 + i b0, beta = M01 - 0.5 (M11 -
+    M00) i, where M = P^T P and b = P^T c. We take the minimum of
+    ||r(u)|| over the unit-circle roots — exact up to root-finding
+    precision, validated against dense scans in the tests. The 360-point
+    scan remains the bounded static-subset-friendly variant.
+    """
+    c = np.array([float(roe[0]), 0.0])
+    p = np.array([[-float(roe[2]), -float(roe[3])],
+                  [-float(roe[5]), float(roe[4])]])
+    m = p.T @ p
+    b = p.T @ c
+    alpha = complex(b[1], b[0])
+    beta = complex(m[0, 1], -0.5 * (m[1, 1] - m[0, 0]))
+    coeffs = np.array([beta, alpha, 0.0, np.conj(alpha), np.conj(beta)])
+    if np.max(np.abs(coeffs)) < 1e-300:
+        # f is constant: circle centered on the origin (or zero geometry)
+        return a * float(np.linalg.norm(c))
+    # strip leading (numerical) zeros so np.roots sees the true degree
+    nz = int(np.argmax(np.abs(coeffs) > 1e-18 * float(np.max(np.abs(coeffs)))))
+    roots = np.roots(coeffs[nz:])
+    best = math.inf
+    for z in roots:
+        if abs(abs(z) - 1.0) < 1e-6:
+            u = float(np.angle(z))
+            w = np.array([math.cos(u), math.sin(u)])
+            best = min(best, float(np.linalg.norm(c + p @ w)))
+    if math.isinf(best):  # numerically degenerate: fall back to the scan
+        return min_rn_separation(roe, a)
+    return a * best
+
+
 def rn_margin(roe: F64, a: float, keep_out_radius: float) -> float:
     """Passive-safety margin [m]: min RN-plane separation minus KOZ radius.
 

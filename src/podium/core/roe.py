@@ -154,6 +154,32 @@ def stm_j2(
     return phi
 
 
+@contract(e=Interval(0.0, 0.9), inc=Interval(1e-3, 3.14))
+def stm_j2_drag(
+    mu: float, j2: float, r_body: float, a: float, e: float, inc: float, argp: float, dt: float
+) -> F64:
+    """Koenig density-model-free J2+drag STM on the augmented 7-state
+    [da, dl, dex, dey, dix, diy, dadot], dadot = d(da)/dt.
+
+    Differential drag is modeled as a CONSTANT relative semi-major-axis
+    decay rate (estimated by the filter, not derived from a density
+    model — hence density-model-free; near-circular differential-drag
+    assumption: e-vector decay neglected). da(t) = da0 + dadot*t, so
+    every secular rate that couples to da accumulates dadot with weight
+    t^2/2 instead of t: the new column is the J2 STM's da column scaled
+    by dt/2, plus the identity coupling da <- dadot*dt. Pinned entrywise
+    in tests by an FD Jacobian of the exact augmented flow (closed-form
+    time integrals of the rates along a(t)).
+    """
+    phi = np.eye(7)
+    phi6 = stm_j2(mu, j2, r_body, a, e, inc, argp, dt)
+    phi[0:6, 0:6] = phi6
+    phi[0, 6] = dt
+    for i in range(1, 6):
+        phi[i, 6] = phi6[i, 0] * (0.5 * dt)
+    return phi
+
+
 @contract(n=Interval(1e-5, 1e-2))
 def map_roe_to_lvlh(roe: F64, a: float, n: float, u: float) -> F64:
     """First-order near-circular map: ROE -> LVLH state [m, m/s].

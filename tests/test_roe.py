@@ -255,3 +255,172 @@ def test_rn_margin_sign():
     r = np.array([0.0, 0.0, 4e-5, 0.0, 4e-5, 0.0])  # aligned, ~280 m RN
     assert safety.rn_margin(r, a, 200.0) > 0.0
     assert safety.rn_margin(r, a, 400.0) < 0.0
+
+
+# --- #6 follow-ups: drag STM, eccentric map, analytic screening --------
+
+
+def _int_pow(a0, rate, m, t):
+    """Integral of (a0 + rate*s)^m ds over [0, t], series in xi = rate*t/a0.
+
+    The naive closed form ((a0+rt)^(m+1) - a0^(m+1))/(r(m+1)) is
+    catastrophically cancelling for the tiny rates the FD check uses (the
+    dadot-sensitive part sits below the subtraction's rounding noise);
+    the series is exact to ~xi^4 ~ 1e-24 here."""
+    xi = rate * t / a0
+    return a0**m * t * (
+        1.0
+        + m * xi / 2.0
+        + m * (m - 1.0) * xi * xi / 6.0
+        + m * (m - 1.0) * (m - 2.0) * xi**3 / 24.0
+    )
+
+
+def flow_mean_j2_drag(el, dadot, a_chief, dt, mu=MU, j2=J2, re=RE):
+    """Exact secular flow of deputy mean elements under Keplerian + J2
+    with a(s) = a0 + a_chief*dadot*s (density-model-free differential
+    drag: constant relative sma decay, e and inc held). Closed-form time
+    integrals — the oracle for the augmented STM."""
+    a0, e, inc = el[0], el[1], el[2]
+    rate = a_chief * dadot
+    eta = math.sqrt(1.0 - e * e)
+    kfac = 0.75 * j2 * math.sqrt(mu) * re * re / eta**4
+    ci = math.cos(inc)
+    i_m35 = _int_pow(a0, rate, -3.5, dt)
+    i_m15 = _int_pow(a0, rate, -1.5, dt)
+    out = el.copy()
+    out[0] = a0 + rate * dt
+    out[3] = el[3] - 2.0 * kfac * ci * i_m35
+    out[4] = el[4] + kfac * (5.0 * ci * ci - 1.0) * i_m35
+    out[5] = el[5] + math.sqrt(mu) * i_m15 + kfac * eta * (3.0 * ci * ci - 1.0) * i_m35
+    return out
+
+
+def test_j2_drag_stm_matches_flow_jacobian():
+    """Central-difference Jacobian of the exact augmented flow pins every
+    entry of the 7x7 density-model-free J2+drag STM."""
+    dt = 20_000.0
+    phi = roe.stm_j2_drag(MU, J2, RE, CHIEF[0], CHIEF[1], CHIEF[2], CHIEF[4], dt)
+    h7 = np.array([1e-8] * 6 + [1e-10])  # dadot in 1/s: scale h to the units
+    jac = np.zeros((7, 7))
+    for k in range(7):
+        dp = np.zeros(7)
+        dp[k] = h7[k]
+        el_p = roe.elements_from_roe(CHIEF, dp[:6])
+        el_m = roe.elements_from_roe(CHIEF, -dp[:6])
+        chief_t = flow_mean_j2_drag(CHIEF, 0.0, CHIEF[0], dt)
+        dep_p = flow_mean_j2_drag(el_p, dp[6], CHIEF[0], dt)
+        dep_m = flow_mean_j2_drag(el_m, -dp[6], CHIEF[0], dt)
+        roe_p = np.concatenate([roe.roe_from_elements(chief_t, dep_p), [dp[6]]])
+        roe_m = np.concatenate([roe.roe_from_elements(chief_t, dep_m), [-dp[6]]])
+        jac[:, k] = (roe_p - roe_m) / (2.0 * h7[k])
+    assert np.allclose(phi, jac, rtol=3e-5, atol=3e-5)
+
+
+def test_j2_drag_stm_reduces_to_j2():
+    dt = 8_000.0
+    phi7 = roe.stm_j2_drag(MU, J2, RE, CHIEF[0], CHIEF[1], CHIEF[2], CHIEF[4], dt)
+    phi6 = roe.stm_j2(MU, J2, RE, CHIEF[0], CHIEF[1], CHIEF[2], CHIEF[4], dt)
+    assert np.allclose(phi7[:6, :6], phi6, atol=1e-18)
+    assert phi7[0, 6] == dt
+    assert np.allclose(phi7[6, :6], 0.0)
+
+
+@pytest.mark.slow
+def test_j2_drag_stm_vs_truth_differential_drag():
+    """Dual-ECI truth with differential ballistic coefficients: extract
+    dadot from the first orbit, then the augmented STM must predict the
+    quadratic mean-longitude runaway over 8 orbits. Tolerance reflects
+    drag decay not being exactly linear and orbit-averaging residue."""
+    a = 6_778_137.0
+    n = math.sqrt(MU / a**3)
+    period = 2 * math.pi / n
+    orbits = 8
+    cfg = nl.ForceConfig(j2=J2, drag=nl.DragConfig(rho0=1e-11))
+    rv0 = np.concatenate(nl.elements_to_rv(a, 0.001, 0.9, 0.5, 1.2, 0.3, MU))
+    times, x_rel, rv_t = nl.propagate_relative(
+        rv0, np.zeros(6), orbits * period, dt=5.0, cfg=cfg,
+        bc_target=200.0, bc_chaser=40.0,
+    )
+    # orbit-averaged osculating ROE per orbit (co-located start: roe0 = 0)
+    steps = len(times) - 1
+    per_orbit = steps // orbits
+    roe_hist = np.zeros((orbits, 6))
+    for k in range(orbits):
+        sl = slice(k * per_orbit, (k + 1) * per_orbit)
+        acc = np.zeros(6)
+        for i in range(sl.start, sl.stop):
+            el_c = nl.elements_from_rv(rv_t[i, 0:3], rv_t[i, 3:6], MU)
+            rv_c_full = nl.lvlh_to_eci(rv_t[i], x_rel[i], cfg, 200.0)
+            el_d = nl.elements_from_rv(rv_c_full[0:3], rv_c_full[3:6], MU)
+            acc += roe.roe_from_elements(el_c, el_d)
+        roe_hist[k] = acc / per_orbit
+    # dadot from the first-orbit da slope
+    dadot = (roe_hist[1, 0] - roe_hist[0, 0]) / period
+    t_span = (orbits - 1) * period
+    phi = roe.stm_j2_drag(MU, J2, RE, a, 0.001, 0.9, 1.2, t_span)
+    roe7_0 = np.concatenate([roe_hist[0], [dadot]])
+    pred = phi @ roe7_0
+    dl_truth = roe_hist[-1, 1] - roe_hist[0, 1]
+    dl_pred = pred[1] - roe_hist[0, 1]
+    assert abs(dl_truth) * a > 100.0  # the effect is macroscopic (>100 m)
+    assert abs(dl_pred - dl_truth) < 0.25 * abs(dl_truth)
+    # and the da prediction tracks the decay trend
+    assert abs(pred[0] - roe_hist[-1, 0]) < 0.35 * abs(roe_hist[-1, 0] - roe_hist[0, 0])
+
+
+def test_eccentric_map_reduces_to_near_circular():
+    a = 6_900_000.0
+    n = math.sqrt(MU / a**3)
+    chief = np.array([a, 1e-8, math.radians(51.0), 0.4, 0.7, 1.3])
+    r0 = np.array([1e-5, -6e-5, 2e-5, -1.5e-5, 1.2e-5, 2.5e-5])
+    u = chief[4] + chief[5]  # = argp + M ~ argp + nu at e ~ 0
+    x_ecc = nl.map_roe_to_lvlh_eccentric(r0, chief, MU)
+    x_circ = roe.map_roe_to_lvlh(r0, a, n, u)
+    # near-circular map is itself O(e)-accurate; at e=1e-8 they must agree
+    assert np.allclose(x_ecc[:3], x_circ[:3], atol=2e-3)
+    assert np.allclose(x_ecc[3:], x_circ[3:], atol=1e-6)
+
+
+def test_eccentric_map_first_order_exactness():
+    """The Jacobian map's error against the exact nonlinear separation
+    must scale quadratically with ROE size — first-order in ROE at any
+    eccentricity (here e = 0.3, far outside the near-circular map)."""
+    chief = np.array([7_200_000.0, 0.3, math.radians(60.0), 1.0, 0.8, 2.1])
+    r_base = np.array([2e-5, -8e-5, 4e-5, -3e-5, 2e-5, 5e-5])
+    errs = []
+    for scale in (1.0, 0.5):
+        r0 = scale * r_base
+        dep = roe.elements_from_roe(chief, r0)
+        x_exact = nl.eci_to_lvlh(
+            nl._rv_from_mean_elements(chief, MU),
+            nl._rv_from_mean_elements(dep, MU),
+            nl.ForceConfig(mu=MU), 1.0,
+        )
+        x_map = nl.map_roe_to_lvlh_eccentric(r0, chief, MU)
+        errs.append(float(np.linalg.norm(x_map[:3] - x_exact[:3])))
+    assert errs[0] / errs[1] > 3.0  # quadratic in the ROE scale
+    sep = float(np.linalg.norm(x_exact[:3]))
+    assert errs[1] < 0.02 * sep  # small in absolute terms too
+
+
+def test_analytic_min_rn_matches_dense_scan():
+    """The quartic-root minimum equals a 200k-point scan to high
+    precision across seeded random geometries — the scan is the oracle,
+    the analytic form is the product."""
+    rng = np.random.default_rng(123)
+    a = 7_000_000.0
+    us = np.linspace(0.0, 2 * math.pi, 200_000, endpoint=False)
+    cu, su = np.cos(us), np.sin(us)
+    for _ in range(60):
+        r = rng.normal(0.0, 3e-5, 6)
+        x = r[0] - r[2] * cu - r[3] * su
+        z = r[4] * su - r[5] * cu
+        dense = a * float(np.sqrt(np.min(x * x + z * z)))
+        analytic = safety.min_rn_separation_analytic(r, a)
+        assert analytic <= dense + 1e-6  # true min is <= any sampled value
+        assert abs(analytic - dense) < 1e-6 * a * 3e-5 + 1e-4 * max(dense, 1e-9)
+    # degenerate geometries
+    assert safety.min_rn_separation_analytic(np.zeros(6), a) == 0.0
+    circ = np.array([2e-5, 0.0, 0.0, 0.0, 0.0, 0.0])  # pure radial offset
+    assert abs(safety.min_rn_separation_analytic(circ, a) - a * 2e-5) < 1e-6

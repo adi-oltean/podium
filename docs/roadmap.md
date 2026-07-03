@@ -47,9 +47,17 @@ headline addition is the ROE module, #5.)
       ROE↔elements and ROE↔LVLH maps, Koenig closed-form Keplerian and J2
       STMs (every J2 entry pinned by a finite-difference Jacobian of the
       exact secular flow), impulsive control-input matrix (validated by
-      finite-difference impulses in the ECI truth model). Follow-up (#6):
-      J2+differential-drag STM variant, eccentric-valid LVLH map,
-      analytic minimum-separation ellipse screening
+      finite-difference impulses in the ECI truth model)
+- [x] ROE follow-ups (#6): density-model-free **J2+drag STM** (augmented
+      7-state with constant relative sma-decay rate; pinned by an FD
+      Jacobian of the exact augmented flow with closed-form rate
+      integrals, and validated against the differential-BC truth over 8
+      orbits — quadratic mean-longitude runaway within 25%);
+      **eccentric-valid ROE→LVLH map** (Jacobian of the exact nonlinear
+      chain, sandbox side; first-order-exact at e=0.3 by quadratic-
+      scaling test); **analytic min-RN-separation** (quartic stationary
+      points on the unit circle, matches 200k-point scans to 1e-4
+      relative; the bounded scan remains the static-subset variant)
 - [x] **ROE-native passive safety** (`podium.guidance.safety`): e/i-vector
       separation angle and RN-plane minimum-separation screening
       (along-track-drift-independent lower bound), validated against

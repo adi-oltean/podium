@@ -27,7 +27,8 @@ import numpy as np
 from numpy.typing import NDArray
 
 from podium import constants as const
-from podium.core import integrators
+from podium.core import integrators, ya
+from podium.core import roe as roe_mod
 
 F64 = NDArray[np.float64]
 
@@ -240,6 +241,46 @@ def lvlh_to_eci(rv_target: F64, x_lvlh: F64, cfg: ForceConfig, bc_target: float)
     rc = rt + rot.T @ x_lvlh[0:3]
     vc = vt + rot.T @ (x_lvlh[3:6] + np.cross(omega, x_lvlh[0:3]))
     return np.concatenate([rc, vc])
+
+
+def _rv_from_mean_elements(el: F64, mu: float) -> F64:
+    """ECI state from mean elements [a, e, inc, raan, argp, M] (two-body:
+    mean == osculating)."""
+    ecc = ya.kepler_eccentric(float(el[5]), float(el[1]))
+    nu = ya.true_from_eccentric(ecc, float(el[1]))
+    r, v = elements_to_rv(el[0], el[1], el[2], el[3], el[4], nu, mu)
+    return np.concatenate([r, v])
+
+
+def roe_lvlh_jacobian(chief: F64, mu: float, h: float = 1e-7) -> F64:
+    """Eccentric-valid first-order ROE -> LVLH map (6x6 Jacobian).
+
+    Central-difference Jacobian of the EXACT nonlinear chain
+    roe -> deputy elements -> ECI -> LVLH about the chief's mean elements
+    [a, e, inc, raan, argp, M] — valid at any eccentricity the element
+    conversions support, unlike the O(e) near-circular map in
+    podium.core.roe. Sandbox-side by design (the differencing is not
+    static-subset); the truncation is O(|roe|^2) like any first-order
+    map, quantified in the validity-envelope tests.
+    """
+    rv_c = _rv_from_mean_elements(chief, mu)
+    cfg = ForceConfig(mu=mu)
+    jac = np.zeros((6, 6))
+    for k in range(6):
+        dp = np.zeros(6)
+        dp[k] = h
+        el_p = roe_mod.elements_from_roe(chief, dp)
+        el_m = roe_mod.elements_from_roe(chief, -dp)
+        x_p = eci_to_lvlh(rv_c, _rv_from_mean_elements(el_p, mu), cfg, 1.0)
+        x_m = eci_to_lvlh(rv_c, _rv_from_mean_elements(el_m, mu), cfg, 1.0)
+        jac[:, k] = (x_p - x_m) / (2.0 * h)
+    return jac
+
+
+def map_roe_to_lvlh_eccentric(roe: F64, chief: F64, mu: float) -> F64:
+    """First-order eccentric-valid ROE -> LVLH state via roe_lvlh_jacobian."""
+    out: F64 = roe_lvlh_jacobian(chief, mu) @ roe
+    return out
 
 
 def _deriv(cfg: ForceConfig, bc_target: float, bc_chaser: float) -> integrators.Deriv:
