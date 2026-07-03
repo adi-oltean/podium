@@ -45,7 +45,9 @@ class _FuncMeta:
     param_order: list[str] = field(default_factory=list)
     param_arrays: dict[str, int] = field(default_factory=dict)  # name->len
     out_shape: tuple[int, ...] | None = None  # None => returns scalar
+    out_eye: bool = False  # identity-initialized return array (np.eye)
     contracts: dict = field(default_factory=dict)
+    globals_: dict = field(default_factory=dict)
 
 
 def _mangle(func: Callable) -> str:
@@ -81,18 +83,24 @@ def _analyze(func: Callable) -> tuple[_FuncMeta, ast.FunctionDef]:
     fn = func.__name__
     meta = _FuncMeta(py_name=fn, c_name=_mangle(func))
     meta.contracts = getattr(func, "__podium_contract__", {})
+    meta.globals_ = getattr(func, "__wrapped__", func).__globals__
     meta.param_order = [a.arg for a in node.args.args]
     if node.args.vararg or node.args.kwarg or node.args.kwonlyargs \
             or node.args.defaults:
         raise EmitError(f"{fn}: only plain positional parameters supported")
 
-    # array-ness + minimum lengths from constant subscripts
+    # array-ness + minimum lengths from constant subscripts (loop-var
+    # indices contribute array-ness but no size bound)
     sizes: dict[str, int] = {}
     for sub in ast.walk(node):
         if isinstance(sub, ast.Subscript) and isinstance(sub.value, ast.Name):
             name = sub.value.id
             if name in meta.param_order:
-                idx = _const_index(sub.slice, fn)
+                try:
+                    idx = _const_index(sub.slice, fn)
+                except EmitError:
+                    sizes.setdefault(name, 0)
+                    continue
                 if len(idx) != 1:
                     raise EmitError(f"{fn}: 2-D parameter arrays unsupported")
                 sizes[name] = max(sizes.get(name, 0), idx[0] + 1)
@@ -108,9 +116,15 @@ def _analyze(func: Callable) -> tuple[_FuncMeta, ast.FunctionDef]:
                     and st.targets[0].id == ret_name
                     and isinstance(st.value, ast.Call)
                     and isinstance(st.value.func, ast.Attribute)
-                    and st.value.func.attr in ("empty", "zeros")):
+                    and st.value.func.attr in ("empty", "zeros", "eye")):
                 arg = st.value.args[0]
-                if isinstance(arg, ast.Constant):
+                if st.value.func.attr == "eye":
+                    if not isinstance(arg, ast.Constant):
+                        raise EmitError(f"{fn}: non-constant eye size")
+                    k = int(arg.value)
+                    meta.out_shape = (k, k)
+                    meta.out_eye = True
+                elif isinstance(arg, ast.Constant):
                     meta.out_shape = (int(arg.value),)
                 elif isinstance(arg, ast.Tuple):
                     meta.out_shape = tuple(
@@ -130,6 +144,7 @@ class _Emitter(ast.NodeVisitor):
         self.ret_name: str | None = None
         self.zero_init = False
         self.tmp_n = 0
+        self.loop_vars: set[str] = set()
 
     # -- expressions ----------------------------------------------------
     def expr(self, e: ast.expr) -> str:
@@ -138,7 +153,14 @@ class _Emitter(ast.NodeVisitor):
                 raise EmitError(f"{self.m.py_name}: unsupported constant {e.value!r}")
             return repr(float(e.value))
         if isinstance(e, ast.Name):
-            return e.id
+            if (e.id in self.declared or e.id in self.loop_vars
+                    or e.id in self.m.param_order or e.id == self.ret_name):
+                return e.id
+            # module-level numeric constant (e.g. _TWO_PI): inline it
+            g = self.m.globals_.get(e.id)
+            if isinstance(g, (int, float)) and not isinstance(g, bool):
+                return repr(float(g))
+            raise EmitError(f"{self.m.py_name}: unknown name {e.id!r}")
         if isinstance(e, ast.UnaryOp) and isinstance(e.op, ast.USub):
             return f"(-{self.expr(e.operand)})"
         if isinstance(e, ast.BinOp):
@@ -148,8 +170,8 @@ class _Emitter(ast.NodeVisitor):
                     return f"({self.expr(e.left)} {sym} {self.expr(e.right)})"
             raise EmitError(f"{self.m.py_name}: unsupported operator")
         if isinstance(e, ast.Subscript) and isinstance(e.value, ast.Name):
-            idx = _const_index(e.slice, self.m.py_name)
-            return e.value.id + "".join(f"[{i}]" for i in idx)
+            name = ("out" if e.value.id == self.ret_name else e.value.id)
+            return name + self._index_c(e.slice)
         if isinstance(e, ast.Compare):
             if len(e.ops) != 1:
                 raise EmitError(f"{self.m.py_name}: chained comparison")
@@ -163,6 +185,36 @@ class _Emitter(ast.NodeVisitor):
             return self.call_expr(e)
         raise EmitError(f"{self.m.py_name}: unsupported expression "
                         f"{ast.dump(e)[:60]}")
+
+    def _range_bound(self, st: ast.For) -> int:
+        """Bounded `for _ in range(N)`: N a literal or a module-level
+        integer constant — compile-time loop bounds, per the subset."""
+        it = st.iter
+        if not (isinstance(it, ast.Call) and isinstance(it.func, ast.Name)
+                and it.func.id == "range" and len(it.args) == 1):
+            raise EmitError(f"{self.m.py_name}: only range(N) loops")
+        arg = it.args[0]
+        if isinstance(arg, ast.Constant) and isinstance(arg.value, int):
+            return arg.value
+        if isinstance(arg, ast.Name):
+            g = self.m.globals_.get(arg.id)
+            if isinstance(g, int) and not isinstance(g, bool):
+                return g
+        raise EmitError(f"{self.m.py_name}: loop bound not compile-time")
+
+    def _index_c(self, node: ast.expr) -> str:
+        """Subscript index -> C brackets: constant ints, loop vars, or a
+        tuple mixing them."""
+        elts = node.elts if isinstance(node, ast.Tuple) else [node]
+        parts = []
+        for e in elts:
+            if isinstance(e, ast.Constant) and isinstance(e.value, int):
+                parts.append(f"[{e.value}]")
+            elif isinstance(e, ast.Name) and e.id in self.loop_vars:
+                parts.append(f"[{e.id}]")
+            else:
+                raise EmitError(f"{self.m.py_name}: unsupported subscript")
+        return "".join(parts)
 
     def call_expr(self, e: ast.Call) -> str:
         # math.<fn>(...)
@@ -208,22 +260,43 @@ class _Emitter(ast.NodeVisitor):
             if len(st.targets) != 1:
                 raise EmitError(f"{fn}: multiple assignment")
             tgt = st.targets[0]
+            # tuple unpack `a, b = e1, e2`: safe to sequence only when no
+            # target name appears in any RHS element (checked)
+            if isinstance(tgt, ast.Tuple):
+                if not (isinstance(st.value, ast.Tuple)
+                        and len(tgt.elts) == len(st.value.elts)
+                        and all(isinstance(t, ast.Name) for t in tgt.elts)):
+                    raise EmitError(f"{fn}: unsupported tuple assignment")
+                names = {t.id for t in tgt.elts}  # type: ignore[union-attr]
+                for rhs in st.value.elts:
+                    for n_ in ast.walk(rhs):
+                        if isinstance(n_, ast.Name) and n_.id in names:
+                            raise EmitError(
+                                f"{fn}: tuple assignment reads its targets")
+                for t, rhs in zip(tgt.elts, st.value.elts):
+                    self.stmt(ast.Assign(targets=[t], value=rhs), indent)
+                return
             # the return-array allocation
             if isinstance(tgt, ast.Name) and isinstance(st.value, ast.Call) \
                     and isinstance(st.value.func, ast.Attribute) \
-                    and st.value.func.attr in ("empty", "zeros") \
+                    and st.value.func.attr in ("empty", "zeros", "eye") \
                     and isinstance(st.value.func.value, ast.Name) \
                     and st.value.func.value.id == "np":
                 if self.ret_name is not None:
                     raise EmitError(f"{fn}: only one array allocation allowed")
                 self.ret_name = tgt.id
-                if st.value.func.attr == "zeros":
+                if st.value.func.attr in ("zeros", "eye"):
                     total = 1
                     for d in self.m.out_shape or ():
                         total *= d
                     self.lines.append(
                         f"{indent}for (int _i = 0; _i < {total}; _i++)"
                         f" ((double *)out)[_i] = 0.0;")
+                if st.value.func.attr == "eye":
+                    k = (self.m.out_shape or (0,))[0]
+                    self.lines.append(
+                        f"{indent}for (int _i = 0; _i < {k}; _i++)"
+                        f" out[_i][_i] = 1.0;")
                 return
             if isinstance(tgt, ast.Name):
                 # array-valued kernel call assigned to a local: the local
@@ -255,11 +328,43 @@ class _Emitter(ast.NodeVisitor):
                 return
             if isinstance(tgt, ast.Subscript) and isinstance(tgt.value, ast.Name):
                 name = "out" if tgt.value.id == self.ret_name else tgt.value.id
-                idx = _const_index(tgt.slice, fn)
-                lhs = name + "".join(f"[{i}]" for i in idx)
+                lhs = name + self._index_c(tgt.slice)
                 self.lines.append(f"{indent}{lhs} = {self.expr(st.value)};")
                 return
             raise EmitError(f"{fn}: unsupported assignment target")
+        if isinstance(st, ast.AugAssign):
+            ops = {ast.Add: "+=", ast.Sub: "-=", ast.Mult: "*=",
+                   ast.Div: "/="}
+            sym = next((s for t, s in ops.items() if isinstance(st.op, t)),
+                       None)
+            if sym is None:
+                raise EmitError(f"{fn}: unsupported augmented op")
+            if isinstance(st.target, ast.Name):
+                lhs = st.target.id
+            elif isinstance(st.target, ast.Subscript) \
+                    and isinstance(st.target.value, ast.Name):
+                base = ("out" if st.target.value.id == self.ret_name
+                        else st.target.value.id)
+                lhs = base + self._index_c(st.target.slice)
+            else:
+                raise EmitError(f"{fn}: unsupported augmented target")
+            self.lines.append(f"{indent}{lhs} {sym} {self.expr(st.value)};")
+            return
+        if isinstance(st, ast.For):
+            bound = self._range_bound(st)
+            var = st.target.id if isinstance(st.target, ast.Name) else None
+            if var is None:
+                raise EmitError(f"{fn}: loop target must be a name")
+            self.loop_vars.add(var)
+            self.lines.append(
+                f"{indent}for (int {var} = 0; {var} < {bound}; {var}++) {{")
+            for s in st.body:
+                self.stmt(s, indent + "    ")
+            self.lines.append(f"{indent}}}")
+            self.loop_vars.discard(var)
+            if st.orelse:
+                raise EmitError(f"{fn}: for-else unsupported")
+            return
         if isinstance(st, ast.If):
             self.lines.append(f"{indent}if {self.expr(st.test)} {{")
             for s in st.body:

@@ -294,9 +294,18 @@ headline addition is the ROE module, #5.)
 
 The layers exist; v0.6 composes them into one auditable whole.
 
-- [ ] Emitter v1: bounded `for` loops + local fixed arrays, covering the
-      full static core (roe, ya, integrators, EKF update, quaternion
-      feedback); CompCert-compilable-subset audit of the emitted C
+- [x] Emitter v1 (#27): bounded `for range(N)` loops (compile-time
+      bounds, module-constant resolution), module-constant inlining,
+      tuple/augmented assignment, loop-var subscripts, np.eye
+      allocation. 17 kernels now emit + verify, incl. the bounded
+      Newton Kepler solve and the first CONTRACTED kernels through the
+      ACSL path (roe maps/STM). Tier-1 policy recalibrated from
+      measurement: strict bit-exact for arithmetic+sqrt kernels;
+      trig-bearing kernels bounded by output-vector scale (cancelling
+      entries diverge by ulps of their INTERMEDIATES — measured and
+      documented), <=1% incidence. Remaining for the full core: matmul
+      lowering (EKF), integrators (function-typed params), CompCert
+      audit
 - [ ] Sound value gate in CI: Frama-C/EVA over the emitted-and-annotated
       C (float intervals from the ACSL contracts), memory/index gate,
       reproducible audit report artifacts
