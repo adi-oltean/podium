@@ -51,6 +51,8 @@ references/citations); existing suite untouched.
       overfull-hbox warnings only)
 - [x] README links the preprint
 - [x] Committed and pushed; issue closed
+- [x] Follow-up (owner request): paper moved out of the public repo into
+      the private adi-oltean/podium-paper repository until submission
 
 ## Push/merge instructions
 
