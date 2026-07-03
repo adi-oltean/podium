@@ -61,7 +61,7 @@
   <div class="meta" id="scenario"></div>
   <div class="meta"><a href="3d/" style="color:var(--accent)">3-D viewer &rarr;</a></div>
   <div class="meta"><a href="iss-sim/" style="color:var(--accent)">ISS-sim autopilot demo &rarr;</a></div>
-  <div class="meta"><a id="buildlink" style="color:var(--accent)" href="https://github.com/adi-oltean/podium/commit/HEAD" title="source commit of this build">build 0</a> &middot; <a href="builds/" style="color:var(--accent)">all builds</a></div>
+  <div class="meta"><a id="buildlink" style="color:var(--accent)" href="https://github.com/adi-oltean/podium/commit/221ef9cd354f2b8e0089bbbf7bc5337c8da69624" title="source commit of this build">build 1</a> &middot; <a href="builds/" style="color:var(--accent)">all builds</a></div>
 </header>
 <div id="stage">
   <canvas id="view"></canvas>
@@ -85,8 +85,8 @@
 <script>
 "use strict";
 // build identity: dev sentinels; tools/deploy_viewer.py injects real values
-const BUILD = 0;
-const SRC_COMMIT = 'HEAD';
+const BUILD = 1;
+const SRC_COMMIT = '221ef9cd354f2b8e0089bbbf7bc5337c8da69624';
 const _bl = document.getElementById("buildlink");
 _bl.textContent = "build " + BUILD;
 _bl.href = "https://github.com/adi-oltean/podium/commit/" + SRC_COMMIT;
