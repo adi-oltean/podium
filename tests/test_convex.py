@@ -10,8 +10,10 @@ import pytest
 cp = pytest.importorskip("cvxpy")
 
 from podium import constants as const  # noqa: E402
+from podium.control import lqr  # noqa: E402
 from podium.core import cw, ya  # noqa: E402
 from podium.core import roe as roe_mod  # noqa: E402
+from podium.guidance import convex as ConvexMod  # noqa: E402
 from podium.guidance import safety  # noqa: E402
 from podium.guidance.convex import (  # noqa: E402
     ConeSpec,
@@ -222,4 +224,150 @@ def test_roe_planner_reconfigures_and_reports_safety():
     assert safety.rn_margin(roef, a, 200.0) > 0.0
     # dv sanity: dominant cost is the e-vector change, |d(de)|*n*a/2
     expected = np.linalg.norm(roef[2:4]) * n * a / 2.0
+    assert plan.total_dv() < 3.0 * expected
+
+
+# --- Layer-0 follow-ups (#9) -------------------------------------------
+
+
+def test_lcvx_annulus_lossless_and_exact():
+    """Thrust-annulus finite burn: the relaxation must come back lossless
+    (audited, not assumed — discrete-time LCvx bounds non-tight nodes by
+    the state dimension), the annulus must genuinely bite, and replaying
+    the ZOH profile through the exact discretization must hit the target
+    at solver tolerance."""
+    # Normal scenario: near-minimum-time transfer, so thrust is needed
+    # throughout and the primer never vanishes.
+    annulus = ConvexMod.AnnulusSpec(rho_min=0.008, rho_max=0.02)
+    times = np.linspace(0.0, 900.0, 17)
+    x0 = np.array([0.0, -2000.0, 0.0, 0.0, 0.0, 0.0])
+    planner = ConvexMod.FiniteBurnPlanner(times, annulus)
+    plan = planner.solve(x0, XF, n=N)
+    assert plan.status == "optimal"
+    assert plan.controllable
+    mags = np.linalg.norm(plan.u, axis=1)
+    assert np.all(mags >= annulus.rho_min - 1e-7)
+    assert np.all(mags <= annulus.rho_max + 1e-7)
+    # losslessness audit clean, and the lower bound genuinely binding
+    # (measured: 12 of 16 nodes ride rho_min, max gap ~3e-9)
+    assert len(plan.lcvx_inactive) == 0
+    assert plan.lcvx_max_gap < 1e-5 * annulus.rho_max
+    assert int(np.sum(mags < annulus.rho_min + 1e-6)) >= 8
+    # replay through the exact ZOH dynamics
+    ad, bd = lqr.cw_discrete(N, float(times[1] - times[0]))
+    x = plan.states[0].copy()
+    for i in range(len(times) - 1):
+        x = ad @ x + bd @ plan.u[i]
+    assert np.linalg.norm(x - XF) < 1e-5
+    # the lower bound is not vacuous: without it the optimum coasts
+    free = ConvexMod.FiniteBurnPlanner(
+        times, ConvexMod.AnnulusSpec(rho_min=0.0, rho_max=0.02)
+    ).solve(x0, XF, n=N)
+    assert float(np.min(np.linalg.norm(free.u, axis=1))) < annulus.rho_min
+    assert plan.objective >= free.objective - 1e-9
+
+
+def test_lcvx_audit_catches_degenerate_relaxation():
+    """Excess-capacity problem (forced minimum fuel far above what the
+    transfer needs — the discrete analogue of coast arcs): the relaxation
+    goes loose and the shipped audit must say so, loudly. This is the
+    audit doing its job: such a solution is not a valid thrust profile."""
+    annulus = ConvexMod.AnnulusSpec(rho_min=0.004, rho_max=0.02)
+    times = np.linspace(0.0, 1500.0, 16)
+    x0 = np.array([0.0, -2000.0, 0.0, 0.0, 0.0, 0.0])
+    plan = ConvexMod.FiniteBurnPlanner(times, annulus).solve(x0, XF, n=N)
+    assert plan.status == "optimal"  # the SOCP is fine; the audit is not
+    assert len(plan.lcvx_inactive) > 6  # exceeds the n_x theory bound
+    assert plan.lcvx_max_gap > 1e-4  # measured ~1.6e-3
+
+
+def test_passive_safety_scenarios_protect_failure_drifts():
+    """Breger-How: without the constraint some failure drift enters the
+    keep-out sphere; with it, every protected (node, sample) drift stays
+    outside — and since the hyperplane normal is unit, satisfaction
+    implies true distance."""
+    times = np.linspace(0.0, 2000.0, 11)
+    x0 = np.array([0.0, -1200.0, 0.0, 0.0, 0.0, 0.0])
+    xf = np.array([0.0, -150.0, 0.0, 0.0, 0.0, 0.0])
+    spec = ConvexMod.PassiveSafetySpec(
+        radius=200.0, horizon=2000.0, n_samples=6,
+        failure_nodes=tuple(range(1, 6)),
+    )
+    taus = np.linspace(0.0, spec.horizon, spec.n_samples + 1)[1:]
+
+    def worst_drift(plan):
+        worst = math.inf
+        for j in spec.failure_nodes:
+            for tau in taus:
+                xd = cw.stm(N, float(tau)) @ plan.states[j]
+                worst = min(worst, float(np.linalg.norm(xd[:3])))
+        return worst
+
+    free = RendezvousPlanner(times).solve(x0, xf, n=N)
+    assert worst_drift(free) < spec.radius  # scenario genuinely dangerous
+    guarded = RendezvousPlanner(times, passive_safety=spec).solve(x0, xf, n=N)
+    assert guarded.status == "optimal"
+    assert worst_drift(guarded) >= spec.radius - 1e-6
+    assert guarded.objective >= free.objective - 1e-9
+
+
+def test_qp_tracking_objective_dpp_resolve():
+    """QP tracking: the compiled problem re-solves against different
+    Parameter references, and tracking a reference beats ignoring it."""
+    times = np.linspace(0.0, 1200.0, 9)
+    planner = RendezvousPlanner(times, objective="qp_tracking",
+                                track_state_weight=1e-4,
+                                track_control_weight=1.0)
+    x0 = np.array([100.0, -500.0, 0.0, 0.0, 0.0, 0.0])
+
+    def straight_ref():
+        ref = np.zeros((len(times), 6))
+        for i in range(len(times)):
+            frac = i / (len(times) - 1)
+            ref[i, 0:3] = (1 - frac) * x0[0:3]
+        return ref
+
+    ref = straight_ref()
+    p_track = planner.solve(x0, XF, n=N, x_ref=ref)
+    p_zero = planner.solve(x0, XF, n=N)  # same compiled problem, ref=0
+    assert p_track.status == p_zero.status == "optimal"
+
+    def tracking_error(plan):
+        return float(np.sum((plan.states - ref) ** 2))
+
+    assert tracking_error(p_track) < tracking_error(p_zero)
+    # both still satisfy the hard terminal condition
+    for p in (p_track, p_zero):
+        assert np.linalg.norm(replay(p, N)[:3]) < 1e-4
+
+
+def test_roe_safe_set_terminal():
+    """Convex e/i safe-set terminal: alignment cones + minimum magnitudes
+    hold, |da| bounded, and the exact RN-plane scan confirms the achieved
+    geometry clears the keep-out radius."""
+    a, n = A, N
+    orbit = 2 * math.pi / n
+    times = np.linspace(0.0, 1.5 * orbit, 7)
+    spec = ConvexMod.SafeSetSpec(direction=(1.0, 0.0), e_min=4e-5,
+                                 i_min=4e-5, cone_angle=math.radians(10.0),
+                                 da_tol=1e-7)
+    plan = RoePlanner(times, safe_set=spec).solve(
+        np.zeros(6), None, a=a, n=n, u0=0.3
+    )
+    assert plan.status == "optimal"
+    # terminal post-burn ROE
+    rT = plan.roes[-1] + roe_mod.control_matrix(
+        a, n, 0.3 + n * plan.times[-1]
+    ) @ plan.dvs[-1]
+    de, di = rT[2:4], rT[4:6]
+    uhat = np.array([1.0, 0.0])
+    assert uhat @ de >= spec.e_min - 1e-9
+    assert uhat @ di >= spec.i_min - 1e-9
+    tan_c = math.tan(spec.cone_angle)
+    assert np.linalg.norm(de - (uhat @ de) * uhat) <= tan_c * (uhat @ de) + 1e-9
+    assert np.linalg.norm(di - (uhat @ di) * uhat) <= tan_c * (uhat @ di) + 1e-9
+    assert abs(rT[0]) <= spec.da_tol + 1e-9
+    # the receipt: exact scan of the achieved geometry
+    assert safety.rn_margin(rT, a, 150.0) > 0.0
+    expected = np.linalg.norm(de) * n * a / 2.0
     assert plan.total_dv() < 3.0 * expected

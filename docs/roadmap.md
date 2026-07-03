@@ -59,11 +59,21 @@ headline addition is the ROE module, #5.)
 - [x] Constraint library v0 (#8): approach cone (exact SOC),
       rotating-hyperplane KOZ (bounded two-pass reference refinement;
       hyperplane implies true distance), plume half-space (arrival burn
-      exempt by design, active constraints recorded on the Plan);
-      Breger-How passive-safety scenarios deferred (#9)
-- [ ] LCvx thrust-annulus option with validity checks — including the
-      discrete-time lossless-convexification conditions (continuous-time
-      guarantees do not survive discretization unconditionally) (#9)
+      exempt by design, active constraints recorded on the Plan)
+- [x] Breger-How passive-safety scenarios (#9): per-failure-node
+      free-drift KOZ avoidance as linear constraints (normal folded with
+      the drift STM into one DPP parameter row per scenario sample);
+      convex e/i safe-set terminal for the ROE planner (alignment cones +
+      minimum magnitudes, exact rn_margin scan as the post-solve receipt);
+      QP tracking objective for MPC-style re-solves
+- [x] LCvx thrust-annulus (#9, `FiniteBurnPlanner`): classical slack
+      relaxation on the exact ZOH CW discretization, shipped with the
+      validity checks rather than the assumption — controllability
+      precondition plus a per-solve losslessness audit against the
+      discrete-time theory bound (non-tight nodes <= state dimension);
+      the audit provably flags degenerate excess-capacity problems where
+      the relaxation goes loose (tested both ways). YA/ROE finite-burn
+      dynamics deferred (#12)
 - [x] Clarabel default solver (QOCO alternate deferred to the embedded
       path)
 - [x] **ARCH-COMP rendezvous benchmark as a CI reachability gate** (#10):
