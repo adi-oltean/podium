@@ -43,6 +43,8 @@ docs/          Architecture, comparative analysis, trajectory optimization,
 - [V-bar approach viewer](https://adi-oltean.github.io/podium/) — a 1 km glideslope approach propagated through the nonlinear truth model, in a self-contained page (fermi-style: no build system, no external requests).
 - [ISS-sim autopilot](https://adi-oltean.github.io/podium/iss-sim/) — Podium's pulsed docking-control laws (`podium.control.docking`) flying [SpaceX's ISS docking simulator](https://iss-sim.spacex.com/) via a paste-in-console autopilot.
 
+**Preprint:** [`paper/`](paper/) — *Podium: A Verification-Oriented Open-Source Library for RPOD GNC* (LaTeX source + PDF; build with `tectonic paper/main.tex`).
+
 ## Quick start
 
 ```bash

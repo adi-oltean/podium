@@ -1,0 +1,459 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{microtype}
+\usepackage[hidelinks]{hyperref}
+\usepackage{url}
+
+\newcommand{\podium}{\textsc{Podium}}
+\newcommand{\dd}{\mathrm{d}}
+
+\title{\podium: A Verification-Oriented Open-Source Library for\\
+Rendezvous, Proximity Operations, and Docking GNC}
+\author{Adi Oltean\thanks{\texttt{github.com/adi-oltean/podium}. The library and this
+manuscript were developed with substantial AI assistance (Anthropic Claude);
+all physics claims are enforced by the repository's test suite.}}
+\date{July 2026 --- v0.1 preprint}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We present \podium{}, an open-source (MIT) Python library and simulation
+sandbox for guidance, navigation, and control (GNC) of spacecraft rendezvous,
+proximity operations, and docking (RPOD) in low and medium Earth orbit,
+designed from the outset for translation to flight C code validated by
+abstract interpretation. A survey of the open-source ecosystem finds no
+maintained tool that combines validated relative-motion dynamics, RPOD
+guidance primitives, deterministic simulation, and a credible path to
+verified flight software; \podium{} targets exactly that gap. The library
+enforces a strict two-layer architecture: a \emph{static subset} algorithm
+core (pure step functions, fixed array shapes, compile-time loop bounds,
+machine-readable range contracts on every scalar) mechanically translatable
+to analyzable C, beneath a full-Python sandbox for truth models and analysis.
+We describe the implemented v0.1 kernels---Clohessy--Wiltshire and
+Yamanaka--Ankersen state transitions, a nonlinear dual-propagation truth
+model with $J_2$ and differential drag, and pulsed minimum-impulse-bit
+terminal docking control---together with the validation methodology:
+independent cross-implementation checks, quadratic-scaling separation of
+linearization error from implementation error, and CI-enforced validity
+envelopes for the linear models. A case study validates the docking laws
+end-to-end against an uncooperative black-box plant, SpaceX's public ISS
+docking simulator, via browser automation: system identification recovered
+an undocumented per-frame actuation model, a sign-inverted rate display, and
+a frame-rate-dependent control gain, and the campaign surfaced two genuine
+control defects---a pulse-deadband stall whose standing offset
+$\tau\,\Delta v/2$ scales with frame rate, cured by sub-pulse dithering---
+before the autopilot achieved repeatable docking success. We close with the
+designed convex guidance stack (lossless convexification on relative-motion
+STMs, successive convexification for six-degree-of-freedom docking) and the
+planned contract-to-annotation verification pipeline.
+\end{abstract}
+
+\section{Introduction}
+
+Autonomous rendezvous, proximity operations, and docking is moving from a
+capability of a few national programs to a routine commercial requirement:
+satellite servicing, active debris removal, orbital assembly, and crew and
+cargo logistics all fly some version of the same terminal problem---bring a
+chaser from kilometers away to millimeter-per-second contact inside tight
+lateral, angular, and rate gates \cite{fehse2003}. The GNC algorithms
+involved are mature in the literature, yet the \emph{software} situation is
+lopsided. Flight-proven RPOD stacks are closed and proprietary. Open-source
+astrodynamics is rich in propagators and orbit-determination machinery but
+thin exactly where RPOD lives: validated relative-motion models, approach
+corridors and keep-out zones, docking-phase control, passive abort safety,
+and---most conspicuously---any deliberate route from prototype Python to
+flight-grade, formally analyzable C.
+
+\podium{} \cite{podium2026} is an attempt to fill that gap in the open. Its
+premise is that verifiability is an architectural property, not a
+post-processing step: if flight algorithms are written from day one in a
+restricted \emph{static subset} of Python with contracts as data, the
+eventual C translation is mechanical, and the resulting code lands in
+precisely the dialect that industrial abstract interpreters are known to
+prove runtime-error-free---the approach validated on the ESA Automated
+Transfer Vehicle docking software by Astr\'ee in 2008 \cite{kastner2010}.
+
+This preprint documents the v0.1 state of the library. Its contributions:
+
+\begin{enumerate}
+  \item a two-layer, verification-oriented architecture for GNC libraries,
+        with machine-readable interval contracts on every core scalar
+        (Section~\ref{sec:arch});
+  \item implemented and cross-validated relative-motion kernels, including
+        a Yamanaka--Ankersen state transition matrix, released under a
+        permissive license together with a truth-model validation
+        methodology and measured validity envelopes (Sections~\ref{sec:kernels}--\ref{sec:truth});
+  \item pulsed (minimum-impulse-bit) terminal docking control laws with a
+        closed-form deadband-stall analysis, near-zone gain scheduling, and
+        sub-pulse dithering (Section~\ref{sec:docking});
+  \item a black-box validation case study in which the docking laws fly
+        SpaceX's public ISS docking simulator to repeatable success,
+        including the system identification of its undocumented plant and
+        two control defects the campaign surfaced (Section~\ref{sec:casestudy});
+  \item a designed (not yet implemented) convex guidance stack and
+        verification pipeline, stated as such (Section~\ref{sec:design}).
+\end{enumerate}
+
+\section{Related work and ecosystem gap}
+\label{sec:related}
+
+A July 2026 survey of open-source spacecraft simulation and GNC tooling
+(archived in the repository) examined Basilisk \cite{schulte2020basilisk},
+NASA's 42, Trick, cFS, and GMAT, ESA-adjacent Orekit and tudatpy, the
+archived poliastro, nyx-space, and RPOD-specific efforts including AFRL's
+CW-based reinforcement-learning environments and the MuJoCo-based
+SmallSatSim. No maintained tool combines: (i) validated relative-motion
+dynamics---notably, no surveyed tool ships an open Yamanaka--Ankersen
+implementation; (ii) docking contact coupled to those dynamics; (iii)
+RPOD-relevant sensor and actuator models; (iv) GNC algorithm hooks between
+simulation and flight code; (v) first-class deterministic Monte Carlo; and
+(vi) a path to verified flight C. Incumbent licenses are fractured
+(ISC, NOSA, AGPL, ``government-purpose''), leaving permissive RPOD territory
+essentially unoccupied. \podium{} deliberately does \emph{not} compete on
+general simulation fidelity: Basilisk remains the recommended high-fidelity
+backend, and Orekit/GMAT serve as cross-validation oracles.
+
+On the verification side, \podium{} follows three precedents: the
+Astr\'ee/ATV result that abstract interpretation can prove docking flight
+code free of runtime errors when the code is one synchronous loop of pure,
+statically-bounded step functions \cite{kastner2010}; Feron-style credible
+autocoding, where controllers carry their invariants as machine-checkable
+contracts \cite{feron2013}; and the embedded-solver code generation dialect
+of CVXPYgen and its relatives---static allocation, fixed iteration counts,
+\texttt{math.h} as the only dependency \cite{cvxpygen2022}. For closed-loop
+verification, the ARCH-COMP spacecraft rendezvous benchmark
+\cite{chan2017} defines the community-standard hybrid model that
+\podium{}'s mode logic is designed to remain traceable to.
+
+\section{Architecture: the two-layer rule}
+\label{sec:arch}
+
+Everything in \podium{} respects one boundary. The \textbf{flight core}
+(\texttt{podium.core}, plus flight-side functions in \texttt{control} and
+\texttt{guidance}) obeys the \emph{static subset}: pure step functions with
+no globals, I/O, clock access, or randomness; fixed array shapes known at
+import time; loops with compile-time constant bounds (solvers are
+\emph{anytime}: fixed maximum iterations, status code, best iterate); no
+recursion or function pointers; guarded divisions and square roots; and
+saturation at every physical boundary. The \textbf{sandbox} (truth dynamics,
+gain synthesis, Monte Carlo, plotting, solver prototyping) may use the full
+scientific-Python stack. The simulation engine calls flight-core functions
+through the same signature they will have after C translation.
+
+Contracts are declared once, as data, and consumed four ways:
+\begin{center}
+\begin{verbatim}
+@contract(n=Interval(1e-5, 1e-2), e=Interval(0.0, 0.9))
+def stm(n, e, theta0, dt): ...
+\end{verbatim}
+\end{center}
+(i) runtime checks during simulation; (ii) comment-annotation blocks
+(\texttt{[range(lo,hi)]}, \texttt{[len(6)]}, \texttt{PROVE(...)}) for the
+external abstract-interpretation tool at C translation; (iii) a generated
+analysis harness that draws inputs nondeterministically from the declared
+ranges---the analyzer's operating envelope, as in the ATV and A380
+campaigns; (iv) API documentation. Unconstrained scalars are the leading
+cause of failed interval-domain proofs, so the rule is absolute: every core
+scalar parameter carries a range contract.
+
+Determinism is likewise non-negotiable: fixed-step integration, one seeded
+generator, no platform-dependent reductions---identical configuration and
+seed give bit-identical trajectories, which makes every Monte Carlo outlier
+exactly replayable.
+
+\section{Relative-motion kernels}
+\label{sec:kernels}
+
+Frames and conventions are fixed library-wide: target-centered LVLH with
+$x$ radial (zenith), $y$ along-track, $z$ cross-track; scalar-first
+quaternions rotating body to reference; SI units throughout.
+
+\subsection{Clohessy--Wiltshire}
+
+For a circular target orbit with mean motion $n$, the classical equations
+\cite{clohessy1960}
+\begin{equation}
+\ddot x = 3n^2x + 2n\dot y + u_x,\qquad
+\ddot y = -2n\dot x + u_y,\qquad
+\ddot z = -n^2 z + u_z
+\end{equation}
+admit the closed-form state transition matrix implemented in
+\texttt{core.cw}, with two-impulse targeting by inversion of the
+position--velocity block.
+
+\subsection{Yamanaka--Ankersen state transition}
+
+For an elliptic target ($0 \le e < 1$), \podium{} implements the
+Yamanaka--Ankersen state transition \cite{yamanaka2002} for the
+Tschauner--Hempel equations. With true anomaly $\theta$ as independent
+variable, $\rho = 1 + e\cos\theta$, and the standard substitution
+$\tilde{\mathbf r} = \rho\,\mathbf r$ with derivatives taken with respect to
+$\theta$, the in-plane equations reduce to
+\begin{equation}
+\tilde x'' = \frac{3}{\rho}\,\tilde x + 2\tilde y', \qquad
+\tilde y'' = -2\tilde x', \qquad
+\tilde z'' = -\tilde z .
+\end{equation}
+Writing $s=\rho\sin\theta$, $c=\rho\cos\theta$, and
+$J = k^2(t-t_0)$ with $k^2 = \sqrt{\mu/p^3}$, the implemented in-plane
+fundamental matrix on $(\tilde x,\tilde y,\tilde x',\tilde y')$ is
+\begin{equation}
+\Phi_f(\theta, J) =
+\begin{bmatrix}
+s & c & 2-3esJ & 0\\[2pt]
+c\,(1{+}1/\rho) & -s\,(1{+}1/\rho) & -3\rho^2 J & 1\\[2pt]
+s' & c' & -3e\,(s'J + \sin\theta/\rho) & 0\\[2pt]
+-2s & e-2c & -3\,(1-2esJ) & 0
+\end{bmatrix},
+\label{eq:yafund}
+\end{equation}
+each column verified by direct substitution into the Tschauner--Hempel
+system during development. The physical-space transition over a time step
+is assembled as
+$\Phi = \Lambda^{-1}(\theta_1)\,\tilde\Phi(\theta_1,\theta_0)\,\Lambda(\theta_0)$,
+where $\Lambda$ maps physical LVLH states to the tilde variables and the
+anomaly propagation solves Kepler's equation with a fixed twenty-iteration
+Newton recursion (the denominator $1-e\cos E \ge 1-e$ is bounded away from
+zero by the eccentricity contract $e \le 0.9$)---bounded iteration being a
+static-subset requirement, not a style choice.
+
+\subsection{Validation methodology and validity envelopes}
+\label{sec:envelopes}
+
+Every physics kernel in \podium{} must carry a ``receipt'': a test against
+an independent reference with a tolerance derived from physics rather than
+tuned to pass. The YA kernel's receipts illustrate the methodology:
+
+\begin{enumerate}
+  \item \textbf{Independent truth.} The STM is compared against numerical
+        integration of the \emph{nonlinear} elliptic relative dynamics
+        (Section~\ref{sec:truth}) across $e \in \{0, 0.05, 0.15, 0.35\}$.
+  \item \textbf{Error-scaling separation.} The residual against truth must
+        scale \emph{quadratically} with separation (halving the initial
+        offset must quarter the error): linearization error is
+        $O(\lVert\delta\mathbf r\rVert^2/a)$, while any implementation
+        defect scales linearly. This single test discriminates ``model
+        error, as designed'' from ``bug.''
+  \item \textbf{Structural identities.} Exact reduction to the CW STM at
+        $e=0$; composition $\Phi(t_0{\to}t_2) =
+        \Phi(t_1{\to}t_2)\Phi(t_0{\to}t_1)$; inverse via negative time
+        steps; $\det\Phi = 1$.
+  \item \textbf{CI-enforced envelopes.} The measured one-orbit position
+        error obeys $\varepsilon \le C(e)\,\lVert\delta\mathbf r\rVert^2/a$
+        with $C \approx 40$ for $e \le 0.05$ and $C \approx 200$ at
+        $e = 0.2$ (the nonlinear term is amplified near perigee), asserted
+        in CI together with the quadratic scaling so the bound cannot
+        silently loosen. For context, at 1\,km separation and low
+        eccentricity this is centimeter-level model error per orbit.
+        The same harness documents \emph{why the YA kernel exists}: at
+        1\,km separation the CW error exceeds the YA error by a factor
+        ${>}30$ at $e=0.05$ and ${>}100$ at $e=0.2$.
+\end{enumerate}
+
+\section{Nonlinear truth model}
+\label{sec:truth}
+
+The truth layer (\texttt{dynamics.nonlinear}) makes no relative-motion
+approximation: both spacecraft are integrated in ECI under identical force
+models---two-body, $J_2$, and exponential-atmosphere drag with a co-rotating
+atmosphere and per-spacecraft ballistic coefficients---and the relative
+state is formed by differencing in the target's LVLH frame. Double-precision
+differencing error at LEO radii ($\sim$nanometers) is far below truth-model
+needs. The LVLH frame's angular velocity is treated exactly,
+\begin{equation}
+\boldsymbol\omega_{\mathrm{LVLH}} =
+\Bigl[\; \frac{r}{h}\,(\mathbf a_{\mathrm{pert}}\cdot\hat{\mathbf z}),\;
+0,\; \frac{h}{r^2} \;\Bigr],
+\end{equation}
+including the out-of-plane precession component that is often dropped;
+a dedicated test central-differences the position history under active
+$J_2$ and drag and requires agreement with the reported relative velocity
+to better than $2\times10^{-5}$\,m/s. Further receipts: secular RAAN drift
+matching $-\tfrac{3}{2}nJ_2(R_E/p)^2\cos i$ over ten orbits; drag
+semi-major-axis decay matching the analytic per-orbit estimate;
+differential-drag along-track drift with the correct sign; two-body energy
+conservation to $10^{-10}$ relative at the CI step size. The YA and truth
+implementations are fully independent, so they cross-check each other.
+
+\section{Pulsed terminal docking control}
+\label{sec:docking}
+
+The docking phase of many vehicles---and, conveniently, the control model
+of the simulator in Section~\ref{sec:casestudy}---is \emph{pulsed}: each
+thruster firing imparts a fixed velocity increment $\Delta v$ (a minimum
+impulse bit, MIB), and the controller chooses integer pulse counts.
+\texttt{podium.control.docking} provides three laws:
+
+\paragraph{Closing-rate profile.} $v_{\mathrm{cmd}}(r) =
+\mathrm{clamp}(r/\tau_a,\, v_{\mathrm{contact}},\, v_{\mathrm{far}})$: an
+exponential-decay glideslope in range with a firm, capture-safe contact
+floor.
+
+\paragraph{Gain-scheduled proportional nulling.} Lateral offsets and
+attitude errors are driven by saturated proportional velocity/rate commands
+$u = -\mathrm{clamp}(p/\tau,\pm u_{\max})$ with a shorter time constant
+inside a near zone. The scheduling is not cosmetic. With pulse quantization
+and a half-pulse deadband, a proportional law stalls once
+$|p|/\tau < \Delta v/2$, leaving a standing offset
+\begin{equation}
+p_{\mathrm{stall}} = \tfrac{1}{2}\,\tau\,\Delta v .
+\label{eq:stall}
+\end{equation}
+With far-field gains alone this evaluates to $0.6$\,m laterally and
+$0.25^\circ$ per axis at the case study's pulse sizes---\emph{outside} the
+$0.2$\,m/$0.2^\circ$ docking gates. The near-zone constants place the stall
+at $0.1$\,m and $0.05^\circ$. \podium{}'s click-dynamics unit tests (a
+per-axis integrator plant actuated only by fixed increments) caught exactly
+this failure in the first implementation; the tests encode the sim's
+success gates as assertions.
+
+\paragraph{Pulse allocator.} $n = \mathrm{round}_0\!\bigl((v_{\mathrm{cmd}}
+- v_{\mathrm{est}})/\Delta v\bigr)$ with a half-pulse deadband
+(round-toward-zero) so the vehicle never chatters about its setpoint, and a
+per-cycle saturation. For fine tracking the deadband is optionally replaced
+by \emph{sub-pulse dithering}: the fractional pulse is carried into the
+next control cycle (first-order $\Sigma\Delta$ modulation), so the average
+applied rate tracks commands far below one pulse per cycle. Section
+\ref{sec:casestudy} shows why this matters.
+
+\section{Case study: black-box validation against the SpaceX ISS docking
+simulator}
+\label{sec:casestudy}
+
+SpaceX's public ISS docking simulator \cite{isssim} implements Crew
+Dragon's manual docking mode: pulsed translation and rotation inputs, HUD
+telemetry, and the operative gates ($<0.2$\,m lateral, $<0.2^\circ$ per
+axis, $<0.2$\,m/s closing at contact). As an \emph{uncooperative,
+undocumented plant} with a real success criterion, it makes an unusually
+honest validation target. A Playwright-driven harness injects the exact
+autopilot script that human users paste into the browser console; the
+autopilot reads the sim's telemetry and calls the sim's own control
+handlers (identical to clicking its buttons).
+
+\subsection{System identification}
+
+Because nothing about the plant is documented, the control mapping was
+recovered empirically (button-probe campaigns sampling raw telemetry) and
+by reading the minified source. Findings, all load-bearing:
+(i) translation state is meters \emph{per frame}, applied along
+\emph{capsule body} axes, one \texttt{translationPulseSize} per click, with
+the displayed $(x,y,z)$ mapping to body $(-z,+x,+y)$ and displayed lateral
+values being the \emph{negative} of the port's body coordinates;
+(ii) the attitude ``rate'' display is a click counter whose sign is
+\emph{inverted} relative to the true error drift---the camera's angular
+velocity is proportional to \emph{minus} the accumulated click register,
+with a frame-rate-dependent gain;
+(iii) the docking contact test is a raycast whose reach shrinks to
+$0.1$\,m at terminal range, so an approach faster than $\sim0.1$\,m/frame
+\emph{tunnels through the port geometrically}---observed directly: an
+otherwise perfect approach at $0.159$\,m/frame passed through the station
+untouched;
+(iv) the success gate requires each world-frame velocity component below
+$0.004$\,m/frame with all three angles below $0.2^\circ$ at contact.
+
+The flight autopilot therefore counts \texttt{requestAnimationFrame} to
+convert its SI control laws to frame units at the actuation boundary,
+measures the attitude plant gain at engagement with a five-pulse probe
+(re-estimated in flight), and creeps the final meters at $0.003$\,m/frame.
+
+\subsection{Failure modes found by test}
+
+The campaign surfaced three defects, each with a lesson:
+
+\begin{enumerate}
+  \item \textbf{Polarity inversion} (all three rotation axes): assumed
+        button directions were backwards, producing positive feedback and
+        an uncontrollable spin in the first live run. In-flight
+        sign-learning proved noise-unstable; the cure was offline system
+        identification and hard-coded, verified polarities.
+  \item \textbf{Lateral limit cycle into structure}: aggressive lateral
+        capture near the station produced $\pm 6$\,m oscillations at
+        one-cycle latency and a grazing contact with station structure at
+        $\sim$8\,m range. Cured by distance-scheduled lateral velocity
+        caps and a 10\%-half-angle approach corridor that pauses closing
+        whenever the corridor is violated, with a gate-hold inside 4\,m.
+  \item \textbf{Frame-rate-dependent deadband stall}: after headless
+        verification passed end-to-end, a live 60\,fps run docked
+        $0.2$--$0.3$\,m below the port center and failed. In frame units
+        the stall radius of Eq.~\eqref{eq:stall} becomes
+        $p_{\mathrm{stall}} = \tfrac{1}{2}\tau\,\Delta v_{\mathrm{click}} f$:
+        $0.24$\,m at $f{=}60$\,fps but only $0.02$\,m at the harness's
+        SwiftShader $5$\,fps---the bug was \emph{invisible at every frame
+        rate the automated tests ran at}. Sub-pulse dithering
+        (Section~\ref{sec:docking}) removes the dead zone at any frame
+        rate; regression and live runs then both dock cleanly.
+\end{enumerate}
+
+After the fixes, the autopilot achieves the simulator's official SUCCESS
+outcome repeatably: headless (harness-verified, with wall-clock compression
+by state teleports between independently verified flight phases) and on a
+60\,fps desktop from the standard 200\,m start with randomized initial
+attitude, in roughly three minutes of flight time. Beyond the anecdote, the
+methodological point is that \emph{cross-fidelity validation---unit-level
+click dynamics, slow headless end-to-end, and full-rate live runs---caught
+disjoint bug sets}; no single tier would have sufficed.
+
+\section{Designed: convex guidance and the verification pipeline}
+\label{sec:design}
+
+Two major subsystems are designed and documented in the repository but not
+yet implemented; we state them here for completeness and to invite
+scrutiny.
+
+\paragraph{Layered convex guidance.} Layer~0 poses far/mid-field planning
+as one-shot convex programs on the exact CW/YA discretizations: LP/SOCP/QP
+costs; approach cones as second-order-cone constraints; rotating-hyperplane
+keep-out zones; Breger--How passive-safety constraints \cite{breger2008};
+and thrust-annulus lossless convexification following the G-FOLD lineage
+\cite{acikmese2007,acikmese2011}, whose rendezvous exactness was
+established by Lu and Liu \cite{lu2013}---with validity checks
+(controllability, normality, discrete-time repair) shipped as part of the
+implementation rather than left to the user, since keep-out zones are not
+losslessly convexifiable \cite{malyuta2022} and interval-active state
+constraints weaken the guarantees. Layer~1 adds successive convexification
+for six-degree-of-freedom docking: penalized-trust-region iteration
+\cite{szmuk2018} as the default engine (flight pedigree via NASA SPLICE
+\cite{splice2025}), SCvx* \cite{oguri2023} where a feasibility guarantee is
+required, and state-triggered constraints for plume and minimum-impulse-bit
+logic \cite{malyuta2020docking}. The prototype-to-embedded path is
+CVXPY with disciplined parameterized programming, generating
+static-memory, fixed-iteration C solvers \cite{cvxpygen2022}---the same
+dialect the verification pipeline expects, with onboard feasibility
+anchored by \cite{dueri2017,weiss2015}.
+
+\paragraph{Verification pipeline.} The static subset plus contracts are
+designed so that a small AST-walking emitter can translate the core to C
+with contracts rendered as analyzer annotations and \texttt{prove()} calls
+as proof obligations, validated externally by an abstract-interpretation
+tool in the Astr\'ee tradition \cite{kastner2010}; golden-vector
+equivalence between the Python and C artifacts validates the translation
+itself. Closed-loop safety is planned as reachability regression on the
+ARCH-COMP rendezvous benchmark \cite{chan2017}, keeping the code-level mode
+machine traceable to the verified hybrid model, in the spirit of
+proof-carrying control \cite{feron2013}.
+
+\section{Conclusion}
+
+\podium{} v0.1 demonstrates that a GNC library can be simultaneously
+open, physically rigorous, and verification-oriented without exotic
+tooling: the discipline is architectural. The implemented kernels ship with
+receipts---independent truth models, scaling-law bug discriminators, and
+CI-enforced validity envelopes---and the docking control stack has been
+validated end-to-end against an adversarially undocumented external plant,
+an exercise that surfaced exactly the class of unit-convention and
+quantization bugs that destroy real rendezvous missions. The near-term
+roadmap is the sim engine and Monte Carlo harness, the Layer-0 convex
+guidance stack, and the C emitter that turns the contract discipline into
+proofs. Contributions are welcome; every physics claim in the repository is
+gated by the test suite, and the authors would particularly value
+independent replication of the validity envelopes and adversarial review of
+the static-subset rules.
+
+\bibliographystyle{unsrt}
+\bibliography{references}
+
+\end{document}

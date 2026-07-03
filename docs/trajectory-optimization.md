@@ -121,15 +121,103 @@ path is open to us.
 
 ## Key references
 
-Açıkmeşe & Ploen, JGCD 2007 (G-FOLD SOCP) · Blackmore, Açıkmeşe & Scharf,
-JGCD 2010 (min-landing-error) · Açıkmeşe & Blackmore, Automatica 2011 (LTV
-LCvx) · Lu & Liu, JGCD 2013 (rendezvous LCvx) · Mueller & Larsson 2008
-(rotating hyperplane) · Richards, Schouwenaars, How & Feron, JGCD 2002 (MILP
-avoidance) · Breger & How, JGCD 2008 (safe trajectories) · Weiss, Baldwin,
-Erwin & Kolmanovsky, IEEE TCST 2015 (CW MPC with LOS/plume/soft-dock) ·
-Malyuta et al., IEEE CSM 2022, arXiv:2106.09125 (SCP survey) · Mao, Szmuk &
-Açıkmeşe, arXiv:1608.05133 (SCvx) · Oguri, arXiv:2304.14564 (SCvx*) · Szmuk &
-Açıkmeşe, arXiv:1802.03827 (PTR) · Malyuta et al., arXiv:1906.04857 (docking
-via STCs) · Elango et al., arXiv:2404.16826 (CTCS) · Luo, Echigo & Açıkmeşe,
-arXiv:2410.09748 (discrete-time LCvx repair) · Dueri et al., JGCD 2017
-(RAD750 timing) · NASA SPLICE DQG, NTRS 20240014010.
+**Lossless convexification (LCvx) and powered-descent heritage**
+
+1. B. Açıkmeşe and S. R. Ploen, "Convex Programming Approach to Powered
+   Descent Guidance for Mars Landing," *Journal of Guidance, Control, and
+   Dynamics* 30(5):1353–1366, 2007.
+   [doi:10.2514/1.27553](https://doi.org/10.2514/1.27553) — the G-FOLD SOCP.
+2. L. Blackmore, B. Açıkmeşe, and D. P. Scharf, "Minimum-Landing-Error
+   Powered-Descent Guidance for Mars Landing Using Convex Optimization,"
+   *JGCD* 33(4):1161–1171, 2010.
+   [doi:10.2514/1.47202](https://doi.org/10.2514/1.47202)
+3. B. Açıkmeşe and L. Blackmore, "Lossless Convexification of a Class of
+   Optimal Control Problems with Non-Convex Control Constraints,"
+   *Automatica* 47(2):341–347, 2011.
+   [doi:10.1016/j.automatica.2010.10.037](https://doi.org/10.1016/j.automatica.2010.10.037)
+   — the general LTV LCvx theorem.
+4. P. Lu and X. Liu, "Autonomous Trajectory Planning for Rendezvous and
+   Proximity Operations by Conic Optimization," *JGCD* 36(2):375–389, 2013.
+   [doi:10.2514/1.58436](https://doi.org/10.2514/1.58436) — LCvx exactness
+   for rendezvous with active state constraints.
+5. J. Kunhippurayil, M. W. Harris, and O. Jansson, "Lossless Convexification
+   of Optimal Control Problems with Annular Control Constraints,"
+   *Automatica* 133:109848, 2021.
+   [doi:10.1016/j.automatica.2021.109848](https://doi.org/10.1016/j.automatica.2021.109848)
+6. K. Luo, T. Echigo, and B. Açıkmeşe, "Lossless Convexification in
+   Discrete-Time Optimal Control," 2024.
+   [arXiv:2410.09748](https://arxiv.org/abs/2410.09748) — discrete-time
+   violation bound and repair.
+7. D. Malyuta and B. Açıkmeşe, "Lossless Convexification of Optimal Control
+   Problems with Semi-Continuous Inputs," IFAC World Congress, 2020.
+   [arXiv:1911.09013](https://arxiv.org/abs/1911.09013) — RCS on/off with
+   minimum throttle, no integers.
+
+**Convex RPOD formulations and constraints**
+
+8. M. Tillerson, G. Inalhan, and J. P. How, "Co-ordination and Control of
+   Distributed Spacecraft Systems Using Convex Optimization Techniques,"
+   *Int. J. Robust and Nonlinear Control* 12(2–3):207–242, 2002.
+   [doi:10.1002/rnc.683](https://doi.org/10.1002/rnc.683) — canonical LP
+   transcription on relative-motion STMs.
+9. E. Mueller and R. Larsson, "Collision Avoidance Maneuver Planning with
+   Robust Optimization," ESA GNC Conference, 2008 (also AIAA 2009-2051,
+   [doi:10.2514/6.2009-2051](https://doi.org/10.2514/6.2009-2051)) —
+   rotating-hyperplane keep-out-zone constraint.
+10. A. Richards, T. Schouwenaars, J. P. How, and E. Feron, "Spacecraft
+    Trajectory Planning with Avoidance Constraints Using Mixed-Integer
+    Linear Programming," *JGCD* 25(4):755–764, 2002.
+    [doi:10.2514/2.4943](https://doi.org/10.2514/2.4943)
+11. L. S. Breger and J. P. How, "Safe Trajectories for Autonomous
+    Rendezvous of Spacecraft," *JGCD* 31(5):1478–1489, 2008.
+    [doi:10.2514/1.29590](https://doi.org/10.2514/1.29590) — passive-safety
+    constraints, linear per failure scenario.
+12. A. Weiss, M. Baldwin, R. S. Erwin, and I. Kolmanovsky, "Model
+    Predictive Control for Spacecraft Rendezvous and Docking: Strategies
+    for Handling Constraints and Case Studies," *IEEE Trans. Control
+    Systems Technology* 23(4):1638–1647, 2015.
+    [doi:10.1109/TCST.2014.2379639](https://doi.org/10.1109/TCST.2014.2379639)
+    — CW MPC with LOS cone, soft-dock velocity bounds, plume direction.
+13. D. Aguilar Marsillach, S. Di Cairano, and A. Weiss, "Abort-Safe
+    Spacecraft Rendezvous in Case of Partial Thrust Failure," IEEE CDC 2020
+    / *IEEE TCST* 2022.
+    [MERL TR2022-142](https://www.merl.com/publications/docs/TR2022-142.pdf)
+    — backward-reachable-set abort safety.
+
+**Successive convexification**
+
+14. D. Malyuta, T. P. Reynolds, M. Szmuk, T. Lew, R. Bonalli, M. Pavone,
+    and B. Açıkmeşe, "Convex Optimization for Trajectory Generation," *IEEE
+    Control Systems Magazine* 42(5):40–113, 2022.
+    [arXiv:2106.09125](https://arxiv.org/abs/2106.09125) — the survey; also
+    states KOZ non-convexifiability as an open problem.
+15. Y. Mao, M. Szmuk, and B. Açıkmeşe, "Successive Convexification of
+    Non-Convex Optimal Control Problems and Its Convergence Properties,"
+    IEEE CDC 2016. [arXiv:1608.05133](https://arxiv.org/abs/1608.05133)
+16. K. Oguri, "Successive Convexification with Feasibility Guarantee via
+    Augmented Lagrangian for Non-Convex Optimal Control Problems," IEEE
+    CDC 2023. [arXiv:2304.14564](https://arxiv.org/abs/2304.14564) — SCvx*.
+17. M. Szmuk and B. Açıkmeşe, "Successive Convexification for 6-DoF Mars
+    Rocket Powered Landing with Free-Final-Time," AIAA SciTech 2018.
+    [arXiv:1802.03827](https://arxiv.org/abs/1802.03827) — PTR.
+18. D. Malyuta, T. Reynolds, M. Szmuk, B. Açıkmeşe, and M. Mesbahi, "Fast
+    Trajectory Optimization via Successive Convexification for Spacecraft
+    Rendezvous with Integer Constraints," AIAA SciTech 2020.
+    [arXiv:1906.04857](https://arxiv.org/abs/1906.04857) — Apollo
+    transposition & docking via state-triggered constraints.
+19. P. Elango, D. Luo, A. G. Kamath, S. Uzun, T. Kim, and B. Açıkmeşe,
+    "Successive Convexification for Trajectory Optimization with
+    Continuous-Time Constraint Satisfaction," 2024.
+    [arXiv:2404.16826](https://arxiv.org/abs/2404.16826) — CTCS.
+
+**Real-time / onboard**
+
+20. D. Dueri, B. Açıkmeşe, D. P. Scharf, and M. W. Harris, "Customized
+    Real-Time Interior-Point Methods for Onboard Powered-Descent Guidance,"
+    *JGCD* 40(2):197–212, 2017.
+    [doi:10.2514/1.G001480](https://doi.org/10.2514/1.G001480) — ~0.7 s
+    SOCP solves on RAD750.
+21. NASA SPLICE Dual-Quaternion Guidance flight results, AIAA SciTech 2025.
+    [NTRS 20240014010](https://ntrs.nasa.gov/citations/20240014010) —
+    onboard SCvx-class guidance (listen-only) on Blue Origin NS-13/NS-17;
+    IPM-to-PIPG solver migration.
