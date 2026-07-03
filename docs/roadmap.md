@@ -174,6 +174,14 @@ headline addition is the ROE module, #5.)
 - [ ] Contact/capture via MuJoCo backend; capture-envelope MC analysis
 - [ ] Tumbling-target terminal guidance (rotating corridor, variable-
       horizon endpoint) — scoped study
+- [ ] **Infinite-horizon abort-safety certificates**: sum-of-squares
+      barrier functions for the polynomial closed-loop dynamics (CW,
+      quaternion feedback), synthesized offline by SDP (untrusted) and
+      re-verified in CI by an exact algebraic/interval check of the
+      certificate identity — upgrading the reachability gate's
+      bounded-horizon flowpipe proofs to invariants that hold for all
+      time, with the same synthesize-untrusted / verify-cheap split the
+      rest of the verification story uses
 
 ## v0.5 — "Flight path"
 
