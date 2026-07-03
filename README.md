@@ -12,7 +12,7 @@ Mature tools exist — Basilisk, NASA 42, Trick, Orekit, GMAT — and Podium doe
 
 1. **RPOD as the first-class problem.** Relative motion (CW/Tschauner-Hempel), approach corridors, keep-out zones, plume impingement, passive abort safety, and docking contact — not an afterthought bolted onto an orbit propagator.
 2. **A verification-ready algorithm core.** GNC algorithms written as pure, statically-shaped, bounded-loop step functions with machine-readable contracts — the style that abstract interpretation (Astrée-class tools) can actually prove things about, and that translates line-for-line to embedded C.
-3. **Convex trajectory optimization built in.** Direct SOCP transcription of relative dynamics plus successive convexification for the nonconvex constraints (keep-out zones, plume), following the G-FOLD / SCvx lineage. See [`docs/trajectory-optimization.md`](docs/trajectory-optimization.md).
+3. **Convex trajectory optimization built in.** Direct SOCP transcription of relative dynamics plus successive convexification for the nonconvex constraints (keep-out zones, plume), following the G-FOLD / SCvx lineage (planned; see the roadmap).
 4. **A sandbox you can trust.** Deterministic fixed-step simulation (bit-identical replays), truth/flight separation, seeded Monte Carlo, and cross-validation hooks against established stacks.
 
 ## Layout
@@ -74,7 +74,6 @@ dv1, dv2 = cw.two_impulse(x0, np.zeros(6), n, 1500.0)
 |---|---|
 | [`docs/architecture.md`](docs/architecture.md) | Frames, units, module boundaries, sim engine design |
 | [`docs/comparative-analysis.md`](docs/comparative-analysis.md) | Survey of existing simulators; build-on vs interop decisions |
-| [`docs/trajectory-optimization.md`](docs/trajectory-optimization.md) | G-FOLD lineage, convex RPOD formulations, solver strategy |
 | [`docs/verification.md`](docs/verification.md) | Static subset rules, contract→annotation mapping, validation flow |
 | [`docs/visualization.md`](docs/visualization.md) | Rendering architecture (patterns adopted from fermi) |
 | [`docs/roadmap.md`](docs/roadmap.md) | Milestones toward v0.1 |
