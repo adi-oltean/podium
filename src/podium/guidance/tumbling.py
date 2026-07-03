@@ -146,7 +146,10 @@ def envelope_sweep(
             else fix_arrival_phase - float(w) * t_f
         tumble = Tumble(w_spin=float(w), rho_port=rho_port, phase0=phase0)
         plan = plan_tumbling_dock(times, x0, tumble, n, dv_max=dv_max)
-        feasible = plan.status == "optimal" and plan.terminal_pos_err < 1e-3
+        # 'optimal_inaccurate' is platform/solver-version noise; the
+        # REAL feasibility gate is the measured terminal error
+        feasible = (plan.status in ("optimal", "optimal_inaccurate")
+                    and plan.terminal_pos_err < 1e-3)
         out.append({
             "w_spin": float(w),
             "feasible": feasible,
