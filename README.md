@@ -35,8 +35,9 @@ src/podium/
                CW/YA ZOH discretizations
   nav/         Relative-navigation EKF (Joseph form, linear + bearing/range
                EKF updates), sensor models (relative GNSS, camera, lidar)
-  sim/         Deterministic engine, spec registry (STL robust semantics),
-               analysis plots; Monte Carlo campaigns next
+  sim/         Deterministic engine (with actuator MIB/execution-error
+               truth), spec registry (STL robust semantics), IDSS
+               contact-box checkers, seeded Monte Carlo, analysis plots
   viz/         Interactive three.js viewer (planned; canvas viewer live)
   verify/      Contracts (input ranges, invariants) + export to the external
                abstract-interpretation validation tool

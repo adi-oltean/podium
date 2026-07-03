@@ -17,9 +17,12 @@ Design (see docs/architecture.md):
   fragment) evaluated over trace channels; margins double as pytest oracles.
 - **Plots.** `podium.sim.plots` (import explicitly; matplotlib optional):
   trajectory plane view, channel time series, dv timeline.
+- **Acceptance + campaigns.** `podium.sim.idss` (IDSS Rev G contact box
+  checkers) and `podium.sim.monte_carlo` (seeded campaigns, structured
+  arrays, exact reproducibility).
 """
 
-from podium.sim import spec  # noqa: F401
+from podium.sim import idss, monte_carlo, spec  # noqa: F401
 from podium.sim.engine import (  # noqa: F401
     Controller,
     Scenario,

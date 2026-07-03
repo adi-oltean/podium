@@ -147,10 +147,18 @@ headline addition is the ROE module, #5.)
       detumble receipt and a 20-degree slew pinned to the second-order
       design prediction (overshoot and settling of wn=0.1, zeta=0.9).
       Thruster torque allocation deferred to the 6-DOF layer (v0.4)
-- [ ] Docking acceptance tests against the IDSS IDD Rev G contact-condition
-      box (closing 0.05–0.10 m/s, lateral rate 0.04 m/s, angular rates
-      0.20 deg/s, lateral offset 0.10 m, angular misalignment 4 deg)
-- [ ] Monte Carlo campaigns (seeded, structured-array output)
+- [x] Docking acceptance vs the IDSS IDD Rev G box (#17,
+      `podium.sim.idss`): terminal rate-command approach flown through
+      the engine with sensor noise + MIB + execution error contacts
+      inside the translation box (closing 0.05–0.10 m/s, lateral rate
+      0.04 m/s, offset 0.10 m); quaternion-feedback hold satisfies the
+      rotational box (0.20 deg/s, 4 deg) at contact time. Translation
+      and rotation decoupled until the 6-DOF engine (v0.4), coupled at
+      the contact instant and documented as such
+- [x] Monte Carlo campaigns (#17, `podium.sim.monte_carlo`): master-seed
+      spawned per-run seeds, structured-array output with per-run seeds
+      for post-mortem replay; 20-run dispersed docking campaign 100%
+      in-box with bit-identical campaign reproducibility asserted
 - [ ] three.js interactive viewer (fermi patterns; docs/visualization.md)
 
 ## v0.4 — "SCP docking" (Layer 1)
