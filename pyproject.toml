@@ -81,6 +81,9 @@ ignore = ["PLR0913", "PLR2004"]
 # An AST visitor is one dispatch table per node class; splitting it
 # obscures the subset definition.
 "src/podium/emit/cemit.py" = ["PLR0911", "PLR0912", "PLR0915"]
+# cvxpy/cvxpygen imported lazily: generation is a local/offline step and
+# cvxpygen's import pulls a Julia sidecar.
+"src/podium/emit/solvergen.py" = ["PLC0415"]
 
 [tool.mypy]
 strict = true
@@ -123,6 +126,11 @@ disable_error_code = ["import-untyped", "type-arg"]
 module = "podium.emit.cemit"
 disable_error_code = ["type-arg", "arg-type", "attr-defined",
                       "assignment", "operator", "unused-ignore"]
+
+[[tool.mypy.overrides]]
+module = "podium.emit.solvergen"
+disallow_untyped_defs = false
+disable_error_code = ["attr-defined", "import-untyped", "type-arg"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

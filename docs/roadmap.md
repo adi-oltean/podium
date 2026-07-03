@@ -279,7 +279,15 @@ headline addition is the ROE module, #5.)
 - [ ] Open abstract-interpretation gate in CI: sound float-interval
       analysis as the primary value gate plus a memory/index gate;
       reproducible audit evidence
-- [ ] CVXPYgen→QOCOGEN embedded solver generation for Layer-0 problems
+- [x] CVXPYgen embedded solver generation (#26,
+      `podium.emit.solvergen`): fixed-grid Layer-0 rendezvous with live
+      boundary parameters generated to a self-contained C tree (ECOS
+      backend), compiled with plain gcc (build recipe encoded: gnu99,
+      -fcommon, demo-source exclusions, SuiteSparse includes) and run
+      with zero Python — the binary reproduces the Clarabel optimum to
+      1e-5. cvxpygen deliberately NOT a dev dependency (its import pulls
+      a Julia sidecar via pdaqp; generation is a local/offline step).
+      QOCOGEN alternate + verified-KKT checker are the v0.6 items
 - [ ] cFS/F´ integration example (generated GNC app on a software bus)
 
 ## v0.6 — "Certified reference mission"
