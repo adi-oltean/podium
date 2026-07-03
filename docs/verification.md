@@ -28,10 +28,10 @@ This document defines the rules and the contract pipeline.
 
 ## The static subset (rules for `podium.core`)
 
-Interval-domain abstract interpretation (the domain family used by the target
-class of tools, including the fastcheck-style analyzers this project is
-designed against) proves range, bounds, and RTE-freedom properties precisely
-when code is written in a restricted style. All code in `podium.core` must obey:
+Interval-domain abstract interpretation (the domain family used by the
+Astrée/IKOS class of analyzers this project is designed against) proves
+range, bounds, and RTE-freedom properties precisely when code is written in
+a restricted style. All code in `podium.core` must obey:
 
 **Memory & structure**
 1. Pure step functions: outputs depend only on inputs; no globals, no I/O, no
