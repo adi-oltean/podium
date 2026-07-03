@@ -29,6 +29,8 @@ dependencies = [
 [project.optional-dependencies]
 # Trajectory optimization (convex / successive convexification)
 opt = ["cvxpy>=1.4", "clarabel>=0.7"]
+# Contact/capture truth model (probe-drogue docking)
+contact = ["mujoco>=3.2"]
 # Interactive 3-D visualization
 viz = ["matplotlib>=3.7"]
 # High-fidelity cross-validation against established astrodynamics stacks
@@ -44,6 +46,7 @@ dev = [
     "cvxpy>=1.4",
     "clarabel>=0.7",
     "matplotlib>=3.7",
+    "mujoco>=3.2",
 ]
 
 [project.urls]
@@ -72,6 +75,9 @@ ignore = ["PLR0913", "PLR2004"]
 # cvxpy is imported lazily inside synthesize(): the trusted checker must
 # stay importable (and float-free) without the optional SDP stack.
 "src/podium/verify/barrier.py" = ["PLC0415"]
+# mujoco is imported lazily so the module documents itself without the
+# optional contact stack installed.
+"src/podium/sim/contact.py" = ["PLC0415"]
 
 [tool.mypy]
 strict = true
@@ -103,6 +109,10 @@ disable_error_code = ["attr-defined", "union-attr", "type-arg"]
 module = "podium.guidance.tumbling"
 disallow_untyped_calls = false
 disable_error_code = ["attr-defined", "union-attr", "type-arg"]
+
+[[tool.mypy.overrides]]
+module = "podium.sim.contact"
+disable_error_code = ["import-untyped", "type-arg"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

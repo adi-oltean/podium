@@ -211,7 +211,17 @@ headline addition is the ROE module, #5.)
       directly, problem sizes are tiny, and the exact-flow cut mechanism
       is specific to our coast-arc structure. Revisit at 6-DOF where
       OpenSCvx's discretization machinery earns its keep
-- [ ] Contact/capture via MuJoCo backend; capture-envelope MC analysis
+- [x] Contact/capture via MuJoCo (#24, `podium.sim.contact`):
+      probe-drogue model generated programmatically as MJCF (funnel from
+      convex plates + throat sleeve — box-edge contact normals stall
+      probes, measured and designed out; ~29-deg cone after the 47-deg
+      first cut reflected too much axial momentum; optional sustained
+      docking thrust per probe-drogue practice). Receipts: IDSS-box
+      corner conditions ALL physically capture (the acceptance box tied
+      to a capture mechanism), beyond-mouth misses, 2 m/s bounces, peak
+      force monotone in closing rate, deterministic, envelope boundary
+      bracketed. Deferred: contact attitude (6-DOF), latch model,
+      compliant drogue, dispersed MC campaign via monte_carlo
 - [x] Tumbling-target terminal guidance — scoped study (#23,
       `podium.guidance.tumbling` + docs/plans/23-tumbling-study.md):
       known-tumble port capture stays CONVEX (deterministic port

@@ -20,6 +20,8 @@ Design (see docs/architecture.md):
 - **Acceptance + campaigns.** `podium.sim.idss` (IDSS Rev G contact box
   checkers) and `podium.sim.monte_carlo` (seeded campaigns, structured
   arrays, exact reproducibility).
+- **Contact.** `podium.sim.contact` (import explicitly; mujoco optional):
+  probe-drogue capture truth model with envelope sweeps.
 """
 
 from podium.sim import idss, monte_carlo, spec  # noqa: F401
