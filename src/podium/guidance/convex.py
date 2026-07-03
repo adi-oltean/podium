@@ -125,6 +125,11 @@ class Plan:
     # (node index, unit direction toward target) for each plume constraint
     # that was active in the final solve — recorded for transparency/tests.
     plume_dirs: list[tuple[int, F64]] = field(default_factory=list)
+    # Passive-safety verification: per failure node, TRUE minimum drift
+    # distance minus the keep-out radius over a DENSE tau grid (200
+    # samples) — exposes any dip between the sparse constraint samples
+    # instead of letting it pass silently.
+    ps_margins: dict[int, float] = field(default_factory=dict)
 
     def total_dv(self) -> float:
         return float(np.sum(np.linalg.norm(self.dvs, axis=1)))
@@ -350,13 +355,24 @@ class RendezvousPlanner:
             self._set_reference(self._x.value.T.copy())
             self._problem.solve(solver=cp.CLARABEL)
         assert self._v.value is not None and self._x.value is not None
+        states = self._x.value.T.copy()
+        ps_margins: dict[int, float] = {}
+        if self.passive_safety is not None:
+            taus = np.linspace(0.0, self.passive_safety.horizon, 200)[1:]
+            for j in self.ps_nodes:
+                worst = math.inf
+                for tau in taus:
+                    xd = cw.stm(n, float(tau)) @ states[j]
+                    worst = min(worst, float(np.linalg.norm(xd[0:3])))
+                ps_margins[j] = worst - self.passive_safety.radius
         return Plan(
             times=self.times.copy(),
             dvs=self._v.value.T.copy(),
-            states=self._x.value.T.copy(),
+            states=states,
             objective=float(self._problem.value),
             status=str(self._problem.status),
             plume_dirs=list(self._plume_active),
+            ps_margins=ps_margins,
         )
 
 
@@ -381,9 +397,27 @@ class FiniteBurnPlan:
     lcvx_inactive: list[int]
     lcvx_max_gap: float
     controllable: bool
+    # normality certificate from the solver's duals: per-interval primer
+    # norms ||Bd_k' lambda_k||. A vanishing primer at some interval means
+    # normality fails there — a tight solution is not guaranteed and the
+    # losslessness audit is the only ground truth.
+    primer_norms: F64 = field(default_factory=lambda: np.zeros(0))
 
     def total_dv(self, dt: float) -> float:
         return float(np.sum(np.linalg.norm(self.u, axis=1)) * dt)
+
+    def primer_certificate(self) -> float:
+        """Normality certificate: min_k ||primer_k|| / dt.
+
+        Gamma-stationarity makes the primer norm equal dt at tight nodes
+        with interior slack (and <= dt when the throttle floor binds), so
+        primer/dt is the natural scale-free measure: O(0.1..1) on normal
+        problems, collapsing to ~0 where normality fails (measured: six
+        orders of magnitude of separation on the test problems)."""
+        if len(self.primer_norms) == 0 or len(self.times) < 2:
+            return 0.0
+        dt = float(self.times[1] - self.times[0])
+        return float(np.min(self.primer_norms)) / dt
 
 
 class FiniteBurnPlanner:
@@ -413,14 +447,17 @@ class FiniteBurnPlanner:
         self._x, self._u, self._g = x, u, g
         self._x0 = cp.Parameter(6, name="x0")
         self._xf = cp.Parameter(6, name="xf")
-        self._ad = cp.Parameter((6, 6), name="ad")
-        self._bd = cp.Parameter((6, 3), name="bd")
+        # per-interval discretizations: for e != 0 the YA Ad/Bd vary
+        # along the orbit
+        self._ads = [cp.Parameter((6, 6), name=f"ad{i}") for i in range(self.k)]
+        self._bds = [cp.Parameter((6, 3), name=f"bd{i}") for i in range(self.k)]
 
         cons = [x[:, 0] == self._x0, x[:, self.k] == self._xf]
+        self._dyn_cons = []
         for i in range(self.k):
-            cons.append(
-                x[:, i + 1] == self._ad @ x[:, i] + self._bd @ u[:, i]
-            )
+            c = x[:, i + 1] == self._ads[i] @ x[:, i] + self._bds[i] @ u[:, i]
+            self._dyn_cons.append(c)
+            cons.append(c)
         for i in range(self.k):
             cons.append(cp.norm(u[:, i], 2) <= g[i])
         cons.append(g >= annulus.rho_min)
@@ -428,23 +465,64 @@ class FiniteBurnPlanner:
         self._problem = cp.Problem(cp.Minimize(cp.sum(g) * self.dt), cons)
         assert self._problem.is_dcp(dpp=True)
 
-    def solve(self, x0: F64, xf: F64, n: float) -> FiniteBurnPlan:
-        ad, bd = _lqr.cw_discrete(n, self.dt)
-        # controllability precondition (Kalman rank)
-        ctrb = np.hstack([np.linalg.matrix_power(ad, i) @ bd for i in range(6)])
-        controllable = int(np.linalg.matrix_rank(ctrb)) == 6
-        self._ad.value = ad
-        self._bd.value = bd
+    def solve(
+        self, x0: F64, xf: F64, n: float, e: float = 0.0, theta0: float = 0.0
+    ) -> FiniteBurnPlan:
+        ads, bds = [], []
+        for i in range(self.k):
+            if e == 0.0:
+                if i == 0:
+                    ad, bd = _lqr.cw_discrete(n, self.dt)
+                # constant for all intervals at e = 0
+            else:
+                th_i = ya.propagate_true_anomaly(
+                    n, e, theta0, float(self.times[i])
+                )
+                ad, bd = _lqr.ya_discrete(n, e, th_i, self.dt)
+            ads.append(ad)
+            bds.append(bd)
+            self._ads[i].value = ad
+            self._bds[i].value = bd
+        # time-varying controllability: rank of the lifted reachability
+        # matrix [Phi_{K-1..j+1} Bd_j]_j
+        cols = []
+        acc = np.eye(6)
+        for j in range(self.k - 1, -1, -1):
+            cols.append(acc @ bds[j])
+            acc = acc @ ads[j]
+        controllable = int(np.linalg.matrix_rank(np.hstack(cols))) == 6
         self._x0.value = np.asarray(x0, dtype=np.float64)
         self._xf.value = np.asarray(xf, dtype=np.float64)
-        self._problem.solve(solver=cp.CLARABEL)
-        assert self._u.value is not None and self._x.value is not None
+        try:
+            self._problem.solve(solver=cp.CLARABEL)
+        except cp.error.SolverError:
+            pass
+        if self._u.value is None or self._x.value is None:
+            # infeasible/failed: return an empty plan carrying the status
+            # (find_min_time probes feasibility through exactly this path)
+            return FiniteBurnPlan(
+                times=self.times.copy(),
+                u=np.zeros((self.k, 3)),
+                gammas=np.zeros(self.k),
+                states=np.zeros((self.k + 1, 6)),
+                objective=math.inf,
+                status=str(self._problem.status),
+                lcvx_gaps=np.zeros(self.k),
+                lcvx_inactive=[],
+                lcvx_max_gap=math.inf,
+                controllable=controllable,
+            )
         assert self._g.value is not None
         u = self._u.value.T.copy()
         g = self._g.value.copy()
         gaps = g - np.linalg.norm(u, axis=1)
         tol = 1e-6 * self.annulus.rho_max
         inactive = [int(i) for i in np.flatnonzero(gaps > tol)]
+        primer = np.zeros(self.k)
+        for i, c in enumerate(self._dyn_cons):
+            lam = c.dual_value
+            if lam is not None:
+                primer[i] = float(np.linalg.norm(bds[i].T @ np.asarray(lam)))
         return FiniteBurnPlan(
             times=self.times.copy(),
             u=u,
@@ -456,7 +534,69 @@ class FiniteBurnPlanner:
             lcvx_inactive=inactive,
             lcvx_max_gap=float(np.max(gaps)),
             controllable=controllable,
+            primer_norms=primer,
         )
+
+
+def find_min_time(
+    x0: F64,
+    xf: F64,
+    n: float,
+    rho_max: float,
+    k: int,
+    t_lo: float,
+    t_hi: float,
+    iters: int = 12,
+    e: float = 0.0,
+    theta0: float = 0.0,
+) -> float:
+    """Bounded bisection for the minimum feasible transfer time under
+    ||u|| <= rho_max (the coast-arc antidote: run LCvx at a horizon just
+    above this and the throttle floor stays normal). t_hi must be
+    feasible; returns a time within (t_hi - t_lo) / 2^iters of optimal.
+    """
+    def feasible(tof: float) -> bool:
+        planner = FiniteBurnPlanner(
+            np.linspace(0.0, tof, k + 1), AnnulusSpec(0.0, rho_max)
+        )
+        plan = planner.solve(x0, xf, n, e=e, theta0=theta0)
+        return plan.status in ("optimal", "optimal_inaccurate")
+
+    if not feasible(t_hi):
+        raise ValueError("t_hi is not feasible; raise it")
+    lo, hi = t_lo, t_hi
+    for _ in range(iters):
+        mid = 0.5 * (lo + hi)
+        if feasible(mid):
+            hi = mid
+        else:
+            lo = mid
+    return hi
+
+
+def quantize_plan(plan: Plan, dv_quantum: float) -> Plan:
+    """Minimum-impulse-bit bridge: quantize each burn to thruster clicks
+    with per-axis sigma-delta carry, so quantization error accumulates to
+    at most half a click per axis over the whole plan instead of
+    sqrt(K) clicks. Returns a new Plan (states/objective copied — they
+    describe the unquantized optimum; the receipt is flying the result).
+    """
+    q = dv_quantum
+    dvs = plan.dvs.copy()
+    carry = np.zeros(3)
+    for i in range(dvs.shape[0]):
+        want = dvs[i] + carry
+        clicks = np.round(want / q)
+        dvs[i] = clicks * q
+        carry = want - dvs[i]
+    return Plan(
+        times=plan.times.copy(),
+        dvs=dvs,
+        states=plan.states.copy(),
+        objective=plan.objective,
+        status=plan.status,
+        plume_dirs=list(plan.plume_dirs),
+    )
 
 
 @dataclass

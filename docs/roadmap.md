@@ -84,8 +84,20 @@ headline addition is the ROE module, #5.)
       precondition plus a per-solve losslessness audit against the
       discrete-time theory bound (non-tight nodes <= state dimension);
       the audit provably flags degenerate excess-capacity problems where
-      the relaxation goes loose (tested both ways). YA/ROE finite-burn
-      dynamics deferred (#12)
+      the relaxation goes loose (tested both ways)
+- [x] Layer-0 residuals (#12): **eccentric finite-burn** (YA ZOH
+      discretization with composition-identity receipts; per-interval
+      time-varying maps and lifted-reachability controllability check);
+      **primer normality certificate** from the solver duals (primer/dt
+      is scale-free: O(0.1) normal vs ~1e-7 degenerate, with the
+      Gamma-stationarity identity primer==dt at interior-slack nodes
+      pinning the dual convention); **min-time pre-solve** (bounded
+      bisection; LCvx at 1.15x t_min passes the audit — the coast-arc
+      antidote); **dense passive-safety verification margins** reported
+      on every plan (exposes inter-sample dips instead of hiding them);
+      **MIB bridge** (`quantize_plan`: sigma-delta thruster-click
+      quantization, residual <= half a click per axis, flown through the
+      engine against the nonlinear truth)
 - [x] Clarabel default solver (QOCO alternate deferred to the embedded
       path)
 - [x] **ARCH-COMP rendezvous benchmark as a CI reachability gate** (#10):

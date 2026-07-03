@@ -11,7 +11,7 @@ from __future__ import annotations
 import numpy as np
 from numpy.typing import NDArray
 
-from podium.core import cw
+from podium.core import cw, ya
 
 F64 = NDArray[np.float64]
 
@@ -32,6 +32,30 @@ def cw_discrete(n: float, dt: float) -> tuple[F64, F64]:
     for i in range(m + 1):
         w = 1.0 if i in (0, m) else (4.0 if i % 2 == 1 else 2.0)
         b += w * cw.stm(n, dt - i * h) @ sel
+    b *= h / 3.0
+    return a, b
+
+
+def ya_discrete(n: float, e: float, theta0: float, dt: float) -> tuple[F64, F64]:
+    """ZOH discretization of the Yamanaka-Ankersen linear dynamics over
+    one interval starting at true anomaly theta0: x+ = A x + B u.
+
+    A is the exact YA STM; B = int_0^dt Phi(s -> dt) B_c ds by Simpson
+    quadrature (64 panels — same scheme as cw_discrete; the integrand is
+    smooth). Reduces to cw_discrete at e = 0; the composition identity
+    Ad2 Bd1 + Bd2 == Bd_full is the self-consistency receipt.
+    """
+    a = ya.stm(n, e, theta0, dt)
+    m = 64
+    h = dt / m
+    b = np.zeros((6, 3))
+    sel = np.zeros((6, 3))
+    sel[3:6, :] = np.eye(3)
+    for i in range(m + 1):
+        w = 1.0 if i in (0, m) else (4.0 if i % 2 == 1 else 2.0)
+        s = i * h
+        th_s = ya.propagate_true_anomaly(n, e, theta0, s)
+        b += w * ya.stm(n, e, th_s, dt - s) @ sel
     b *= h / 3.0
     return a, b
 

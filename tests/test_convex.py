@@ -371,3 +371,130 @@ def test_roe_safe_set_terminal():
     assert safety.rn_margin(rT, a, 150.0) > 0.0
     expected = np.linalg.norm(de) * n * a / 2.0
     assert plan.total_dv() < 3.0 * expected
+
+
+# --- Layer-0 residuals (#12) -------------------------------------------
+
+
+def test_ya_discrete_reduces_and_composes():
+    """YA ZOH: equals cw_discrete at e=0 and satisfies the two-interval
+    composition identity Ad2 Ad1 / Ad2 Bd1 + Bd2 == full-interval maps."""
+    dt = 120.0
+    a_cw, b_cw = lqr.cw_discrete(N, dt)
+    a_ya, b_ya = lqr.ya_discrete(N, 0.0, 0.7, dt)
+    assert np.allclose(a_ya, a_cw, rtol=1e-9, atol=1e-12)
+    assert np.allclose(b_ya, b_cw, rtol=1e-6, atol=1e-9)
+    e, th0 = 0.2, 1.1
+    a1, b1 = lqr.ya_discrete(N, e, th0, dt)
+    th1 = ya.propagate_true_anomaly(N, e, th0, dt)
+    a2, b2 = lqr.ya_discrete(N, e, th1, dt)
+    a_full, b_full = lqr.ya_discrete(N, e, th0, 2 * dt)
+    assert np.allclose(a2 @ a1, a_full, rtol=1e-9, atol=1e-9)
+    assert np.allclose(a2 @ b1 + b2, b_full, rtol=1e-5, atol=1e-7)
+
+
+def test_finite_burn_eccentric():
+    """LCvx on YA dynamics (e=0.15): solves, and replaying the ZOH
+    profile through the same per-interval maps hits the target."""
+    annulus = ConvexMod.AnnulusSpec(rho_min=0.008, rho_max=0.02)
+    times = np.linspace(0.0, 900.0, 13)
+    x0 = np.array([0.0, -2000.0, 0.0, 0.0, 0.0, 0.0])
+    e, th0 = 0.15, 0.9
+    plan = ConvexMod.FiniteBurnPlanner(times, annulus).solve(
+        x0, XF, n=N, e=e, theta0=th0
+    )
+    assert plan.status == "optimal"
+    assert plan.controllable
+    x = plan.states[0].copy()
+    dt = float(times[1] - times[0])
+    for i in range(len(times) - 1):
+        th_i = ya.propagate_true_anomaly(N, e, th0, float(times[i]))
+        ad, bd = lqr.ya_discrete(N, e, th_i, dt)
+        x = ad @ x + bd @ plan.u[i]
+    assert np.linalg.norm(x - XF) < 1e-5
+    assert len(plan.lcvx_inactive) <= 6
+
+
+def test_primer_certificate_separates_normal_from_degenerate():
+    """Normality certificate from the duals: primer/dt stays O(0.1) on
+    the normal problem and collapses (~1e-7) on the degenerate one —
+    and at tight interior-slack nodes the primer equals dt exactly
+    (Gamma-stationarity), which pins the dual convention."""
+    x0 = np.array([0.0, -2000.0, 0.0, 0.0, 0.0, 0.0])
+    normal = ConvexMod.FiniteBurnPlanner(
+        np.linspace(0.0, 900.0, 17), ConvexMod.AnnulusSpec(0.008, 0.02)
+    ).solve(x0, XF, n=N)
+    degen = ConvexMod.FiniteBurnPlanner(
+        np.linspace(0.0, 1500.0, 16), ConvexMod.AnnulusSpec(0.004, 0.02)
+    ).solve(x0, XF, n=N)
+    assert normal.primer_certificate() > 0.01
+    assert degen.primer_certificate() < 1e-4
+    # Gamma interior at the first node of the normal problem => primer == dt
+    dt = float(normal.times[1] - normal.times[0])
+    assert abs(normal.primer_norms[0] - dt) < 1e-3 * dt
+
+
+def test_min_time_presolve_yields_normal_lcvx():
+    """Coast-arc antidote: bisect the minimum feasible time, then LCvx at
+    1.15x t_min passes the losslessness audit."""
+    x0 = np.array([0.0, -2000.0, 0.0, 0.0, 0.0, 0.0])
+    rho_max = 0.02
+    t_min = ConvexMod.find_min_time(x0, XF, N, rho_max, k=12,
+                                    t_lo=200.0, t_hi=2000.0)
+    assert 300.0 < t_min < 1200.0
+    # just below is infeasible (bisection bracket is real)
+    tight = ConvexMod.FiniteBurnPlanner(
+        np.linspace(0.0, 0.9 * t_min, 13), ConvexMod.AnnulusSpec(0.0, rho_max)
+    ).solve(x0, XF, n=N)
+    assert tight.status not in ("optimal",)
+    plan = ConvexMod.FiniteBurnPlanner(
+        np.linspace(0.0, 1.15 * t_min, 13),
+        ConvexMod.AnnulusSpec(0.3 * rho_max, rho_max),
+    ).solve(x0, XF, n=N)
+    assert plan.status == "optimal"
+    assert plan.lcvx_max_gap < 1e-5 * rho_max
+    assert len(plan.lcvx_inactive) == 0
+
+
+def test_passive_safety_dense_margins_reported():
+    times = np.linspace(0.0, 2000.0, 11)
+    x0 = np.array([0.0, -1200.0, 0.0, 0.0, 0.0, 0.0])
+    xf = np.array([0.0, -150.0, 0.0, 0.0, 0.0, 0.0])
+    spec = ConvexMod.PassiveSafetySpec(
+        radius=200.0, horizon=2000.0, n_samples=6,
+        failure_nodes=tuple(range(1, 6)),
+    )
+    plan = RendezvousPlanner(times, passive_safety=spec).solve(x0, xf, n=N)
+    assert set(plan.ps_margins) == set(spec.failure_nodes)
+    # sparse samples guarantee >= radius at the samples; the dense report
+    # may dip slightly between them — it must be reported, and small
+    for j, margin in plan.ps_margins.items():
+        assert margin > -10.0, (j, margin)
+
+
+@pytest.mark.slow
+def test_mib_quantized_plan_flies():
+    """MIB bridge: sigma-delta quantization keeps the residual bounded by
+    half a click per axis, and the quantized plan still arrives when
+    flown through the engine against the nonlinear truth."""
+    tof = 2400.0
+    times = np.linspace(0.0, tof, 9)
+    hold = np.array([0.0, -30.0, 0.0, 0.0, 0.0, 0.0])
+    plan = RendezvousPlanner(times, objective="l2").solve(X0, hold, n=N)
+    q = 0.002  # m/s per click (~1 N s on a 500 kg vehicle)
+    qplan = ConvexMod.quantize_plan(plan, q)
+    # every burn is an integer number of clicks
+    assert np.allclose(np.round(qplan.dvs / q) * q, qplan.dvs, atol=1e-12)
+    # sigma-delta: cumulative per-axis error bounded by half a click
+    resid = np.sum(plan.dvs - qplan.dvs, axis=0)
+    assert np.all(np.abs(resid) <= 0.5 * q + 1e-12)
+    sc = Scenario(
+        duration=tof + 30.0,
+        rv_target0=circular_target(A),
+        x_rel0=X0.copy(),
+        dt_gnc=1.0,
+        truth_substeps=5,
+    )
+    tr = run(sc, plan_to_controller(qplan))
+    final = tr.channels()["range"][-1]
+    assert abs(final - 30.0) < 12.0  # baseline test allows 8 m unquantized
