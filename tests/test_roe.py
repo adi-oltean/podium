@@ -9,6 +9,7 @@ metrics against brute-force separation scans.
 import math
 
 import numpy as np
+import pytest
 
 from podium import constants as const
 from podium.core import cw, integrators, roe, ya
@@ -79,6 +80,7 @@ def test_j2_stm_reduces_to_keplerian():
     assert np.allclose(phi, roe.stm_keplerian(n, dt), atol=1e-15)
 
 
+@pytest.mark.slow
 def test_keplerian_stm_vs_truth():
     """Two-body ECI truth: osculating == mean, so the ROE history from the
     truth model checks the Keplerian STM directly. The only STM
@@ -169,6 +171,7 @@ def test_control_matrix_vs_truth_impulses():
         assert np.all(scalefree < 0.03), f"axis {axis}: {scalefree}"
 
 
+@pytest.mark.slow
 def test_j2_stm_vs_truth_secular_drift():
     """15-orbit ECI truth with J2: compare secular trends (mean-longitude
     drift and e-vector rotation) via ROE built from per-orbit means of

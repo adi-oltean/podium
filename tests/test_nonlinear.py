@@ -38,6 +38,7 @@ def test_lvlh_roundtrip():
     assert np.allclose(back, x, rtol=1e-12, atol=1e-9)
 
 
+@pytest.mark.slow
 def test_twobody_energy_conserved():
     rv_t = make_target(6_778_137.0, 0.1)
     x0 = np.zeros(6)
@@ -81,6 +82,7 @@ def test_lvlh_velocity_is_position_derivative():
         assert np.linalg.norm(v_num - x_rel[k, 3:]) < 2e-5  # < 0.02 mm/s
 
 
+@pytest.mark.slow
 def test_j2_raan_drift_matches_analytic():
     a, e, inc = 6_778_137.0, 0.001, math.radians(51.6)
     cfg = nl.ForceConfig(j2=const.J2_EARTH)
@@ -103,6 +105,7 @@ def test_j2_raan_drift_matches_analytic():
     assert abs(d_raan - analytic) < 0.05 * abs(analytic)
 
 
+@pytest.mark.slow
 def test_drag_decays_semimajor_axis():
     a = 6_778_137.0
     bc = 50.0
@@ -128,6 +131,7 @@ def test_drag_decays_semimajor_axis():
     assert abs(da - da_analytic) / abs(da_analytic) < 0.25
 
 
+@pytest.mark.slow
 def test_differential_drag_along_track():
     """Lower-BC (draggier) chaser falls to a lower, faster orbit and pulls
     ahead along-track (+y drift) — the classic differential-drag signature."""

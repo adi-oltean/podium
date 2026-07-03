@@ -45,6 +45,7 @@ YA_ENVELOPE_C = {0.0: 40.0, 0.05: 40.0, 0.2: 200.0}
 
 
 @pytest.mark.parametrize("e", [0.0, 0.05, 0.2])
+@pytest.mark.slow
 def test_ya_error_quadratic_envelope(e):
     """Two claims, both physics-derived: (1) YA error scales quadratically
     with separation (pure linearization error — a model bug would scale
@@ -62,6 +63,7 @@ def test_ya_error_quadratic_envelope(e):
 
 
 @pytest.mark.parametrize("sep", [100.0, 1_000.0, 10_000.0])
+@pytest.mark.slow
 def test_cw_equals_ya_at_zero_ecc(sep):
     truth, x_ya, x_cw = propagate_all(sep, 0.0, PERIOD)
     assert np.allclose(x_cw, x_ya, rtol=1e-9, atol=1e-9)
@@ -69,6 +71,7 @@ def test_cw_equals_ya_at_zero_ecc(sep):
 
 
 @pytest.mark.parametrize("e", [0.05, 0.2])
+@pytest.mark.slow
 def test_cw_degrades_with_eccentricity(e):
     """CW error at eccentricity e is dominated by the O(e*sep) model error
     and dwarfs YA's linearization error — the reason YA exists. Documented

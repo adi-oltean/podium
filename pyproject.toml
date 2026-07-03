@@ -69,3 +69,6 @@ files = ["src/podium"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+markers = [
+    "slow: multi-orbit truth-model propagations (deselect with -m 'not slow')",
+]

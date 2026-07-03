@@ -20,14 +20,22 @@ headline addition is the ROE module, #5.)
 - [x] Quantified CW/YA validity envelopes in CI: YA position error
       < C(e)·sep²/a per orbit with C ≈ 40 (e ≤ 0.05) / 200 (e = 0.2),
       quadratic scaling asserted; CW-vs-YA degradation ratios documented
-- [ ] Sim engine: fixed-step master clock, event detection, scenario config
+- [x] Sim engine (#7): fixed-step master clock with truth substeps,
+      scenario config, seeded measurement noise (bit-identical replay
+      enforced by test), impulsive flight-block interface v0, burn log,
+      channel extraction, threshold-crossing events; closed-loop
+      glideslope and CW-synthesized LQR flown against the nonlinear truth
+      through the engine. Continuous-thrust interface and bisection event
+      refinement deferred
 - [ ] Stochastic atmosphere option for the truth model: seeded
       mean-reverting density perturbation on the exponential baseline,
       envelope calibrated to observed storm excursions (+50–125% at
       200–400 km, May 2024 class events) — deterministic replay preserved
 - [x] v0 web viewer on GitHub Pages (#2): canvas playback of the V-bar
       approach, follow camera, burn timeline, log-range scrubber
-- [ ] `sim.to_viewer_json()` export API + matplotlib analysis plots
+- [x] `Trace.to_viewer_json()` export API (schema-compatible with the live
+      viewer)
+- [ ] matplotlib analysis plots
 
 ## v0.2 — "Relative motion complete + convex guidance" (Layer 0)
 
@@ -54,10 +62,11 @@ headline addition is the ROE module, #5.)
 - [ ] **ARCH-COMP rendezvous benchmark** as an executable example with
       model export for reachability tools (CORA/JuliaReach), designed for
       later use as a CI regression gate
-- [ ] Spec registry v0: named temporal-logic mission predicates (corridor,
-      hold, KOZ, timing) evaluated as sim monitors and pytest oracles over
-      deterministic traces; robustness-guided falsification lane in CI
-      with failing seeds replayed as regressions
+- [x] Spec registry v0 (#7, `podium.sim.spec`): named requirements with
+      STL robust semantics over trace channels (PUS-12-shaped base
+      fragment: always/eventually/final with windows), margins as pytest
+      oracles, co-designed with the engine. Follow-ups: rtamt backend for
+      full STL, robustness-guided falsification lane in CI
 
 ## v0.3 — "Full loop"
 

@@ -13,4 +13,16 @@ Design (see docs/architecture.md):
   triggers — evaluated on the master clock with interval refinement.
 - **Monte Carlo.** Seeded dispersion campaigns over initial state, sensor and
   actuator errors; results as structured arrays for batch analysis.
+- **Specs.** Named requirements (STL robust semantics, PUS-12-shaped base
+  fragment) evaluated over trace channels; margins double as pytest oracles.
 """
+
+from podium.sim import spec  # noqa: F401
+from podium.sim.engine import (  # noqa: F401
+    Controller,
+    Scenario,
+    Trace,
+    circular_target,
+    mean_motion_of,
+    run,
+)

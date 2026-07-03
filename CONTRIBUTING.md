@@ -32,6 +32,10 @@ pytest
 All three must pass. Property-based tests (hypothesis) are encouraged for
 kernel math. Keep functions small; the verification story depends on it.
 
+Multi-orbit truth-model propagations are marked `slow`; use
+`pytest -m "not slow"` for the fast lane (<5 s) during development. CI
+runs the full suite.
+
 ## License
 
 By contributing you agree your contributions are licensed under MIT.
