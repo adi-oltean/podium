@@ -18,6 +18,9 @@ the tests).
 
 from __future__ import annotations
 
+import math
+from typing import Callable
+
 import numpy as np
 from numpy.typing import NDArray
 
@@ -54,21 +57,50 @@ def predict(x: F64, p: F64, phi: F64, q: F64) -> tuple[F64, F64]:
     return x_out, p_out
 
 
-def update_joseph(
-    x: F64, p: F64, z: F64, h: F64, r: F64
-) -> tuple[F64, F64, F64, F64]:
-    """Joseph-form measurement update.
-
-    Returns (x, P, innovation, innovation_covariance). The gain solve is
-    against S = H P H' + R (never inverted explicitly).
-    """
+def _joseph_core(
+    x: F64, p: F64, nu: F64, h: F64, r: F64
+) -> tuple[F64, F64, F64]:
     s = h @ p @ h.T + r
     k = np.linalg.solve(s.T, (p @ h.T).T).T  # K = P H' S^-1
-    nu = z - h @ x
     x_out: F64 = x + k @ nu
     ikh = np.eye(len(x)) - k @ h
     p_j = ikh @ p @ ikh.T + k @ r @ k.T
     p_out: F64 = 0.5 * (p_j + p_j.T)
+    return x_out, p_out, s
+
+
+def update_joseph(
+    x: F64, p: F64, z: F64, h: F64, r: F64
+) -> tuple[F64, F64, F64, F64]:
+    """Joseph-form measurement update (linear H).
+
+    Returns (x, P, innovation, innovation_covariance). The gain solve is
+    against S = H P H' + R (never inverted explicitly).
+    """
+    nu = z - h @ x
+    x_out, p_out, s = _joseph_core(x, p, nu, h, r)
+    return x_out, p_out, nu, s
+
+
+def update_joseph_nonlinear(
+    x: F64,
+    p: F64,
+    z: F64,
+    h_fn: Callable[[F64], F64],
+    h_jac: Callable[[F64], F64],
+    r: F64,
+    angle_rows: tuple[int, ...] = (),
+) -> tuple[F64, F64, F64, F64]:
+    """EKF update: nonlinear measurement prediction h(x), Jacobian H(x),
+    Joseph-form covariance. angle_rows lists innovation components that
+    are angles — they are wrapped to (-pi, pi] before the update, which
+    matters for bearing sensors near the +/-pi seam."""
+    h = np.asarray(h_jac(x), dtype=np.float64)
+    pred = np.asarray(h_fn(x), dtype=np.float64)
+    nu = z - pred
+    for i in angle_rows:
+        nu[i] = math.atan2(math.sin(nu[i]), math.cos(nu[i]))
+    x_out, p_out, s = _joseph_core(x, p, nu, h, r)
     return x_out, p_out, nu, s
 
 

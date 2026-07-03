@@ -130,7 +130,15 @@ headline addition is the ROE module, #5.)
       seeded truth; convergence from 100 m initial error; LQR flying on
       EKF estimates from 5 m position-only measurements stabilizes the
       nonlinear truth closed-loop
-- [ ] Sensor models: relative GNSS, docking camera, lidar; actuator MIB/rise
+- [x] Sensor models + actuator imperfections (#15, `podium.nav.sensors`):
+      relative GNSS (white noise + seeded constant bias), docking camera
+      and lidar (az/el bearing + proportional range noise, visibility-
+      gated; Jacobian pinned by FD; EKF gains a nonlinear Joseph update
+      with bearing wrap-around); engine actuator model (MIB quantization,
+      per-tick cap, seeded proportional execution error — receipts show
+      open-loop pulse plans miss by hundreds of meters under 2% execution
+      error while feedback through the same actuator converges).
+      Thruster rise/tail-off shaping deferred to the 6-DOF layer (v0.4)
 - [ ] Attitude dynamics + quaternion-feedback controller; thruster
       allocation with explicit minimum-impulse-bit handling
 - [ ] Docking acceptance tests against the IDSS IDD Rev G contact-condition

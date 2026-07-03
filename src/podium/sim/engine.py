@@ -49,6 +49,11 @@ class Scenario:
     seed: int = 0
     meas_pos_std: float = 0.0  # per-axis measurement noise [m]
     meas_vel_std: float = 0.0  # per-axis measurement noise [m/s]
+    # actuator imperfections (hardware truth, applied to commanded burns;
+    # the burn log records what was ACTUALLY applied):
+    dv_quantum: float = 0.0  # minimum impulse bit [m/s]; 0 = ideal
+    dv_max_tick: float = math.inf  # per-tick impulse magnitude cap [m/s]
+    dv_exec_std_frac: float = 0.0  # per-axis proportional execution error
 
 
 @dataclass
@@ -152,6 +157,16 @@ def run(
             meas[3:6] += rng.normal(0.0, sc.meas_vel_std, 3)
 
         dv = np.asarray(controller(t, meas), dtype=np.float64)
+        if float(dv[0] * dv[0] + dv[1] * dv[1] + dv[2] * dv[2]) > 0.0:
+            # actuator hardware: magnitude cap, MIB quantization, then
+            # proportional per-axis execution error (in that order)
+            mag = float(np.linalg.norm(dv))
+            if mag > sc.dv_max_tick:
+                dv = dv * (sc.dv_max_tick / mag)
+            if sc.dv_quantum > 0.0:
+                dv = np.round(dv / sc.dv_quantum) * sc.dv_quantum
+            if sc.dv_exec_std_frac > 0.0:
+                dv = dv * (1.0 + rng.normal(0.0, sc.dv_exec_std_frac, 3))
         if float(dv[0] * dv[0] + dv[1] * dv[1] + dv[2] * dv[2]) > 0.0:
             # Impulse commanded in the rotating LVLH frame: position is
             # unchanged, so the frame terms drop and the ECI velocity jump

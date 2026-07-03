@@ -33,7 +33,8 @@ src/podium/
   control/     LQR (discrete Riccati + continuous CARE synthesis,
                flight-side gain application), pulsed docking control,
                CW/YA ZOH discretizations
-  nav/         Relative-navigation EKF (Joseph form); sensor models next
+  nav/         Relative-navigation EKF (Joseph form, linear + bearing/range
+               EKF updates), sensor models (relative GNSS, camera, lidar)
   sim/         Deterministic engine, spec registry (STL robust semantics),
                analysis plots; Monte Carlo campaigns next
   viz/         Interactive three.js viewer (planned; canvas viewer live)

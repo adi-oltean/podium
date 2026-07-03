@@ -9,4 +9,4 @@ sensors  Measurement models with error budgets: relative GNSS (carrier-phase
          markers), lidar/rangefinder, and star-tracker/gyro attitude.
 """
 
-from podium.nav import ekf  # noqa: F401
+from podium.nav import ekf, sensors  # noqa: F401
