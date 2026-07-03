@@ -78,6 +78,9 @@ ignore = ["PLR0913", "PLR2004"]
 # mujoco is imported lazily so the module documents itself without the
 # optional contact stack installed.
 "src/podium/sim/contact.py" = ["PLC0415"]
+# An AST visitor is one dispatch table per node class; splitting it
+# obscures the subset definition.
+"src/podium/emit/cemit.py" = ["PLR0911", "PLR0912", "PLR0915"]
 
 [tool.mypy]
 strict = true
@@ -113,6 +116,13 @@ disable_error_code = ["attr-defined", "union-attr", "type-arg"]
 [[tool.mypy.overrides]]
 module = "podium.sim.contact"
 disable_error_code = ["import-untyped", "type-arg"]
+
+# AST manipulation is stringly/unions-heavy; the emitted-C receipts are
+# the correctness gate here, not the annotations.
+[[tool.mypy.overrides]]
+module = "podium.emit.cemit"
+disable_error_code = ["type-arg", "arg-type", "attr-defined",
+                      "assignment", "operator", "unused-ignore"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

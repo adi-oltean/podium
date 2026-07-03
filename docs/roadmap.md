@@ -257,18 +257,58 @@ headline addition is the ROE module, #5.)
 
 ## v0.5 — "Flight path"
 
-- [ ] C emitter for the static subset + contract→annotation rendering
-      (analyzer annotations and ACSL), binary64 throughout, generated C
-      kept within the CompCert-compilable subset
-- [ ] Golden-vector Python↔C equivalence harness, two tiers: bit-exact on
-      host (pinned FP semantics, evaluation-order-matched references,
-      correctly-rounded transcendentals) and ULP-bounded on target;
-      differential fuzzing from contract ranges
+- [x] C emitter v0 (#25, `podium.emit.cemit`): AST-based C99 emitter for
+      the static subset — the supported-subset checker REJECTS anything
+      outside it, making the emitter the operational StaticPy
+      definition. Covers scalar/fixed-array kernels, constant-index
+      subscripts (1-D/2-D), whitelisted math.*, branches, cross-kernel
+      calls lowered through temporaries; contracts render as ACSL
+      requires clauses + analyzer [spec] blocks. First kernels: the
+      quaternion family + CW (mean_motion, cw_deriv, stm). Remaining:
+      bounded-for-loop support to cover roe/ya/integrators/EKF (v0.6),
+      CompCert-subset audit
+- [x] Golden vectors, tier 1 (#25): emitted C under pinned FP semantics
+      (-O2 -ffp-contract=off, SSE2 binary64) reproduces Python
+      BIT-FOR-BIT over 2000 seeded vectors per kernel including branch
+      paths — for every arithmetic+sqrt kernel (sqrt is IEEE
+      correctly-rounded). Measured exception that motivates the
+      CORE-MATH item: sin/cos differ between this interpreter's libm
+      and system glibc on ~0.03% of stm values, bounded ≤4 ulp after
+      propagation — asserted as such, not hidden. Tier 2 (ULP-bounded
+      on target) open
 - [ ] Open abstract-interpretation gate in CI: sound float-interval
       analysis as the primary value gate plus a memory/index gate;
       reproducible audit evidence
 - [ ] CVXPYgen→QOCOGEN embedded solver generation for Layer-0 problems
 - [ ] cFS/F´ integration example (generated GNC app on a software bus)
+
+## v0.6 — "Certified reference mission"
+
+The layers exist; v0.6 composes them into one auditable whole.
+
+- [ ] Emitter v1: bounded `for` loops + local fixed arrays, covering the
+      full static core (roe, ya, integrators, EKF update, quaternion
+      feedback); CompCert-compilable-subset audit of the emitted C
+- [ ] Sound value gate in CI: Frama-C/EVA over the emitted-and-annotated
+      C (float intervals from the ACSL contracts), memory/index gate,
+      reproducible audit report artifacts
+- [ ] Correctly-rounded transcendentals option (CORE-MATH) closing the
+      measured tier-1 sin/cos gap; tier-2 ULP-bounded golden vectors on
+      a cross-compiled target (qemu-aarch64)
+- [ ] CVXPYgen/QOCOGEN embedded generation of a Layer-0 problem with the
+      verified-KKT-checker pattern (certificate checked by exact/interval
+      arithmetic, R4-style)
+- [ ] 6-DOF attitude-coupled PTR + contact attitude (carried from v0.4);
+      thruster torque allocation
+- [ ] End-to-end reference mission: far-range ROE phasing → corridor
+      approach (SCP plan, EKF nav, imperfect actuators) → IDSS contact →
+      MuJoCo capture, as one seeded scenario with a release-grade audit
+      bundle (spec margins, MC table, reach verdicts, barrier
+      certificate, golden-vector attestation) published per tag
+- [ ] Orekit cross-validation lane in CI (orekit-jpype) for the truth
+      model; three.js viewer frame-blending using the target-ECI export
+- [ ] cFS or F´ integration example: the generated GNC app on a software
+      bus, fed by the reference-mission scenario
 
 ## Cross-cutting, every release
 

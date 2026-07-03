@@ -40,8 +40,10 @@ src/podium/
                contact-box checkers, seeded Monte Carlo, analysis plots
   viz/         (viewer/ on Pages): canvas 2-D viewer, three.js 3-D viewer,
                ISS-sim autopilot page — all zero-build, self-contained
-  verify/      Contracts (input ranges, invariants) + export to the external
-               abstract-interpretation validation tool
+  verify/      Contracts (input ranges, invariants), exact-rational barrier
+               certificates, + export to the external validation tool
+  emit/        C99 emitter for the static subset (ACSL + analyzer
+               annotations; bit-exact tier-1 golden vectors vs Python)
 tools/reach/   JuliaReach reachability regression (CI gate)
 tests/         pytest receipts (truth-model validations, closed-loop
                flights, statistical consistency, audits)
