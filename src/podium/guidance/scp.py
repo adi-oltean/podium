@@ -63,6 +63,24 @@ class ScpResult:
         return float(np.sum(np.linalg.norm(self.dvs, axis=1)))
 
 
+@dataclass(frozen=True)
+class EventuallyBoxSpec:
+    """STL timed-reach: eventually within [t_lo, t_hi], the position is
+    inside the axis-aligned box (center +- half). Robustness
+    rho = max_{k in window} min_i (half_i - |r_k,i - c_i|); encoded in
+    the SCP via the log-sum-exp smooth max, consumed CONSERVATIVELY:
+    LSE/tau >= eps + ln(K)/tau  =>  true rho >= eps."""
+
+    t_lo: float
+    t_hi: float
+    center: tuple[float, float, float]
+    half: tuple[float, float, float]
+    eps: float = 1.0  # required true-robustness margin [m]
+    # smoothing sharpness [1/m]: conservatism is ln(K)/tau, so tau must
+    # keep that well under the box half-width (tau=0.5, K=5 -> 3.2 m)
+    tau: float = 0.5
+
+
 class PtrDockingPlanner:
     """PTR loop for impulsive transfers with a true keep-out sphere."""
 
@@ -79,6 +97,7 @@ class PtrDockingPlanner:
         pen_gamma: float = 8.0,
         tol_feas: float = 1e-4,
         tol_step: float = 1e-3,
+        stl_reach: EventuallyBoxSpec | None = None,
     ) -> None:
         self.times = np.asarray(times, dtype=np.float64)
         self.k = len(self.times) - 1
@@ -92,6 +111,50 @@ class PtrDockingPlanner:
         self.pen_gamma = pen_gamma
         self.tol_feas = tol_feas
         self.tol_step = tol_step
+        self.stl_reach = stl_reach
+        self.stl_nodes: list[int] = []
+        if stl_reach is not None:
+            self.stl_nodes = [
+                i for i, t in enumerate(self.times)
+                if stl_reach.t_lo <= t <= stl_reach.t_hi and 0 < i <= self.k
+            ]
+            if not self.stl_nodes:
+                raise ValueError("STL window contains no trajectory nodes")
+
+    # -- STL smooth robustness --------------------------------------------
+    def _stl_margins(self, states: F64) -> F64:
+        """Per-window-node box margins m_k = min_i(half_i - |r_i - c_i|)."""
+        sp = self.stl_reach
+        assert sp is not None
+        out = np.empty(len(self.stl_nodes))
+        for j, k in enumerate(self.stl_nodes):
+            d = states[k, 0:3] - np.asarray(sp.center)
+            out[j] = float(np.min(np.asarray(sp.half) - np.abs(d)))
+        return out
+
+    def stl_true_robustness(self, states: F64) -> float:
+        """Exact (non-smooth) STL robustness of the node trajectory."""
+        return float(np.max(self._stl_margins(states)))
+
+    def _stl_lse(self, states: F64) -> tuple[float, F64, F64]:
+        """(LSE/tau smoothed max, softmax weights, reference margins).
+
+        Soundness structure: node margins enter the subproblem EXACTLY
+        via hypograph variables (m is concave: m <= each affine face
+        expression), and only the LSE — convex in the margins — is
+        tangent-linearized. A convex function dominates its tangent, so
+        tangent >= target implies LSE >= target implies true max-margin
+        >= eps. Linearizing the concave margins directly instead is a
+        RELAXATION the optimizer exploits by exiting through a face the
+        subgradient didn't pick (observed as a period-2 oscillation)."""
+        sp = self.stl_reach
+        assert sp is not None
+        m = self._stl_margins(states)
+        mmax = float(np.max(m))
+        w = np.exp(sp.tau * (m - mmax))
+        lse = mmax + math.log(float(np.sum(w))) / sp.tau
+        w = w / float(np.sum(w))
+        return lse, w, m
 
     # -- exact flow helpers ---------------------------------------------
     def _flow_position(self, n: float, xk: F64, dvk: F64, tau: float) -> F64:
@@ -133,8 +196,9 @@ class PtrDockingPlanner:
         x = cp.Variable((6, self.k + 1))
         v = cp.Variable((3, self.k + 1))
         n_node = self.k - 1
-        s = cp.Variable(n_node + len(cuts), nonneg=True) if (n_node + len(cuts)) \
-            else None
+        n_stl = 1 if self.stl_reach is not None else 0
+        s = cp.Variable(n_node + len(cuts) + n_stl, nonneg=True) \
+            if (n_node + len(cuts) + n_stl) else None
         cons = [x[:, 0] == x0]
         phi = cw.stm(n, float(self.times[1] - self.times[0]))
         for i in range(self.k):
@@ -166,6 +230,22 @@ class PtrDockingPlanner:
             assert s is not None
             cons.append(row @ (x[:, k] + _B @ v[:, k])
                         >= self.r_koz - s[n_node + j])
+        # STL timed-reach: exact hypograph margins + LSE tangent (see
+        # _stl_lse for why this split is the sound one)
+        if self.stl_reach is not None:
+            sp = self.stl_reach
+            lse, w, m_ref = self._stl_lse(ref)
+            target = sp.eps + math.log(len(self.stl_nodes)) / sp.tau
+            mk = cp.Variable(len(self.stl_nodes))
+            for j, k in enumerate(self.stl_nodes):
+                for i in range(3):
+                    d_i = x[i, k] - sp.center[i]
+                    cons.append(mk[j] <= sp.half[i] - d_i)
+                    cons.append(mk[j] <= sp.half[i] + d_i)
+            expr = lse + cp.sum(cp.multiply(w, mk - m_ref))
+            assert s is not None
+            cons.append(expr >= target - s[n_node + len(cuts)])
+
         fuel = cp.sum([cp.norm(v[:, i], 1 if self.objective == "l1" else 2)
                        for i in range(self.k + 1)])
         wt = self.w_tr if w_tr is None else w_tr
@@ -208,7 +288,11 @@ class PtrDockingPlanner:
             fuel = float(np.sum(np.linalg.norm(dvs, axis=1)))
             node_viol = self._node_worst(states)
             dense_viol, new_cuts = self._dense_worst(n, states, dvs)
-            true_viol = max(node_viol, dense_viol)
+            stl_short = 0.0
+            if self.stl_reach is not None:
+                stl_short = max(0.0, self.stl_reach.eps
+                                - self.stl_true_robustness(states))
+            true_viol = max(node_viol, dense_viol, stl_short)
             history.append({"iter": it, "step": step, "slack": slack,
                             "violation": true_viol, "w_pen": w_pen,
                             "w_tr": w_tr, "cuts": len(cuts), "fuel": fuel})
@@ -220,7 +304,10 @@ class PtrDockingPlanner:
             if slack > self.tol_feas and true_viol >= 0.9 * prev_viol:
                 w_pen *= self.pen_gamma
             elif slack <= self.tol_feas and true_viol <= self.tol_feas:
-                w_tr = max(1e-9, w_tr * 0.2)
+                # bounded expansion: enough to break flat-valley crawl,
+                # floored so linearized constraints keep a restoring pull
+                # (w_tr -> 0 makes the loop oscillate, observed)
+                w_tr = max(self.w_tr * 0.04, w_tr * 0.2)
             prev_viol = true_viol
             ref, ref_dv = states, dvs
             if new_cuts and dense_viol > self.tol_feas:

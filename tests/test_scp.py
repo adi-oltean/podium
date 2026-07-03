@@ -15,8 +15,13 @@ from podium.guidance.convex import (  # noqa: E402
     RendezvousPlanner,
     plan_to_controller,
 )
-from podium.guidance.scp import PtrDockingPlanner, ScpResult  # noqa: E402
+from podium.guidance.scp import (  # noqa: E402
+    EventuallyBoxSpec,
+    PtrDockingPlanner,
+    ScpResult,
+)
 from podium.sim import Scenario, circular_target, run  # noqa: E402
+from podium.sim import spec as sp_mod  # noqa: E402
 
 A = 6_778_137.0
 N = math.sqrt(const.MU_EARTH / A**3)
@@ -106,6 +111,61 @@ def test_deterministic():
     r2 = PtrDockingPlanner(times, koz_radius=200.0).solve(x0, xf, N)
     assert np.array_equal(r1.dvs, r2.dvs)
     assert r1.iterations == r2.iterations
+
+
+def test_stl_timed_reach_bites_and_holds():
+    """STL 'eventually in the inspection box within [200, 400] s': the
+    unconstrained plan never visits the box (negative true robustness);
+    with the spec the PTR converges, the TRUE (non-smooth) robustness is
+    >= eps, the KOZ stays clean, and fuel goes up (the detour is real)."""
+    times = np.linspace(0.0, 600.0, 13)
+    x0 = np.array([0.0, -300.0, 0.0, 0.0, 0.0, 0.0])
+    xf = np.array([0.0, 300.0, 0.0, 0.0, 0.0, 0.0])
+    r = 200.0
+    box = EventuallyBoxSpec(t_lo=200.0, t_hi=400.0,
+                            center=(120.0, -260.0, 0.0),
+                            half=(25.0, 25.0, 25.0), eps=1.0)
+    plain = PtrDockingPlanner(times, koz_radius=r).solve(x0, xf, N)
+    stl = PtrDockingPlanner(times, koz_radius=r, stl_reach=box)
+    res = stl.solve(x0, xf, N)
+    assert stl.stl_true_robustness(plain.states) < 0.0  # spec bites
+    assert res.status == "converged"
+    assert stl.stl_true_robustness(res.states) >= box.eps - 1e-6
+    assert dense_min_range(res, N) >= r - 0.5  # KOZ still clean
+    assert res.total_dv() > plain.total_dv()  # the detour costs fuel
+
+
+@pytest.mark.slow
+def test_stl_plan_satisfies_spec_registry_on_truth():
+    """Fly the STL plan through the engine and judge the timed-reach with
+    the spec registry over a custom box-distance channel — guidance,
+    truth, and monitoring agreeing about one temporal property."""
+    times = np.linspace(0.0, 600.0, 13)
+    x0 = np.array([0.0, -300.0, 0.0, 0.0, 0.0, 0.0])
+    xf = np.array([0.0, 300.0, 0.0, 0.0, 0.0, 0.0])
+    box = EventuallyBoxSpec(t_lo=200.0, t_hi=400.0,
+                            center=(120.0, -260.0, 0.0),
+                            half=(25.0, 25.0, 25.0), eps=1.0)
+    res = PtrDockingPlanner(times, koz_radius=200.0,
+                            stl_reach=box).solve(x0, xf, N)
+    assert res.status == "converged"
+
+    class PlanShim:
+        times = res.times
+        dvs = res.dvs
+
+    sc = Scenario(duration=620.0, rv_target0=circular_target(A),
+                  x_rel0=x0.copy(), dt_gnc=1.0, truth_substeps=4)
+    tr = run(sc, plan_to_controller(PlanShim))
+    # custom channel: Chebyshev distance to the box (negative = inside)
+    d = np.abs(tr.x_rel[:, 0:3] - np.asarray(box.center)) \
+        - np.asarray(box.half)
+    boxdist = np.max(d, axis=1)
+    channels = {"t": tr.times, "boxdist": boxdist}
+    spec = sp_mod.eventually_below("reach_box", "boxdist", 0.0,
+                                   t_start=box.t_lo, t_end=box.t_hi)
+    margins = sp_mod.evaluate((spec,), channels)
+    assert margins["reach_box"] > 0.0, margins
 
 
 @pytest.mark.slow

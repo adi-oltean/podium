@@ -191,9 +191,21 @@ headline addition is the ROE module, #5.)
       Receipt: a coarse grid whose coast dips inside the sphere between
       nodes is caught and cut. Integral-augmentation CTCS (for future
       non-coast dynamics) and state-triggered constraints stay open
-- [ ] Temporal-logic mission constraints in the SCP stack via smooth
-      robustness encodings, with mixed-integer reference solutions as
-      offline validation
+- [x] Temporal-logic mission constraints in SCP (#22,
+      `EventuallyBoxSpec`): timed-window reach specs via smooth
+      robustness with a SOUND encoding split — node box margins enter
+      the subproblem exactly as hypograph variables (they are concave),
+      and only the convex LSE smooth-max is tangent-linearized (a convex
+      function dominates its tangent, so tangent >= eps + ln(K)/tau
+      implies true robustness >= eps; linearizing the concave margins
+      directly is a relaxation the optimizer provably exploits —
+      observed as a period-2 oscillation before the fix). Receipts: spec
+      bites (negative robustness without it), converged plans meet TRUE
+      non-smooth robustness, KOZ stays clean, and the engine-flown trace
+      passes a spec-registry eventually-check — guidance, truth, and
+      monitoring agreeing on one temporal property. Deferred: MIP
+      reference validation (no MIP dependency), richer fragments
+      (until/nested), robustness-maximization objective
 - [x] Evaluate OpenSCvx vs in-house (#21, decision recorded): in-house —
       the Layer-0 cvxpy transcription/receipt infrastructure carries
       directly, problem sizes are tiny, and the exact-flow cut mechanism
