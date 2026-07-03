@@ -1,7 +1,26 @@
 # Comparative analysis of existing open-source frameworks
 
-Survey date: July 2026. Full framework-by-framework details in the table
-below; conclusions first.
+Survey date: July 2026 (updated 2026-07-03). Full framework-by-framework
+details in the table below; conclusions first.
+
+Update 2026-07-03 (verified against repos/registries):
+
+- **Orekit MR !1133 is still open** (milestone 14.0, under active review):
+  a `propagation.relative` package (CW + YA propagators, two-impulse
+  rendezvous) plus relative maneuvers. When merged, Orekit gains its first
+  native RPOD package — Java-side, CW/YA only, no ROE, no optimization.
+- **Basilisk latest is v2.10.2** (2026-05-08); RPOD-relevant additions:
+  `hillFrameRelativeControl`, differential-drag formation scenario,
+  `stochasticAtmDensity`, docked-two-craft constraint effector (2.9).
+- **No open implementation of relative-orbital-elements (ROE) dynamics**
+  (Koenig/D'Amico STMs, e/i-vector passive safety) exists in any surveyed
+  tool — see the roadmap's ROE module (issue #5).
+- SCPToolbox.jl remains dormant; **OpenSCvx** (Python/JAX, CTCS built-in)
+  is the active SCP core. **Brahe** (Rust/Python, MIT, JOSS) is a new
+  pedagogy-first entrant. `dyn4space` does not exist; SaRA is
+  human-robot-safety software, not RPOD (both occasionally mis-cited).
+- AFRL `safe-autonomy-sims` remains the RL docking reference and models
+  continuous thrust only — no minimum-impulse-bit actuation.
 
 ## The gap Podium fills
 

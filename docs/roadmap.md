@@ -1,7 +1,8 @@
 # Roadmap
 
 Focus: LEO/MEO RPOD. Each milestone is shippable and validated before the
-next starts.
+next starts. (Revised 2026-07-03 after a literature/practice sweep; the
+headline addition is the ROE module, #5.)
 
 ## v0.1 — "CW sandbox" (current)
 
@@ -20,41 +21,79 @@ next starts.
       < C(e)·sep²/a per orbit with C ≈ 40 (e ≤ 0.05) / 200 (e = 0.2),
       quadratic scaling asserted; CW-vs-YA degradation ratios documented
 - [ ] Sim engine: fixed-step master clock, event detection, scenario config
+- [ ] Stochastic atmosphere option for the truth model: seeded
+      mean-reverting density perturbation on the exponential baseline,
+      envelope calibrated to observed storm excursions (+50–125% at
+      200–400 km, May 2024 class events) — deterministic replay preserved
 - [x] v0 web viewer on GitHub Pages (#2): canvas playback of the V-bar
       approach, follow camera, burn timeline, log-range scrubber
 - [ ] `sim.to_viewer_json()` export API + matplotlib analysis plots
 
-## v0.2 — "Convex guidance" (Layer 0)
+## v0.2 — "Relative motion complete + convex guidance" (Layer 0)
 
-- [ ] Direct transcription on CW/YA STMs: LP (L1 fuel), SOCP (L2), QP
+- [ ] **ROE module (#5)**: quasi-nonsingular relative orbital elements,
+      ROE↔LVLH/OE maps, Koenig closed-form STMs (Keplerian, J2,
+      J2+differential-drag), impulsive control-input matrix — all
+      closed-form, static-subset, validated against the nonlinear truth
+      model (no other open implementation exists)
+- [ ] **ROE-native passive safety**: e/i-vector separation constraints +
+      ellipse-based screening checks as the primary passive-safety
+      mechanism (flight-heritage formulation), with Breger-How Cartesian
+      constraints as the terminal-phase complement
+- [ ] Direct transcription on CW/YA/ROE STMs: LP (L1 fuel), SOCP (L2), QP
       (tracking) via CVXPY, DPP-parametrized from day one
 - [ ] Constraint library: approach cone, rotating-hyperplane KOZ, plume
-      half-space, Breger-How passive-safety scenarios
-- [ ] LCvx thrust-annulus option with validity checks (Lu & Liu)
+      half-space, passive-safety scenarios
+- [ ] LCvx thrust-annulus option with validity checks — including the
+      discrete-time lossless-convexification conditions (continuous-time
+      guarantees do not survive discretization unconditionally)
 - [ ] Clarabel default solver; QOCO alternate
-- [ ] **ARCH-COMP rendezvous benchmark** as an executable example with model
-      export for reachability tools (CORA/JuliaReach)
+- [ ] **ARCH-COMP rendezvous benchmark** as an executable example with
+      model export for reachability tools (CORA/JuliaReach), designed for
+      later use as a CI regression gate
+- [ ] Spec registry v0: named temporal-logic mission predicates (corridor,
+      hold, KOZ, timing) evaluated as sim monitors and pytest oracles over
+      deterministic traces; robustness-guided falsification lane in CI
+      with failing seeds replayed as regressions
 
 ## v0.3 — "Full loop"
 
 - [ ] Relative-nav EKF (fixed-dimension, Joseph form, static subset)
 - [ ] Sensor models: relative GNSS, docking camera, lidar; actuator MIB/rise
-- [ ] Attitude dynamics + quaternion-feedback controller; thruster allocation
+- [ ] Attitude dynamics + quaternion-feedback controller; thruster
+      allocation with explicit minimum-impulse-bit handling
+- [ ] Docking acceptance tests against the IDSS IDD Rev G contact-condition
+      box (closing 0.05–0.10 m/s, lateral rate 0.04 m/s, angular rates
+      0.20 deg/s, lateral offset 0.10 m, angular misalignment 4 deg)
 - [ ] Monte Carlo campaigns (seeded, structured-array output)
 - [ ] three.js interactive viewer (fermi patterns; docs/visualization.md)
 
 ## v0.4 — "SCP docking" (Layer 1)
 
 - [ ] PTR successive convexification for 6-DOF approach+docking; SCvx* mode
-- [ ] State-triggered constraints (plume, min-impulse-bit); CTCS augmentation
+- [ ] Continuous-time constraint satisfaction (CTCS) so corridor/KOZ hold
+      between nodes, not only at them; state-triggered constraints (plume,
+      min-impulse-bit)
+- [ ] Temporal-logic mission constraints in the SCP stack via smooth
+      robustness encodings, with mixed-integer reference solutions as
+      offline validation
 - [ ] Evaluate OpenSCvx as the SCP core vs. in-house loop
 - [ ] Contact/capture via MuJoCo backend; capture-envelope MC analysis
+- [ ] Tumbling-target terminal guidance (rotating corridor, variable-
+      horizon endpoint) — scoped study
 
 ## v0.5 — "Flight path"
 
 - [ ] C emitter for the static subset + contract→annotation rendering
-- [ ] Golden-vector Python↔C equivalence harness
-- [ ] External abstract-interpretation validation gate in CI
+      (analyzer annotations and ACSL), binary64 throughout, generated C
+      kept within the CompCert-compilable subset
+- [ ] Golden-vector Python↔C equivalence harness, two tiers: bit-exact on
+      host (pinned FP semantics, evaluation-order-matched references,
+      correctly-rounded transcendentals) and ULP-bounded on target;
+      differential fuzzing from contract ranges
+- [ ] Open abstract-interpretation gate in CI: sound float-interval
+      analysis as the primary value gate plus a memory/index gate;
+      reproducible audit evidence
 - [ ] CVXPYgen→QOCOGEN embedded solver generation for Layer-0 problems
 - [ ] cFS/F´ integration example (generated GNC app on a software bus)
 
@@ -63,5 +102,9 @@ next starts.
 - Cross-validation oracles: Orekit (orekit-jpype) and/or GMAT propagation
   comparisons in CI; tudatpy for 6-DOF once attitude lands
 - Determinism tests (bit-identical replay)
+- Truth-model credibility documented along the NASA-STD-7009B assessment
+  dimensions (verification, validation, input pedigree, uncertainty)
+- Generated-code workflow aligned with NPR 7150.2D SWE-146 and
+  ECSS-E-ST-40C Rev.1 (2025) expectations for autogenerated software
 - No new dependency unless license-vetted permissive (see
   docs/comparative-analysis.md)

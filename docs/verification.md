@@ -113,8 +113,12 @@ static-subset Python is directly hand-translatable, function-for-function.
    kernels; fixed-step truncation bounds versus validated integration.
 3. **Code level** — generated C proven RTE-free by the external abstract-
    interpretation tool; contracts discharged as proof artifacts.
-4. **Runtime level** — golden-vector Python↔C equivalence in CI; any learned
-   or otherwise unverifiable component wrapped in a run-time-assurance monitor
-   whose backup law and switching surface are the verified artifacts (as of
-   ARCH-COMP 2025, NN docking policies remain unverifiable at scale — the
-   certified path stays classical).
+4. **Runtime level** — golden-vector Python↔C equivalence in CI (two tiers:
+   bit-exact on host with pinned FP semantics; ULP-bounded on target); any
+   learned component wrapped in a run-time-assurance monitor whose backup
+   law and switching surface are the verified artifacts. As of 2026,
+   closed-loop reachability of NN docking policies remains open at the
+   full initial set, while certificate-based verification (neural
+   Lyapunov-barrier proofs) has succeeded on CW-scale benchmarks — the
+   certified path here stays classical, with a documented route for small
+   certificate-carrying learned components later.
