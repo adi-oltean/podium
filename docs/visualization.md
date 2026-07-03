@@ -62,6 +62,21 @@ envelope cone, approach corridor (translucent cone/frustum), keep-out sphere,
 V-bar/R-bar grid in the LVLH plane, thruster-firing glyphs at burn events,
 day/night terminator lighting from the sun vector.
 
+## Build discipline (fermi deploy pattern)
+
+Every shipped viewer build has a derived identity — never hand-typed:
+`tools/deploy_viewer.py` computes BUILD = max existing
+`viewer/builds/b<N>/` + 1 and SHA = `git rev-parse HEAD` (clean-tree
+guard on shipped sources), injects both into the live pages (the
+sources carry `build 0` / `HEAD` dev sentinels that must never ship),
+writes an immutable snapshot to `viewer/builds/b<N>/`, regenerates the
+builds catalog, and re-verifies everything it wrote. Old builds are
+never deleted — a deploy only adds a directory, so all versions stay
+live side by side at `/builds/b<N>/`. Vendored libraries live under
+version-pinned paths (`viewer/vendor/three-<ver>/`); upgrades add a new
+pinned dir rather than mutate what old builds reference. The badge in
+each page links to the exact source commit.
+
 ## Parity discipline
 
 If any dynamics ever get reimplemented viewer-side (e.g., smooth interpolation

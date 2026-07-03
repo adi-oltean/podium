@@ -51,6 +51,10 @@ try:
             page.wait_for_timeout(1200)
 
             check(page.evaluate("!!window.__P3D") is True, "debug handle present")
+            badge = page.get_attribute("#buildlink", "href") or ""
+            btxt = page.inner_text("#buildlink")
+            check("/commit/" in badge and btxt.startswith("build "),
+                  f"build badge present ({btxt} -> {badge.rsplit('/', 1)[-1][:10]})")
             check(page.evaluate("window.__P3D.drawCalls()") > 0, "webgl draw calls > 0")
 
             # non-blank canvas: sample pixels for variety

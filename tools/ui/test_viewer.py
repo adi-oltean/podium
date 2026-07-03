@@ -54,6 +54,10 @@ try:
             check(page.evaluate("T.length") == 1207, "1207 samples embedded")
             scen = page.text_content("#scenario") or ""
             check("V-bar glideslope" in scen, "scenario header populated")
+            badge = page.get_attribute("#buildlink", "href") or ""
+            btxt = page.inner_text("#buildlink")
+            check("/commit/" in badge and btxt.startswith("build "),
+                  f"build badge present ({btxt} -> {badge.rsplit('/', 1)[-1][:10]})")
 
             # HUD at t=0
             hud = page.text_content("#hud") or ""
