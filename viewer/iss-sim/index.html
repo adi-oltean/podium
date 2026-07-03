@@ -112,6 +112,17 @@ const lateralRateCmd = (p, x) => axisRateCmd(p, latVMax(x), Math.abs(p) > 2 ? 25
 const approachRateSI = r => Math.min(r / 50.0, 3.0);             // m/s profile (floor in mv below)
 const pulsesNeeded = (vc, ve, dv) =>
   clamp(Math.trunc((vc - ve) / dv + (vc > ve ? 0.5 : -0.5)), -40, 40);
+// Translation uses a dithered allocator: the fractional click is carried to
+// the next cycle (PWM-style), so sub-pulse rate commands still track on
+// average. Without this, at 60 fps the lateral law dead-zones for all
+// offsets under tau*dv*fps/2 = 0.24 m — Dragon docks 0.2 m off-center.
+const carry = { y: 0, z: 0, ax: 0 };
+const pulsesDithered = (vc, ve, dv, key) => {
+  const want = (vc - ve) / dv + carry[key];
+  const n = clamp(Math.round(want), -40, 40);
+  carry[key] = clamp(want - n, -1, 1);
+  return n;
+};
 
 // frame-unit floors/caps from the sim's own gates. The cruise ceiling is
 // dominated by the SI profile (3 m/s) on fast machines and by the absolute
@@ -219,21 +230,23 @@ const ctl = setInterval(() => {
   if (aligned) {
     // lateral nulling: SI command -> frame units at the actuator boundary
     fire(() => translateRight(), () => translateLeft(),
-      pulsesNeeded(lateralRateCmd(s.y, s.x) / fps, s.mvy, dvT()));
+      pulsesDithered(lateralRateCmd(s.y, s.x) / fps, s.mvy, dvT(), "y"));
     fire(() => translateUp(), () => translateDown(),
-      pulsesNeeded(lateralRateCmd(s.z, s.x) / fps, s.mvz, dvT()));
+      pulsesDithered(lateralRateCmd(s.z, s.x) / fps, s.mvz, dvT(), "z"));
 
-    // closing: corridor + docking-gate discipline, frame-unit floor/ceiling
+    // closing: corridor + docking-gate discipline, frame-unit floor/ceiling.
+    // Aim-at-center: inside 4 m the offsets must be under 0.1 m (dithering
+    // makes that reachable at any frame rate) before the final creep.
     const corridor = Math.max(0.15, 0.10 * s.x);
     const latOK = Math.abs(s.y) < corridor && Math.abs(s.z) < corridor;
-    const gatesOK = Math.abs(s.y) < 0.2 && Math.abs(s.z) < 0.2 &&
+    const gatesOK = Math.abs(s.y) < 0.1 && Math.abs(s.z) < 0.1 &&
       Math.abs(s.pitch) < 0.15 && Math.abs(s.yaw) < 0.15 && Math.abs(s.roll) < 0.15 &&
       Math.abs(s.mvy) < 0.003 && Math.abs(s.mvz) < 0.003;
     const mvTarget = !latOK ? 0.0
       : (s.x < 4 && !gatesOK) ? 0.0
       : clamp(approachRateSI(range) / fps, MV_CONTACT, MV_FAR);
     fire(() => translateForward(), () => translateBackward(),
-      pulsesNeeded(mvTarget, s.mvClose, dvT()));
+      pulsesDithered(mvTarget, s.mvClose, dvT(), "ax"));
   }
   prev = s; prevT = t;
 
@@ -276,9 +289,15 @@ drops below half a pulse, leaving a standing offset of
 stall offset is 0.6 m / 0.25&deg; — <em>outside</em> the docking gates. The
 near-zone gains put it at 0.1 m / 0.05&deg;. (Podium's click-dynamics unit
 tests caught exactly this failure mode.)</p>
-<p><b>3. Half-pulse deadband allocator.</b> <code>pulses_needed()</code> converts
-a rate error into an integer click count, rounding toward zero inside half a
-pulse — the vehicle never chatters around its setpoint.</p>
+<p><b>3. Pulse allocator with sub-pulse dithering.</b> <code>pulses_needed()</code>
+converts a rate error into an integer click count. For translation the
+fractional click is carried into the next cycle (PWM-style): at 60 fps the
+lateral commands near the port are far below one click per cycle, and a
+plain deadband allocator stalls Dragon ~0.24 m off-center — it docks on the
+port rim and fails. Dithering lets the average rate track arbitrarily small
+commands. (Both failure modes — the deadband stall and its frame-rate
+scaling — were found by test, not foresight: the Python click-dynamics unit
+tests caught the first; a 60 fps live run caught the second.)</p>
 <p>The browser side adds the navigation and sequencing a real GNC stack would
 provide. The control mapping was <em>system-identified</em> offline with
 Playwright (repo: <code>tools/ui/sysid*_issim.py</code>): translation pulses
