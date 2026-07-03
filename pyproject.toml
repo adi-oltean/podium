@@ -58,6 +58,10 @@ select = ["E", "F", "I", "NPY", "PL"]
 # over "pythonic" idioms, so silence complexity nags there.
 ignore = ["PLR0913", "PLR2004"]
 
+[tool.ruff.lint.per-file-ignores]
+# UI test harnesses embed JavaScript snippets whose lines don't wrap.
+"tools/ui/*" = ["E501"]
+
 [tool.mypy]
 strict = true
 files = ["src/podium"]

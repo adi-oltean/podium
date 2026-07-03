@@ -200,6 +200,30 @@ For process management (find PID, kill, restart), ALWAYS write a tmp script.
 Write new scripts to the appropriate directory. Legacy `tmp/*.py` scripts
 prompt for approval individually.
 
+## Playwright / UI Testing (RAM hygiene — pattern from ../fermi)
+
+Use Playwright (installed in `.venv`) for all UI verification: the viewer
+pages in `viewer/` and browser-driven integration tests (`tools/ui/`).
+This WSL box has ~8 GB and OOM-crashes from accumulated tooling, so:
+
+- **One heavy process at a time.** NEVER `run_in_background` a Playwright
+  run; strictly sequential.
+- **Always `timeout` heavy scripts** (`timeout 180 ./.venv/bin/python
+  tools/ui/test_viewer.py`) so a hung script can't hold a browser open.
+- **Guarantee teardown:** launch inside `with sync_playwright() as p:` AND
+  close the browser in `finally:`. Launch lean:
+  `p.chromium.launch(args=['--no-sandbox','--disable-dev-shm-usage'])`
+  (add `--disable-gpu` only for non-WebGL pages).
+- **One `http.server` per script**, started with `subprocess.Popen` and
+  `.terminate()`d in the same `finally:`. Never leave one running.
+- **A `timeout`/interrupt does NOT run `finally` cleanup** (SIGTERM), so it
+  orphans the browser. After ANY interrupted/timed-out Playwright run — or
+  whenever RAM feels tight — run `bash tools/ram_sweep.sh` (kills ONLY
+  orphaned Playwright browsers and test http.servers). Inspect with `free -h`.
+- Headless WebGL runs on SwiftShader at ~5 fps; sims with per-frame physics
+  (e.g. iss-sim) run ~12x slower than wall-clock on a 60 fps machine — budget
+  test timeouts accordingly.
+
 ## Screenshots
 
 **SS = See Screenshot.** When user says "SS", find the most recent `.png`

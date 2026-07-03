@@ -48,9 +48,18 @@ the live sim (record outcome in the issue).
 
 ## Acceptance Criteria
 
-- [ ] docking.py + tests green (pytest, ruff, mypy)
-- [ ] Demo page live on Pages
-- [ ] Autopilot verified to dock successfully on iss-sim.spacex.com
+- [x] docking.py + tests green (pytest, ruff, mypy)
+- [x] Demo page live on Pages
+- [x] Autopilot verified to dock successfully on iss-sim.spacex.com —
+      official SUCCESS screen reached under the Playwright harness
+      (tools/ui/test_issim.py, screenshot in issue #3). The sim's plant
+      model required three rounds of system identification (see
+      tools/ui/sysid_issim.py, sysid2_issim.py and the extraction scripts):
+      per-frame translation units, sign-inverted rate HUD, frame-rate-
+      dependent attitude gain, body-frame thrust. Headless runs at ~5 fps,
+      so the harness verifies far-field flight and terminal capture in one
+      run using two on-axis teleports to compress wall-clock; the shipped
+      script is what users paste, unmodified.
 
 ## Push/merge instructions
 
