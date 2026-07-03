@@ -82,6 +82,37 @@ def elements_to_rv(
     return rot @ r_pf, rot @ v_pf
 
 
+def elements_from_rv(r: F64, v: F64, mu: float) -> F64:
+    """Osculating classical elements [a, e, inc, raan, argp, M] from ECI r, v.
+
+    Sandbox utility (inverse of elements_to_rv) used by tests and analysis.
+    Angles in radians, wrapped to [0, 2*pi). Requires a bound, non-degenerate
+    orbit with e > 0 and 0 < inc < pi (argp/raan ill-conditioned otherwise —
+    callers in tests keep e >= 0.01).
+    """
+    rn = float(np.linalg.norm(r))
+    v2 = float(np.dot(v, v))
+    h_vec = np.cross(r, v)
+    node = np.cross(np.array([0.0, 0.0, 1.0]), h_vec)
+    node_n = float(np.linalg.norm(node))
+    e_vec = ((v2 - mu / rn) * r - float(np.dot(r, v)) * v) / mu
+    e = float(np.linalg.norm(e_vec))
+    a = 1.0 / (2.0 / rn - v2 / mu)
+    inc = math.acos(float(h_vec[2]) / float(np.linalg.norm(h_vec)))
+    raan = math.atan2(float(node[1]), float(node[0])) % (2.0 * math.pi)
+    argp = math.acos(min(1.0, max(-1.0, float(np.dot(node, e_vec)) / (node_n * e))))
+    if e_vec[2] < 0.0:
+        argp = 2.0 * math.pi - argp
+    nu = math.acos(min(1.0, max(-1.0, float(np.dot(e_vec, r)) / (e * rn))))
+    if float(np.dot(r, v)) < 0.0:
+        nu = 2.0 * math.pi - nu
+    ecc_anom = 2.0 * math.atan2(
+        math.sqrt(1.0 - e) * math.sin(0.5 * nu), math.sqrt(1.0 + e) * math.cos(0.5 * nu)
+    )
+    mean_anom = (ecc_anom - e * math.sin(ecc_anom)) % (2.0 * math.pi)
+    return np.array([a, e, inc, raan, argp, mean_anom])
+
+
 def perturb_accel(r: F64, v: F64, cfg: ForceConfig, bc: float) -> F64:
     """Perturbing (non-central) acceleration in ECI: J2 + drag."""
     a = np.zeros(3)

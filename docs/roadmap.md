@@ -31,15 +31,18 @@ headline addition is the ROE module, #5.)
 
 ## v0.2 — "Relative motion complete + convex guidance" (Layer 0)
 
-- [ ] **ROE module (#5)**: quasi-nonsingular relative orbital elements,
-      ROE↔LVLH/OE maps, Koenig closed-form STMs (Keplerian, J2,
-      J2+differential-drag), impulsive control-input matrix — all
-      closed-form, static-subset, validated against the nonlinear truth
-      model (no other open implementation exists)
-- [ ] **ROE-native passive safety**: e/i-vector separation constraints +
-      ellipse-based screening checks as the primary passive-safety
-      mechanism (flight-heritage formulation), with Breger-How Cartesian
-      constraints as the terminal-phase complement
+- [x] **ROE module (#5)**: quasi-nonsingular relative orbital elements,
+      ROE↔elements and ROE↔LVLH maps, Koenig closed-form Keplerian and J2
+      STMs (every J2 entry pinned by a finite-difference Jacobian of the
+      exact secular flow), impulsive control-input matrix (validated by
+      finite-difference impulses in the ECI truth model). Follow-up (#6):
+      J2+differential-drag STM variant, eccentric-valid LVLH map,
+      analytic minimum-separation ellipse screening
+- [x] **ROE-native passive safety** (`podium.guidance.safety`): e/i-vector
+      separation angle and RN-plane minimum-separation screening
+      (along-track-drift-independent lower bound), validated against
+      brute-force scans; Breger-How Cartesian constraints remain the
+      planned terminal-phase complement
 - [ ] Direct transcription on CW/YA/ROE STMs: LP (L1 fuel), SOCP (L2), QP
       (tracking) via CVXPY, DPP-parametrized from day one
 - [ ] Constraint library: approach cone, rotating-hyperplane KOZ, plume

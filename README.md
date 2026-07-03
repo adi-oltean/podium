@@ -4,7 +4,7 @@
 
 Podium is an open-source framework for *developing, testing, and formally validating* guidance, navigation & control algorithms for spacecraft rendezvous and docking. It is Python-first for iteration speed, but the algorithm core is written in a deliberately restricted style (the *static subset*) so that flight algorithms translate mechanically to C and can be proven safe by an external abstract-interpretation tool.
 
-> Status: pre-alpha scaffold. The CW kernel, **Yamanaka-Ankersen STM** (elliptic relative motion — no other open implementation exists), quaternion kernel, glideslope guidance, and LQR synthesis/application are implemented and tested; the rest of the tree is designed but stubbed. See [`docs/roadmap.md`](docs/roadmap.md).
+> Status: pre-alpha. Implemented and tested: the CW kernel, **Yamanaka-Ankersen STM** and **relative-orbital-elements kernel** (Koenig Keplerian/J2 STMs, e/i-vector passive safety — no other open implementations exist), the nonlinear truth model (J2 + differential drag), quaternion kernel, glideslope guidance, LQR, and pulsed docking control. See [`docs/roadmap.md`](docs/roadmap.md).
 
 ## Why another space simulator?
 
@@ -20,8 +20,9 @@ Mature tools exist — Basilisk, NASA 42, Trick, Orekit, GMAT — and Podium doe
 ```
 src/podium/
   core/        Verifiable algorithm core (static subset): CW dynamics & STM,
-               Yamanaka-Ankersen STM (elliptic orbits), quaternion kernel,
-               fixed-step integrators
+               Yamanaka-Ankersen STM (elliptic orbits), relative orbital
+               elements (Koenig Keplerian/J2 STMs, LVLH maps, control
+               matrix), quaternion kernel, fixed-step integrators
   dynamics/    Truth models: Tschauner-Hempel, nonlinear relative motion,
                J2 + drag, rigid-body attitude
   guidance/    Glideslope, multi-impulse targeting, convex/SCP trajectory

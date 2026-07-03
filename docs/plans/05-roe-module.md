@@ -65,11 +65,20 @@ error over separation/eccentricity/duration/perturbation grid).
 
 ## Acceptance Criteria
 
-- [ ] Code implemented under static-subset rules with contracts
-- [ ] Receipts green (pytest, ruff, mypy) incl. truth-model comparisons
-      and quadratic-scaling discriminators
-- [ ] Validity-envelope table extended and documented
-- [ ] architecture.md updated
+- [x] Code implemented under static-subset rules with contracts
+      (`core/roe.py`, `guidance/safety.py`)
+- [x] Receipts green (pytest, ruff, mypy): J2 STM pinned entrywise by a
+      central-difference Jacobian of the exact secular flow; Keplerian STM
+      vs two-body ECI truth with quadratic-scaling discriminator; control
+      matrix vs finite-difference truth impulses (3% scale-free, chief
+      e=0.01); J2 secular drift vs 15-orbit ECI truth via orbit-averaged
+      osculating ROE; map↔CW equivalence near-circular; safety metrics vs
+      brute force
+- [x] Near-circular map/CW equivalence documented in tests (full
+      multi-model envelope table deferred to #6 with the eccentric map)
+- [x] architecture.md, README, roadmap updated
+- Deferred to #6: J2+differential-drag STM variant, eccentric-valid LVLH
+  map, analytic (non-scan) minimum-separation ellipse checks
 
 ## Push/merge instructions
 
