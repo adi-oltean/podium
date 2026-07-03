@@ -13,6 +13,9 @@ scp         Layer-1 PTR/SCvx* successive convexification: true nonconvex
             penalty ramp, and exact-flow continuous-time cuts.
 safety      Passive-abort / free-drift safety metrics (e/i separation,
             RN-plane minimum separation: bounded scan + analytic form).
+tumbling    Tumbling-target terminal guidance (scoped study): known-
+            tumble port capture stays CONVEX (rotating corridor as
+            per-node cones, terminal port match as a boundary state).
 arch        ARCH-COMP rendezvous benchmark model + hybrid-automaton
             export for the CI reachability gate.
 """

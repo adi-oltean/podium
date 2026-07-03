@@ -99,6 +99,11 @@ disallow_untyped_calls = false
 disallow_untyped_defs = false
 disable_error_code = ["attr-defined", "union-attr", "type-arg"]
 
+[[tool.mypy.overrides]]
+module = "podium.guidance.tumbling"
+disallow_untyped_calls = false
+disable_error_code = ["attr-defined", "union-attr", "type-arg"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"

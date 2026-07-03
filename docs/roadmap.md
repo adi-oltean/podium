@@ -212,8 +212,19 @@ headline addition is the ROE module, #5.)
       is specific to our coast-arc structure. Revisit at 6-DOF where
       OpenSCvx's discretization machinery earns its keep
 - [ ] Contact/capture via MuJoCo backend; capture-envelope MC analysis
-- [ ] Tumbling-target terminal guidance (rotating corridor, variable-
-      horizon endpoint) — scoped study
+- [x] Tumbling-target terminal guidance — scoped study (#23,
+      `podium.guidance.tumbling` + docs/plans/23-tumbling-study.md):
+      known-tumble port capture stays CONVEX (deterministic port
+      kinematics → terminal boundary state + per-node rotating-corridor
+      cones on the exact CW STM). Findings pinned by tests: fuel-vs-rate
+      is phase-confounded (fix the arrival phase for clean envelopes);
+      the naive co-rotation cost intuition fails at low rates (matching
+      a slow port beats nulling all motion — CW drift supplies velocity
+      free); measured envelope closes at ~3 deg/s under a 0.35 m/s burn
+      cap (~1 deg/s flyable at 2.1 m/s). Engine flight arrives on the
+      independently-recomputed rotating port within 1 m / 1 cm/s.
+      Follow-on: uncertain tumble (estimator + robust corridors), 3-D
+      nutation, plume-vs-rotating-body — where SCP re-enters
 - [x] **Infinite-horizon abort-safety certificates** (#20,
       `podium.verify.barrier`): barrier functions over the CW flow
       invariants in time-scaled coordinates (integer dynamics matrix →
