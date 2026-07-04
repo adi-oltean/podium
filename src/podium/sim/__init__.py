@@ -22,6 +22,9 @@ Design (see docs/architecture.md):
   arrays, exact reproducibility).
 - **Contact.** `podium.sim.contact` (import explicitly; mujoco optional):
   probe-drogue capture truth model with envelope sweeps.
+- **Mission.** `podium.sim.mission` (import explicitly; needs the opt +
+  contact extras): the end-to-end reference mission and its
+  byte-deterministic audit bundle.
 """
 
 from podium.sim import idss, monte_carlo, spec  # noqa: F401

@@ -84,6 +84,9 @@ ignore = ["PLR0913", "PLR2004"]
 # cvxpy/cvxpygen imported lazily: generation is a local/offline step and
 # cvxpygen's import pulls a Julia sidecar.
 "src/podium/emit/solvergen.py" = ["PLC0415"]
+# mission composes the optional stacks (cvxpy, mujoco) lazily; the phase
+# controller is one narrative function by design.
+"src/podium/sim/mission.py" = ["PLC0415", "PLR0915"]
 
 [tool.mypy]
 strict = true
@@ -131,6 +134,10 @@ disable_error_code = ["type-arg", "arg-type", "attr-defined",
 module = "podium.emit.solvergen"
 disallow_untyped_defs = false
 disable_error_code = ["attr-defined", "import-untyped", "type-arg"]
+
+[[tool.mypy.overrides]]
+module = "podium.sim.mission"
+disable_error_code = ["type-arg", "assignment", "operator", "union-attr"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

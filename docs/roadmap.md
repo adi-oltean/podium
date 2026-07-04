@@ -317,11 +317,21 @@ The layers exist; v0.6 composes them into one auditable whole.
       arithmetic, R4-style)
 - [ ] 6-DOF attitude-coupled PTR + contact attitude (carried from v0.4);
       thruster torque allocation
-- [ ] End-to-end reference mission: far-range ROE phasing → corridor
-      approach (SCP plan, EKF nav, imperfect actuators) → IDSS contact →
-      MuJoCo capture, as one seeded scenario with a release-grade audit
-      bundle (spec margins, MC table, reach verdicts, barrier
-      certificate, golden-vector attestation) published per tag
+- [x] End-to-end reference mission (#28, `podium.sim.mission`): one
+      seeded scenario composing every layer — barrier-certified safe
+      formation (certificate re-verified in exact rationals into the
+      bundle) → PTR/CTCS approach with mid-course replans from EKF
+      estimates through MIB+execution-error actuators → corridor-GATED
+      terminal feedback into the IDSS box → MuJoCo capture; attitude
+      held and judged at contact time. Receipts: reference run docks
+      in-box and captures (dv 12.4 m/s measured, chatter-trim noted as
+      polish); dispersed campaign 100% capture; audit bundle
+      byte-deterministic; dispersed starts proven inside the certified
+      ellipsoid. Two measured GNC lessons encoded: q_accel must budget
+      actuator mismatch (undersized → near-open-loop filter → 0.1 m
+      estimate bias that blinded the estimate-keyed gate), and docking
+      boxes need docking-grade sensing. Per-tag publishing of the
+      bundle remains open (release workflow)
 - [ ] Orekit cross-validation lane in CI (orekit-jpype) for the truth
       model; three.js viewer frame-blending using the target-ECI export
 - [ ] cFS or F´ integration example: the generated GNC app on a software
