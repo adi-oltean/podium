@@ -299,9 +299,18 @@ headline addition is the ROE module, #5.)
       QOCOGEN alternate + verified-KKT checker are the v0.6 items
 - [ ] cFS/F´ integration example (generated GNC app on a software bus)
 
-## v0.6 — "Certified reference mission"
+## v0.6 — "Certified reference mission" — COMPLETE (2026-07-04)
 
-The layers exist; v0.6 composes them into one auditable whole.
+The layers exist; v0.6 composes them into one auditable whole. Every
+item below shipped: the reference mission with a byte-deterministic,
+evidence-gated per-tag audit bundle; the emitter grown to the full
+flight core (bounded loops, matmul, the EKF) with tier-1 golden
+vectors now replayed through CompCert; three proof-class CI gates
+(reachability, exact-rational barriers, Frama-C/EVA); independent
+Orekit cross-validation; 6-DOF attitude-coupled guidance; viewer
+frame blending; and a cFS app running the verified kernels on a
+software bus. Remaining stretch items (CORE-MATH, QOCOGEN,
+tudatpy 6-DOF oracle, torque allocation) carry into v0.7.
 
 - [x] Emitter v1 (#27): bounded `for range(N)` loops (compile-time
       bounds, module-constant resolution), module-constant inlining,
@@ -414,8 +423,19 @@ The layers exist; v0.6 composes them into one auditable whole.
       inertial blend — measured 77.8 deg at t=1200 s = exactly the
       frame rotation — and chaser RANGE is blend-invariant, so the
       physics is untouched) in test_viewer3d
-- [ ] cFS or F´ integration example: the generated GNC app on a software
-      bus, fed by the reference-mission scenario
+- [x] cFS integration example (#36, `podium.emit.cfsapp` +
+      `examples/cfs_nav_app/`): a Core Flight System relative-navigation
+      app in genuine cFS idiom (CFE_ES_RunLoop, CFE_SB pipe/subscribe/
+      receive/transmit, EVS events) whose GNC step is ENTIRELY the
+      emitted, EVA-proven, CompCert-checked kernels
+      (update_sequential + predict over a maintained 6-state + 6x6
+      covariance). A minimal portable CFE SB/ES/EVS shim lets the same
+      app source compile and run standalone with gcc (-Wall -Werror
+      clean); README maps every piece to real cFS and to F´. Receipt:
+      the compiled app reproduces the Python EKF to 1e-11 on a recorded
+      nav stream. Nice tie-back: the app runs r_var at the EVA-proven
+      envelope floor — the sound-value gate constrains the flight
+      configuration, not just the code
 
 ## Cross-cutting, every release
 

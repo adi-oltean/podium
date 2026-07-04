@@ -47,7 +47,8 @@ src/podium/
 tools/reach/   JuliaReach reachability regression (CI gate)
 tests/         pytest receipts (truth-model validations, closed-loop
                flights, statistical consistency, audits)
-examples/      Runnable scenarios (V-bar approach, ...)
+examples/      Runnable scenarios (V-bar approach); cfs_nav_app/ — a
+               Core Flight System app running the verified kernels
 docs/          Architecture, comparative analysis, trajectory optimization,
                verification approach, roadmap, per-issue plans
 ```
