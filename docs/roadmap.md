@@ -355,8 +355,17 @@ The layers exist; v0.6 composes them into one auditable whole.
       ellipsoid. Two measured GNC lessons encoded: q_accel must budget
       actuator mismatch (undersized → near-open-loop filter → 0.1 m
       estimate bias that blinded the estimate-keyed gate), and docking
-      boxes need docking-grade sensing. Per-tag publishing of the
-      bundle remains open (release workflow)
+      boxes need docking-grade sensing
+- [x] Per-tag audit publishing (#31, `.github/workflows/release.yml`):
+      every v* tag becomes a GitHub Release carrying the evidence —
+      bundle.json (byte-deterministic mission audit), the emitted
+      kernels.c + eva_driver.c, a FRESH EVA zero-alarm proof run on
+      the release runner, and meta.json (stamps kept separate so
+      bundle.json stays byte-comparable). Hard-gated: the tag cannot
+      ship unless the mission captures, all IDSS/STL margins are
+      positive, the barrier certificate verifies exactly, and EVA
+      reports zero alarms. workflow_dispatch = artifact-only dry run.
+      First exercised on tag v0.5.0
 - [ ] Orekit cross-validation lane in CI (orekit-jpype) for the truth
       model; three.js viewer frame-blending using the target-ECI export
 - [ ] cFS or F´ integration example: the generated GNC app on a software

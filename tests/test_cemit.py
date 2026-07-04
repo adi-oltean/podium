@@ -8,20 +8,11 @@ import subprocess
 import numpy as np
 import pytest
 
-from podium.core import cw, quat, roe, ya
 from podium.emit import cemit, evagen
-from podium.nav import ekf
+from podium.emit.kernels import FLIGHT_KERNELS as KERNELS
 from podium.verify import Interval, contract
 
 GCC = shutil.which("gcc")
-
-KERNELS = [quat.normalize, quat.multiply, quat.conjugate, quat.rotate,
-           quat.deriv, quat.error, cw.mean_motion, cw.cw_deriv, cw.stm,
-           ya.kepler_eccentric, ya.true_from_eccentric,
-           ya.eccentric_from_true, ya.propagate_true_anomaly,
-           roe.stm_keplerian, roe.map_roe_to_lvlh, roe.map_lvlh_to_roe,
-           roe.control_matrix, ekf.predict, ekf.update_sequential,
-           ekf.process_noise_wna]
 
 # per-function input specs: (list of (kind, size), sampler ranges)
 CASES = {

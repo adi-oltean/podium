@@ -19,17 +19,8 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "src"))
 
-from podium.core import cw, quat, roe, ya  # noqa: E402
 from podium.emit import cemit, evagen  # noqa: E402
-from podium.nav import ekf  # noqa: E402
-
-KERNELS = [quat.normalize, quat.multiply, quat.conjugate, quat.rotate,
-           quat.deriv, quat.error, cw.mean_motion, cw.cw_deriv, cw.stm,
-           ya.kepler_eccentric, ya.true_from_eccentric,
-           ya.eccentric_from_true, ya.propagate_true_anomaly,
-           roe.stm_keplerian, roe.map_roe_to_lvlh, roe.map_lvlh_to_roe,
-           roe.control_matrix, ekf.predict, ekf.update_sequential,
-           ekf.process_noise_wna]
+from podium.emit.kernels import FLIGHT_KERNELS as KERNELS  # noqa: E402
 
 IMAGE = "framac/frama-c:dev"
 

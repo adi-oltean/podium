@@ -1,0 +1,56 @@
+name: release
+
+# Per-tag audit bundle: every vX.Y.Z tag becomes a GitHub Release
+# carrying the evidence — the byte-deterministic reference-mission
+# audit (hard-gated: capture + all IDSS/STL margins + exact-rational
+# barrier verdict), the emitted flight C, and a FRESH EVA zero-alarm
+# proof run on this runner. A tag cannot ship on failed evidence.
+# workflow_dispatch = dry run (artifacts only, no release).
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - name: Build the audit bundle (hard gate)
+        run: >
+          python3 tools/build_audit_bundle.py audit
+          --tag "${{ github.ref_name }}" --sha "${{ github.sha }}"
+      - name: Fresh EVA proof (hard gate)
+        run: python3 tools/eva_gate.py audit
+      - name: Upload bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-bundle
+          path: |
+            audit/bundle.json
+            audit/meta.json
+            audit/kernels.c
+            audit/eva_driver.c
+            audit/eva_report.txt
+      - name: Create release with evidence attached
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "${{ github.ref_name }}"
+          audit/bundle.json audit/meta.json audit/kernels.c
+          audit/eva_driver.c audit/eva_report.txt
+          --title "${{ github.ref_name }}"
+          --notes "Evidence-gated release: reference mission captured
+          with all IDSS/STL margins positive, abort-safety barrier
+          certificate verified in exact rational arithmetic, and the
+          emitted flight C proven alarm-free by Frama-C/EVA on this
+          runner. See bundle.json / eva_report.txt for the receipts."
