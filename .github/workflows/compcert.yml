@@ -1,0 +1,48 @@
+name: compcert
+
+# The strongest tier-1 claim: replay the golden vectors through
+# CompCert (ccomp), the C compiler with a machine-checked semantics-
+# preservation proof. If these pass, the emitted kernels' binaries
+# reproduce CPython bit-for-bit THROUGH a verified compilation.
+# opam state is cached by setup-ocaml; first run builds CompCert
+# (~25 min), later runs are minutes.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/podium/core/**"
+      - "src/podium/nav/ekf.py"
+      - "src/podium/emit/**"
+      - "tests/test_cemit.py"
+      - ".github/workflows/compcert.yml"
+  workflow_dispatch:
+  schedule:
+    - cron: "29 8 * * 3"  # weekly drift check
+
+jobs:
+  golden-through-ccomp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e . pytest hypothesis
+      - uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: "4.14"
+      - name: Install CompCert (package coq-compcert, Coq opam archive)
+        run: |
+          opam repo add coq-released https://coq.inria.fr/opam/released
+          opam install -y coq-compcert
+      - name: Locate ccomp
+        run: |
+          CCOMP=$(opam exec -- which ccomp || true)
+          if [ -z "$CCOMP" ]; then
+            CCOMP=$(find ~/.opam -name ccomp -type f | head -1)
+          fi
+          "$CCOMP" --version
+          echo "PODIUM_CC=$CCOMP" >> "$GITHUB_ENV"
+      - name: Golden vectors through the verified compiler
+        run: pytest tests/test_cemit.py -v

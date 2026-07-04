@@ -334,6 +334,17 @@ The layers exist; v0.6 composes them into one auditable whole.
 - [x] Sound value gate in CI (#29 — landed under v0.5's carried item):
       see the v0.5 entry; eva.yml re-proves on core/emit changes +
       weekly with report artifacts
+- [x] CompCert audit (#34): receipts, not prose — CompCert 3.17
+      compiles all 20 emitted kernels (verified locally via the
+      ocaml/opam container; package is coq-compcert in the
+      coq-released archive), a subset TRIPWIRE test pins the emitter
+      to the verified-compilable C99 subset forever (no VLAs — every
+      declared dimension a literal — no goto/switch/union/long
+      double/_Complex/malloc), and compcert.yml replays the FULL
+      golden-vector suite through ccomp (PODIUM_CC hook in the
+      harness) on emit changes + weekly: the tier-1 claim upgrades to
+      "a compiler with a machine-checked semantics-preservation proof
+      reproduces CPython bitwise"
 - [ ] Correctly-rounded transcendentals option (CORE-MATH) closing the
       measured tier-1 sin/cos gap; tier-2 ULP-bounded golden vectors on
       a cross-compiled target (qemu-aarch64)

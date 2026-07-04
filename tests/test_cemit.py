@@ -2,6 +2,9 @@
 the host under pinned FP semantics), subset rejection, ACSL rendering,
 and deterministic emission."""
 
+import os
+import pathlib
+import re
 import shutil
 import subprocess
 
@@ -205,8 +208,14 @@ def _vectors(name, n_vec, rng):
 
 @pytest.fixture(scope="module")
 def compiled(tmp_path_factory):
-    if GCC is None:
-        pytest.skip("gcc not available")
+    """Compile the golden driver. PODIUM_CC selects the compiler —
+    notably CompCert's ccomp (compcert.yml), which upgrades the tier-1
+    claim to 'a formally verified compiler reproduces CPython bitwise'.
+    ccomp never contracts FP and takes no -std/-Werror; gcc keeps the
+    pinned-semantics flags."""
+    cc = os.environ.get("PODIUM_CC") or GCC
+    if cc is None:
+        pytest.skip("no C compiler available")
     d = tmp_path_factory.mktemp("cemit")
     src = cemit.emit_module(KERNELS, "podium_kernels_test")
     (d / "kernels.c").write_text(src)
@@ -218,9 +227,14 @@ def compiled(tmp_path_factory):
                     .replace("{dispatch}", _dispatch_block())
     (d / "driver.c").write_text(driver)
     exe = d / "kern"
+    if "ccomp" in pathlib.Path(cc).name:
+        flags = ["-O"]
+    else:
+        flags = ["-std=c99", "-O2", "-ffp-contract=off", "-Wall",
+                 "-Werror"]
     subprocess.run(
-        [GCC, "-std=c99", "-O2", "-ffp-contract=off", "-Wall", "-Werror",
-         "-o", str(exe), str(d / "kernels.c"), str(d / "driver.c"), "-lm"],
+        [cc, *flags, "-o", str(exe), str(d / "kernels.c"),
+         str(d / "driver.c"), "-lm"],
         check=True, capture_output=True, text=True)
     return exe
 
@@ -332,6 +346,23 @@ def test_acsl_rendering():
     assert "\\forall integer i; 0 <= i < 2" in src
     assert "[in, range(-10.0,10.0)] x;" in src
     assert "/* [spec]" in src
+
+
+def test_compcert_subset_tripwire():
+    """The emitted C must stay inside CompCert's verified-compilable
+    C99 subset, forever: no VLAs (every array dimension in a
+    declaration is a literal), no goto/switch/union, no long double or
+    _Complex, no dynamic allocation. This is the tripwire that keeps
+    future emitter growth honest; compcert.yml then proves the point
+    by replaying the golden vectors through ccomp itself."""
+    src = cemit.emit_module(KERNELS, "podium_kernels_test")
+    for banned in ("goto", "switch", "union", "long double", "_Complex",
+                   "malloc", "alloca", "setjmp", "va_", "asm"):
+        assert banned not in src, banned
+    # every declared array dimension is a decimal literal (no VLAs)
+    for decl in re.finditer(r"double \w+((?:\[[^\]]+\])+)[;)=]", src):
+        for dim in re.findall(r"\[([^\]]+)\]", decl.group(1)):
+            assert dim.isdigit(), decl.group(0)
 
 
 def test_eva_driver_generation():
