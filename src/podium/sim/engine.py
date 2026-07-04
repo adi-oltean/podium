@@ -34,6 +34,27 @@ F64 = NDArray[np.float64]
 Controller = Callable[[float, F64], F64]
 
 
+def _quat_from_matrix(m: F64) -> F64:
+    """Rotation matrix -> unit quaternion (w,x,y,z), Shepperd's method
+    (largest pivot — numerically safe near all attitudes)."""
+    tr = float(m[0, 0] + m[1, 1] + m[2, 2])
+    if tr > 0.0:
+        s = math.sqrt(tr + 1.0) * 2.0
+        return np.array([0.25 * s,
+                         (m[2, 1] - m[1, 2]) / s,
+                         (m[0, 2] - m[2, 0]) / s,
+                         (m[1, 0] - m[0, 1]) / s])
+    i = int(np.argmax([m[0, 0], m[1, 1], m[2, 2]]))
+    j, k = (i + 1) % 3, (i + 2) % 3
+    s = math.sqrt(max(1e-15, 1.0 + m[i, i] - m[j, j] - m[k, k])) * 2.0
+    q = np.zeros(4)
+    q[0] = (m[k, j] - m[j, k]) / s
+    q[1 + i] = 0.25 * s
+    q[1 + j] = (m[j, i] + m[i, j]) / s
+    q[1 + k] = (m[k, i] + m[i, k]) / s
+    return q
+
+
 @dataclass
 class Scenario:
     """Everything that defines a run; two equal scenarios replay identically."""
@@ -97,6 +118,20 @@ class Trace:
                 out.append(float(t[i] + frac * (t[i + 1] - t[i])))
         return out
 
+    def frame_quaternions(self) -> F64:
+        """Per-sample LVLH->ECI rotation quaternions (w,x,y,z) from the
+        target trajectory — the viewer's frame-blending input."""
+        out = np.zeros((len(self.times), 4))
+        for i in range(len(self.times)):
+            r, v = self.rv_target[i, 0:3], self.rv_target[i, 3:6]
+            m = nl.lvlh_rotation(r, v).T  # columns = LVLH basis in ECI
+            out[i] = _quat_from_matrix(m)
+        # hemisphere continuity so the viewer can slerp sample-to-sample
+        for i in range(1, len(out)):
+            if float(np.dot(out[i], out[i - 1])) < 0.0:
+                out[i] = -out[i]
+        return out
+
     def to_viewer_json(self, name: str = "podium scenario", orbit: str = "",
                        dock: tuple[float, float, float] = (0.0, 0.0, 0.0),
                        n: float = 0.0) -> str:
@@ -113,6 +148,8 @@ class Trace:
             },
             "t": [round(float(t), 3) for t in self.times],
             "x": [[round(float(v), 4) for v in row] for row in self.x_rel],
+            "q_le": [[round(float(v), 6) for v in row]
+                     for row in self.frame_quaternions()],
             "burns": [
                 {"t": round(float(t), 3), "dv": [round(float(v), 5) for v in dv]}
                 for t, dv in self.burns

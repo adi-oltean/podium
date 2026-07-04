@@ -15,13 +15,17 @@ project (interstellar-mission explorer with a real-time three.js chase cam).
 
 ## Tier 2 — interactive viewer (static HTML + vendored three.js)
 
-> Status: first increment live at `viewer/3d/` (#18) — LVLH scene,
-> corridor/KOZ geometry, preallocated trail, burn glyphs, follow +
-> free-orbit cameras, Playwright receipts. Patterns 1, 2, and the
-> orbit-seeding half of 5 implemented; frame blending (3), chaser
-> recentering (4), log-time (6), and URL state (7) still open — frame
-> blending first, since it needs target-ECI data added to
-> `to_viewer_json()`.
+> Status: live at `viewer/3d/` (#18, #35) — LVLH scene, corridor/KOZ
+> geometry, preallocated trail, burn glyphs, follow + free-orbit
+> cameras, and LVLH<->inertial FRAME BLENDING (#35). Patterns 1, 2,
+> 3, and the orbit-seeding half of 5 implemented; chaser recentering
+> (4), log-time (6), and URL state (7) still open. Frame blending
+> departs slightly from the `render_pos = inertial - blend·offset`
+> sketch below: to keep the shipped LVLH view pixel-identical at
+> blend 0 it blends ROTATIONS from identity (slerp of the per-sample
+> LVLH->ECI quaternion `q_le`), rotating the trail per-point by each
+> point's own frame — so full blend shows the true curved
+> inertial-space arc, and range is provably blend-invariant.
 
 A single `viewer/index.html` plus a vendored `three.min.js`; no bundler, no
 node toolchain. Simulations export a compact JSON (`sim.to_viewer_json()`)

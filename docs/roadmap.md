@@ -402,8 +402,18 @@ The layers exist; v0.6 composes them into one auditable whole.
       precession, tilting the J2 axis), and drag DELTAS within 10%
       (magnitude, direction, co-rotation convention). validate extra
       gains orekit-jpype
-- [ ] three.js viewer frame-blending using the target-ECI export
-      (split out of the Orekit item)
+- [x] three.js viewer frame-blending (#35): to_viewer_json now exports
+      per-sample LVLH->ECI frame quaternions (q_le, hemisphere-
+      continuous for slerp); the viewer gains a LVLH<->inertial blend
+      slider that rotates the LVLH structures (station/corridor/grid)
+      by the current-time frame while rotating the trajectory trail
+      PER-POINT by each point's own frame, so at full blend the
+      straight glideslope becomes its true curved inertial-space arc.
+      Receipts: q_le physics (unit, continuous, matches lvlh_rotation,
+      ~n*dt per step) in test_sim; UI receipts (world rotates ~n*t at
+      inertial blend — measured 77.8 deg at t=1200 s = exactly the
+      frame rotation — and chaser RANGE is blend-invariant, so the
+      physics is untouched) in test_viewer3d
 - [ ] cFS or F´ integration example: the generated GNC app on a software
       bus, fed by the reference-mission scenario
 

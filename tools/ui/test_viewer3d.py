@@ -93,6 +93,23 @@ try:
             page.click("#mode")
             check(page.evaluate("window.__P3D.mode()") == "orbit", "toggles to orbit")
 
+            # frame blending: q_le present, blend rotates the world, and
+            # the chaser RANGE is blend-invariant (a rotation about the
+            # target preserves distance — the physics must not change).
+            check(page.evaluate("window.__P3D.hasFrames()") is True,
+                  "frame quaternions exported (q_le)")
+            page.evaluate("window.__P3D.setT(1200)")
+            r_lvlh = page.evaluate("window.__P3D.range()")
+            a_lvlh = page.evaluate("window.__P3D.worldAngle()")
+            page.evaluate("window.__P3D.setFrame(1)")
+            r_in = page.evaluate("window.__P3D.range()")
+            a_in = page.evaluate("window.__P3D.worldAngle()")
+            check(a_lvlh < 0.5, f"LVLH blend: world unrotated ({a_lvlh:.2f} deg)")
+            check(a_in > 20.0, f"inertial blend: world rotated ({a_in:.1f} deg)")
+            check(abs(r_lvlh - r_in) < 1e-3,
+                  f"range blend-invariant ({r_lvlh:.3f} vs {r_in:.3f} m)")
+            page.evaluate("window.__P3D.setFrame(0)")
+
             page.screenshot(path=str(SHOTS / "viewer3d.png"))
             check(len(errors) == 0, f"zero console errors ({errors[:3]})")
         finally:

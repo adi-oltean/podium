@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 
 from podium.control import lqr
-from podium.core import cw
+from podium.core import cw, quat
 from podium.dynamics import nonlinear as nl
 from podium.guidance.glideslope import glideslope_pulses
 from podium.sim import Scenario, circular_target, mean_motion_of, run
@@ -168,11 +168,34 @@ def test_viewer_json_schema():
     sc = make_scenario(duration=60.0)
     tr = run(sc, lambda t, x: np.array([0.0, 0.01, 0.0]) if t == 0.0 else np.zeros(3))
     js = json.loads(tr.to_viewer_json(name="test", orbit="400 km", n=N))
-    assert set(js) == {"meta", "t", "x", "burns"}
+    assert set(js) == {"meta", "t", "x", "q_le", "burns"}
     assert js["meta"]["dv_total"] == pytest.approx(0.01, abs=1e-6)
-    assert len(js["t"]) == len(js["x"]) == 31
+    assert len(js["t"]) == len(js["x"]) == len(js["q_le"]) == 31
     assert len(js["x"][0]) == 6
     assert js["burns"][0]["t"] == 0.0
+
+
+def test_frame_quaternions_physics():
+    """The exported LVLH->ECI quaternions: unit norm, hemisphere-
+    continuous (slerp-safe), rotation matrix matches lvlh_rotation
+    transposed, and consecutive frames rotate by ~n*dt about the orbit
+    normal — the physics the viewer's frame blending displays."""
+    sc = make_scenario(duration=600.0)
+    tr = run(sc, no_control)
+    q = tr.frame_quaternions()
+    norms = np.linalg.norm(q, axis=1)
+    assert np.max(np.abs(norms - 1.0)) < 1e-9
+    dots = np.sum(q[1:] * q[:-1], axis=1)
+    assert np.all(dots > 0.0)  # continuity
+    # conversion correctness on a sample
+    for i in (0, 150, 300):
+        m = nl.lvlh_rotation(tr.rv_target[i, 0:3], tr.rv_target[i, 3:6]).T
+        for col, e in enumerate(np.eye(3)):
+            assert np.allclose(quat.rotate(q[i], e), m[:, col], atol=1e-9)
+    # frame rate: angle between consecutive quats = n*dt (circular)
+    ang = 2.0 * np.arccos(np.clip(dots, -1.0, 1.0))
+    dt = tr.times[1] - tr.times[0]
+    assert np.allclose(ang, N * dt, rtol=2e-3)
 
 
 def test_dv_actually_applied():
