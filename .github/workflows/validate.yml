@@ -1,0 +1,46 @@
+name: validate
+
+# Independent cross-validation of the truth model against Orekit:
+# two-body vs analytic Keplerian, J2 vs Holmes-Featherstone (pole-of-
+# date aligned), and drag-delta agreement. Runs on dynamics changes,
+# weekly, and on dispatch — not in the main ci lane (JVM + 20 MB data).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/podium/dynamics/**"
+      - "tests/test_orekit_validation.py"
+      - ".github/workflows/validate.yml"
+  workflow_dispatch:
+  schedule:
+    - cron: "17 7 * * 2"  # weekly drift check
+
+jobs:
+  orekit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e . orekit-jpype pytest
+      - name: Cache orekit-data
+        id: okdata
+        uses: actions/cache@v4
+        with:
+          path: orekit-data.zip
+          key: orekit-data-v1
+      - name: Download orekit-data
+        if: steps.okdata.outputs.cache-hit != 'true'
+        run: >
+          curl -sL -o orekit-data.zip
+          https://gitlab.orekit.org/orekit/orekit-data/-/archive/main/orekit-data-main.zip
+      - name: Cross-validate against Orekit
+        env:
+          OREKIT_DATA_ZIP: orekit-data.zip
+        run: pytest tests/test_orekit_validation.py -v

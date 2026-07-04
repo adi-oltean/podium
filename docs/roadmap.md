@@ -366,8 +366,19 @@ The layers exist; v0.6 composes them into one auditable whole.
       positive, the barrier certificate verifies exactly, and EVA
       reports zero alarms. workflow_dispatch = artifact-only dry run.
       First exercised on tag v0.5.0
-- [ ] Orekit cross-validation lane in CI (orekit-jpype) for the truth
-      model; three.js viewer frame-blending using the target-ECI export
+- [x] Orekit cross-validation lane (#32, validate.yml — weekly +
+      dynamics paths, setup-java + cached orekit-data): three receipts
+      against the independent stack — two-body vs ANALYTIC Keplerian
+      (<5 cm over 2 orbits: pure integrator drift), J2 vs
+      Holmes-Featherstone degree 2 (measured 1.13 m over 2 orbits once
+      both stacks are pole-of-date aligned — the first naive
+      comparison differed by 185 m and the cause was real physics:
+      EME2000's z is the J2000 pole, 0.13 deg from the 2026 pole via
+      precession, tilting the J2 axis), and drag DELTAS within 10%
+      (magnitude, direction, co-rotation convention). validate extra
+      gains orekit-jpype
+- [ ] three.js viewer frame-blending using the target-ECI export
+      (split out of the Orekit item)
 - [ ] cFS or F´ integration example: the generated GNC app on a software
       bus, fed by the reference-mission scenario
 
