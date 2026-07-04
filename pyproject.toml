@@ -84,6 +84,8 @@ ignore = ["PLR0913", "PLR2004"]
 # cvxpy/cvxpygen imported lazily: generation is a local/offline step and
 # cvxpygen's import pulls a Julia sidecar.
 "src/podium/emit/solvergen.py" = ["PLC0415"]
+# driver generator: one branch per parameter/output form is the clear shape
+"src/podium/emit/evagen.py" = ["PLR0912"]
 # mission composes the optional stacks (cvxpy, mujoco) lazily; the phase
 # controller is one narrative function by design.
 "src/podium/sim/mission.py" = ["PLC0415", "PLR0915"]

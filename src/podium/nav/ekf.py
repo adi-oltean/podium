@@ -25,7 +25,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from podium.core import cw
-from podium.verify import Interval, contract
+from podium.verify import Interval, contract, shapes
 
 F64 = NDArray[np.float64]
 
@@ -49,12 +49,64 @@ def process_noise_wna(dt: float, q_accel: float) -> F64:
     return q
 
 
+@shapes(x=(6,), p=(6, 6), phi=(6, 6), q=(6, 6))
 def predict(x: F64, p: F64, phi: F64, q: F64) -> tuple[F64, F64]:
-    """KF time update: x+ = Phi x, P+ = Phi P Phi' + Q (symmetrized)."""
+    """KF time update: x+ = Phi x, P+ = Phi P Phi' + Q (symmetrized).
+
+    Emits to C as written (matmul lowering); NumPy's BLAS accumulation
+    order differs from the emitted naive loops, so golden vectors for
+    this kernel are a relative-tolerance class (see tests)."""
     x_out: F64 = phi @ x
     p_prop = phi @ p @ phi.T + q
     p_out: F64 = 0.5 * (p_prop + p_prop.T)
     return x_out, p_out
+
+
+@contract(r_var=Interval(1e-2, 1e6))
+@shapes(x=(6,), p=(6, 6), z=(3,))
+def update_sequential(x: F64, p: F64, z: F64, r_var: float) -> tuple[F64, F64]:
+    """Sequential scalar Joseph updates for position measurements
+    (H = [I3 0], R = r_var * I3).
+
+    The flight-side form: one measurement component at a time, so the
+    innovation covariance is a SCALAR (division, not linalg.solve — no
+    matrix factorization in flight code). For diagonal R this is
+    algebraically equivalent to the batch Joseph update, which the
+    receipts verify to near machine precision. Static subset: fixed
+    shapes, bounded loops, one division guarded by r_var > 0.
+    """
+    xs = np.empty(6)
+    ps = np.empty((6, 6))
+    for i in range(6):
+        xs[i] = x[i]
+        for j in range(6):
+            ps[i, j] = p[i, j]
+    pn = np.empty((6, 6))
+    kk = np.empty(6)
+    for m in range(3):
+        s = ps[m, m] + r_var
+        # covariance-repair clamp: a valid covariance has ps[m,m] >= 0
+        # so s >= r_var already; the clamp makes the division PROVABLY
+        # safe for any input (EVA discharges it from the r_var contract)
+        if s < r_var:  # noqa: PLR1730 — max() is outside the C subset
+            s = r_var
+        for i in range(6):
+            kk[i] = ps[i, m] / s
+        nu = z[m] - xs[m]
+        for i in range(6):
+            xs[i] = xs[i] + kk[i] * nu
+        # Joseph form for H = e_m: P' = (I - k e_m') P (I - k e_m')'
+        #                              + r k k'
+        for i in range(6):
+            for j in range(6):
+                pn[i, j] = (ps[i, j] - kk[i] * ps[m, j]
+                            - ps[i, m] * kk[j]
+                            + kk[i] * ps[m, m] * kk[j]
+                            + r_var * kk[i] * kk[j])
+        for i in range(6):
+            for j in range(6):
+                ps[i, j] = 0.5 * (pn[i, j] + pn[j, i])
+    return xs, ps
 
 
 def _joseph_core(

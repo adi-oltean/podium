@@ -79,6 +79,22 @@ def contract(**arg_intervals: Interval) -> Callable[[F], F]:
     return decorate
 
 
+def shapes(**arg_shapes: tuple[int, ...]) -> Callable[[F], F]:
+    """Declare fixed array shapes for a core function's parameters.
+
+    Passive metadata for the C emitter: pure matrix-algebra kernels
+    (e.g. the EKF prediction) never reveal their shapes through
+    subscripts, so the translation needs them declared. Stored on
+    ``func.__podium_shapes__``; no runtime cost.
+    """
+
+    def decorate(func: F) -> F:
+        func.__podium_shapes__ = dict(arg_shapes)  # type: ignore[attr-defined]
+        return func
+
+    return decorate
+
+
 def prove(condition: bool, label: str = "") -> None:
     """Declare an invariant that must hold at this program point.
 

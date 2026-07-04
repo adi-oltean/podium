@@ -60,6 +60,18 @@ DEFAULT_RANGES: dict[tuple[str, str], tuple[float, float]] = {
     ("map_lvlh_to_roe", "u"): (-7.0, 7.0),
     ("control_matrix", "a"): (6.5e6, 4.3e7),
     ("control_matrix", "u"): (-7.0, 7.0),
+    ("predict", "x"): (-1e5, 1e5),
+    ("predict", "p"): (-1e4, 1e4),
+    ("predict", "phi"): (-10.0, 10.0),
+    ("predict", "q"): (0.0, 10.0),
+    # covariance envelope 1e4 = (100 m std)^2: with r_var >= 1e-2 the
+    # three sequential gain applications stay finite under interval
+    # semantics (wider ranges admit K ~ p/r_var ~ 1e12 and EVA rightly
+    # reports overflow by the third measurement — a real finding about
+    # the stated envelope, not noise)
+    ("update_sequential", "x"): (-1e5, 1e5),
+    ("update_sequential", "p"): (-1e4, 1e4),
+    ("update_sequential", "z"): (-1e5, 1e5),
 }
 
 
@@ -90,20 +102,31 @@ def emit_eva_driver(funcs: "list[Callable[..., object]]") -> str:
                     raise cemit.EmitError(f"no range for {name}.{p}")
                 lo, hi = DEFAULT_RANGES[key]
                 assumed.append(f"{name}.{p} in [{lo!r}, {hi!r}]")
-            if p in meta.param_arrays:
-                nlen = meta.param_arrays[p]
-                body.append(f"    double {p}[{nlen}];")
-                body.append(f"    for (int i = 0; i < {nlen}; i++)"
-                            f" {p}[i] = Frama_C_double_interval"
-                            f"({lo!r}, {hi!r});")
+            shp = meta.param_shapes.get(p)
+            if shp:
+                dims = "".join(f"[{d}]" for d in shp)
+                body.append(f"    double {p}{dims};")
+                iv_call = f"Frama_C_double_interval({lo!r}, {hi!r})"
+                if len(shp) == 1:
+                    body.append(f"    for (int i = 0; i < {shp[0]}; i++)"
+                                f" {p}[i] = {iv_call};")
+                else:
+                    # per-element writes: a flat (double *) cast fill is
+                    # not recognized as initializing the 2-D object
+                    body.append(f"    for (int i = 0; i < {shp[0]}; i++)"
+                                f" for (int j = 0; j < {shp[1]}; j++)"
+                                f" {p}[i][j] = {iv_call};")
             else:
                 body.append(f"    double {p} = Frama_C_double_interval"
                             f"({lo!r}, {hi!r});")
             args.append(p)
-        if meta.out_shape is not None:
-            dims = "".join(f"[{d}]" for d in meta.out_shape)
-            body.append(f"    double out{dims};")
-            args.append("out")
+        if meta.outs:
+            names = (["out"] if len(meta.outs) == 1
+                     else [f"out{i}" for i in range(len(meta.outs))])
+            for nm, (_l, s) in zip(names, meta.outs):
+                dims = "".join(f"[{d}]" for d in s)
+                body.append(f"    double {nm}{dims};")
+                args.append(nm)
             body.append(f"    {meta.c_name}({', '.join(args)});")
         else:
             body.append(f"    double r = {meta.c_name}({', '.join(args)});")

@@ -315,9 +315,25 @@ The layers exist; v0.6 composes them into one auditable whole.
       documented), <=1% incidence. Remaining for the full core: matmul
       lowering (EKF), integrators (function-typed params), CompCert
       audit
-- [ ] Sound value gate in CI: Frama-C/EVA over the emitted-and-annotated
-      C (float intervals from the ACSL contracts), memory/index gate,
-      reproducible audit report artifacts
+- [x] Emitter v2 (#30): matmul lowering — @shapes annotations, 2-D
+      array parameters, tuple returns as multiple out-parameters, and
+      array-expression lowering (@ chains, .T, elementwise, scalar
+      scaling) into fixed-bound loops, so ekf.predict emits AS WRITTEN.
+      New flight kernel update_sequential (sequential scalar Joseph
+      updates: division, no linalg.solve), receipt-proven equivalent
+      to batch Joseph for diagonal R; covariance-repair clamp makes the
+      division provable. 20 kernels emit + verify; matmul kernels are a
+      relative-tolerance golden class (BLAS vs naive accumulation
+      order, impossible to be bit-exact by construction);
+      update_sequential and process_noise_wna are BIT-exact. EVA gate
+      re-proven at 0 alarms over all 20 (138/138 preconditions) — and
+      it caught a REAL envelope finding en route: p<=1e6 with
+      r_var>=1e-6 admits gain ~1e12 and overflows by the third
+      sequential measurement; the stated envelope is now the physical
+      one (p<=1e4, r_var>=1e-2), documented at the declaration
+- [x] Sound value gate in CI (#29 — landed under v0.5's carried item):
+      see the v0.5 entry; eva.yml re-proves on core/emit changes +
+      weekly with report artifacts
 - [ ] Correctly-rounded transcendentals option (CORE-MATH) closing the
       measured tier-1 sin/cos gap; tier-2 ULP-bounded golden vectors on
       a cross-compiled target (qemu-aarch64)

@@ -27,6 +27,27 @@ def test_joseph_form_invariants():
         assert np.all(np.linalg.eigvalsh(f.p) > 0.0)
 
 
+def test_sequential_equals_batch_joseph():
+    """The flight-side sequential scalar update (division, no matrix
+    solve) is algebraically equivalent to the batch Joseph update for
+    H = [I3 0] and diagonal R — the classical result, verified to near
+    machine precision over random PSD covariances."""
+    rng = np.random.default_rng(11)
+    for _ in range(200):
+        x = rng.uniform(-1e3, 1e3, 6)
+        a_ = rng.uniform(-1.0, 1.0, (6, 6))
+        p = a_ @ a_.T + np.eye(6) * rng.uniform(0.1, 2.0)
+        z = rng.uniform(-1e3, 1e3, 3)
+        rv = rng.uniform(0.01, 5.0)
+        xs, ps = ekf.update_sequential(x, p, z, rv)
+        xb, pb, _nu, _s = ekf.update_joseph(x, p, z, ekf.H_POS,
+                                            np.eye(3) * rv)
+        scale = float(np.max(np.abs(pb))) + 1.0
+        assert np.max(np.abs(xs - xb)) < 1e-9 * (np.max(np.abs(xb)) + 1.0)
+        assert np.max(np.abs(ps - pb)) < 1e-9 * scale
+        assert np.all(np.linalg.eigvalsh(ps) > 0.0)
+
+
 def test_process_noise_structure():
     q = ekf.process_noise_wna(2.0, 1e-8)
     assert np.allclose(q, q.T)

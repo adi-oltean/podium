@@ -10,6 +10,7 @@ import pytest
 
 from podium.core import cw, quat, roe, ya
 from podium.emit import cemit, evagen
+from podium.nav import ekf
 from podium.verify import Interval, contract
 
 GCC = shutil.which("gcc")
@@ -19,7 +20,8 @@ KERNELS = [quat.normalize, quat.multiply, quat.conjugate, quat.rotate,
            ya.kepler_eccentric, ya.true_from_eccentric,
            ya.eccentric_from_true, ya.propagate_true_anomaly,
            roe.stm_keplerian, roe.map_roe_to_lvlh, roe.map_lvlh_to_roe,
-           roe.control_matrix]
+           roe.control_matrix, ekf.predict, ekf.update_sequential,
+           ekf.process_noise_wna]
 
 # per-function input specs: (list of (kind, size), sampler ranges)
 CASES = {
@@ -40,15 +42,23 @@ CASES = {
     "map_roe_to_lvlh": ([("a", 6), ("s", 1), ("s", 1), ("s", 1)], None),
     "map_lvlh_to_roe": ([("a", 6), ("s", 1), ("s", 1), ("s", 1)], None),
     "control_matrix": ([("s", 1), ("s", 1), ("s", 1)], None),
+    "predict": ([("a", 6), ("m", 6, 6), ("m", 6, 6), ("m", 6, 6)], None),
+    "update_sequential": ([("a", 6), ("m", 6, 6), ("a", 3), ("s", 1)], None),
+    "process_noise_wna": ([("s", 1), ("s", 1)], None),
 }
 OUT_LEN = {"normalize": 4, "multiply": 4, "conjugate": 4, "rotate": 3,
            "deriv": 4, "error": 3, "mean_motion": 1, "cw_deriv": 6,
            "stm": 36, "kepler_eccentric": 1, "true_from_eccentric": 1,
            "eccentric_from_true": 1, "propagate_true_anomaly": 1,
            "stm_keplerian": 36, "map_roe_to_lvlh": 6,
-           "map_lvlh_to_roe": 6, "control_matrix": 18}
+           "map_lvlh_to_roe": 6, "control_matrix": 18,
+           "predict": 42, "update_sequential": 42,
+           "process_noise_wna": 36}
 SCALAR_RET = {"mean_motion", "kepler_eccentric", "true_from_eccentric",
               "eccentric_from_true", "propagate_true_anomaly"}
+# multi-out kernels: list of flattened out sizes with cast row-lengths
+MULTI_OUT = {"predict": [(6, None), (36, 6)],
+             "update_sequential": [(6, None), (36, 6)]}
 
 
 def _cols(rng, n_vec, *ranges):
@@ -71,6 +81,8 @@ SAMPLERS = {
          r.uniform(1e-4, 2e-3, (n, 1)), r.uniform(-PI, PI, (n, 1))]),
     "control_matrix": lambda r, n: _cols(
         r, n, (6.6e6, 7.5e6), (1e-4, 2e-3), (-PI, PI)),
+    "process_noise_wna": lambda r, n: _cols(
+        r, n, (1e-3, 600.0), (0.0, 1.0)),
 }
 
 _DRIVER = r"""
@@ -79,8 +91,8 @@ _DRIVER = r"""
 #include <stdlib.h>
 {prototypes}
 int main(int argc, char **argv) {
-    double in[16], out[64];
-    char line[4096];
+    double in[128], out[64];
+    char line[8192];
     while (fgets(line, sizeof line, stdin)) {
         int n = 0;
         char *tok = strtok(line, " \n");
@@ -103,15 +115,28 @@ def _dispatch_block() -> str:
         c_name = f"podium_{f.__module__.rsplit('.', 1)[-1]}_{name}"
         args = []
         off = 0
-        for kind, size in spec:
-            if kind == "s":
+        for entry in spec:
+            if entry[0] == "s":
                 args.append(f"in[{off}]")
                 off += 1
-            else:
+            elif entry[0] == "a":
                 args.append(f"&in[{off}]")
-                off += size
+                off += entry[1]
+            else:  # ("m", rows, cols): cast flat storage to 2-D
+                r_, c_ = entry[1], entry[2]
+                args.append(f"(const double (*)[{c_}])&in[{off}]")
+                off += r_ * c_
         if name in SCALAR_RET:
             call = f"out[0] = {c_name}({', '.join(args)}); m = 1;"
+        elif name in MULTI_OUT:
+            o = 0
+            for size, cols in MULTI_OUT[name]:
+                if cols is None:
+                    args.append(f"&out[{o}]")
+                else:
+                    args.append(f"(double (*)[{cols}])&out[{o}]")
+                o += size
+            call = f"{c_name}({', '.join(args)}); m = {OUT_LEN[name]};"
         else:
             call = (f"{c_name}({', '.join(args + ['(void *)out'])});"
                     f" m = {OUT_LEN[name]};")
@@ -124,20 +149,51 @@ def _py_call(name, vec):
     spec = CASES[name][0]
     args = []
     off = 0
-    for kind, size in spec:
-        if kind == "s":
+    for entry in spec:
+        if entry[0] == "s":
             args.append(float(vec[off]))
             off += 1
+        elif entry[0] == "a":
+            args.append(np.asarray(vec[off:off + entry[1]],
+                                   dtype=np.float64))
+            off += entry[1]
         else:
-            args.append(np.asarray(vec[off:off + size], dtype=np.float64))
-            off += size
+            r_, c_ = entry[1], entry[2]
+            args.append(np.asarray(vec[off:off + r_ * c_],
+                                   dtype=np.float64).reshape(r_, c_))
+            off += r_ * c_
     r = f(*args)
+    if isinstance(r, tuple):
+        return np.concatenate([np.asarray(v, dtype=np.float64).ravel()
+                               for v in r])
     return np.atleast_1d(np.asarray(r, dtype=np.float64)).ravel()
+
+
+def _sample_matrix_kernels(name, n_vec, rng):
+    """Inputs for the EKF kernels: symmetric PSD-ish covariance with a
+    boosted diagonal, generic phi/q, moderate states."""
+    rows = []
+    for _ in range(n_vec):
+        x = rng.uniform(-1e3, 1e3, 6)
+        a_ = rng.uniform(-1.0, 1.0, (6, 6))
+        p = a_ @ a_.T + np.eye(6) * rng.uniform(0.1, 2.0)
+        if name == "predict":
+            phi = rng.uniform(-1.5, 1.5, (6, 6))
+            q = np.diag(rng.uniform(0.0, 1.0, 6))
+            rows.append(np.concatenate([x, p.ravel(), phi.ravel(),
+                                        q.ravel()]))
+        else:
+            z = rng.uniform(-1e3, 1e3, 3)
+            rv = rng.uniform(0.01, 5.0, 1)
+            rows.append(np.concatenate([x, p.ravel(), z, rv]))
+    return np.array(rows)
 
 
 def _vectors(name, n_vec, rng):
     spec, ranges = CASES[name]
-    total = sum(s for _, s in spec)
+    if name in ("predict", "update_sequential"):
+        return _sample_matrix_kernels(name, n_vec, rng)
+    total = sum(s[1] if s[0] != "m" else s[1] * s[2] for s in spec)
     if name in SAMPLERS:
         v = SAMPLERS[name](rng, n_vec)
     elif name == "mean_motion":
@@ -190,6 +246,12 @@ def compiled(tmp_path_factory):
 _TRANSCENDENTAL = {"stm", "kepler_eccentric", "true_from_eccentric",
                    "eccentric_from_true", "propagate_true_anomaly",
                    "map_roe_to_lvlh", "map_lvlh_to_roe", "control_matrix"}
+# NumPy's @ uses BLAS accumulation order; the emitted naive loops sum in
+# row-major order — bit-exactness is impossible BY CONSTRUCTION for
+# matmul kernels, and 6-term dot reassociation bounds the divergence.
+# (update_sequential is explicit scalar loops in both languages, so it
+# stays in the strict bit-exact class.)
+_MATMUL = {"predict"}
 
 
 @pytest.mark.slow
@@ -225,8 +287,11 @@ def test_tier1_bit_exact(compiled, name):
             total += 1
             if a != b and not (np.isnan(a) and np.isnan(b)):
                 mismatches += 1
-                assert abs(a - b) <= 1e-12 * vec_scale, (a, b, vec_scale)
-    if name in _TRANSCENDENTAL:
+                tol = 1e-13 if name in _MATMUL else 1e-12
+                assert abs(a - b) <= tol * vec_scale, (a, b, vec_scale)
+    if name in _MATMUL:
+        pass  # reassociation-bounded above; no incidence claim
+    elif name in _TRANSCENDENTAL:
         # measured incidence: 21/72000 (stm sin/cos), ~0.15% (atan2)
         assert mismatches <= 0.01 * total, f"{name}: {mismatches}/{total}"
     else:

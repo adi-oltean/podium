@@ -19,6 +19,6 @@ the trusted path).
 """
 
 from podium.verify import barrier  # noqa: F401
-from podium.verify.contracts import Interval, contract, prove
+from podium.verify.contracts import Interval, contract, prove, shapes
 
-__all__ = ["Interval", "barrier", "contract", "prove"]
+__all__ = ["Interval", "barrier", "contract", "prove", "shapes"]
