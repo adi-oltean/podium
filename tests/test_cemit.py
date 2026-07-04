@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 
 from podium.core import cw, quat, roe, ya
-from podium.emit import cemit
+from podium.emit import cemit, evagen
 from podium.verify import Interval, contract
 
 GCC = shutil.which("gcc")
@@ -268,10 +268,28 @@ def test_acsl_rendering():
         return out
 
     src = cemit.emit_module([scaled], "acsl_test")
-    assert "requires 0.0001 <= n <= 0.01;" in src
+    # ACSL bounds are hex float literals: decimal literals are exact
+    # REALS in ACSL and the nearest double sits off the boundary (this
+    # exact pitfall left 4 preconditions 'unknown' under EVA until fixed)
+    lo, hi = (1e-4).hex(), (1e-2).hex()
+    assert f"requires {lo} <= n <= {hi};" in src
     assert "\\forall integer i; 0 <= i < 2" in src
     assert "[in, range(-10.0,10.0)] x;" in src
     assert "/* [spec]" in src
+
+
+def test_eva_driver_generation():
+    drv = evagen.emit_eva_driver(KERNELS)
+    # prototypes present (missing ones aborted Frama-C linking; caught)
+    assert "void podium_quat_multiply(" in drv
+    # contract-driven interval for the contracted kernel
+    assert "Frama_C_double_interval(1e-05, 0.01)" in drv
+    # contract gaps are declared in the artifact itself
+    assert "ASSUMED (contract gaps):" in drv
+    assert "eva_main" in drv
+    # every kernel is exercised
+    for f in KERNELS:
+        assert f"check_{f.__name__}();" in drv
 
 
 def test_emission_deterministic():

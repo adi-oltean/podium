@@ -276,9 +276,18 @@ headline addition is the ROE module, #5.)
       and system glibc on ~0.03% of stm values, bounded ≤4 ulp after
       propagation — asserted as such, not hidden. Tier 2 (ULP-bounded
       on target) open
-- [ ] Open abstract-interpretation gate in CI: sound float-interval
-      analysis as the primary value gate plus a memory/index gate;
-      reproducible audit evidence
+- [x] Open abstract-interpretation gate in CI (#29, Frama-C/EVA 34,
+      dockerized — Ubuntu 22.04 ships no frama-c package): the emitted
+      kernels + a generated interval-input driver (contract intervals
+      where declared, DOCUMENTED assumed ranges listed inside the
+      artifact where not) PROVEN alarm-free — 0 alarms, 100% statement
+      coverage, 115/115 ACSL preconditions valid — sound float-interval
+      semantics over ALL inputs in the stated ranges.
+      `.github/workflows/eva.yml` re-proves on core/emit changes +
+      weekly and uploads the EVA report as the audit artifact. Pitfall
+      fixed en route: ACSL decimal literals are exact reals, so
+      boundary doubles left preconditions 'unknown' until the emitter
+      switched to hex float literals
 - [x] CVXPYgen embedded solver generation (#26,
       `podium.emit.solvergen`): fixed-grid Layer-0 rendezvous with live
       boundary parameters generated to a self-contained C tree (ECOS

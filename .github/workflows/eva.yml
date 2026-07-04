@@ -1,0 +1,34 @@
+name: eva
+
+# Sound value gate: Frama-C/EVA proves the emitted kernels alarm-free
+# (no division by zero, overflow, or invalid access) over the
+# contracted input ranges — float-interval analysis, not testing.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/podium/core/**"
+      - "src/podium/emit/**"
+      - "tools/eva_gate.py"
+      - ".github/workflows/eva.yml"
+  workflow_dispatch:
+  schedule:
+    - cron: "43 6 * * 1"  # weekly drift check
+
+jobs:
+  prove:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+      - name: Run the EVA gate (dockerized Frama-C)
+        run: python3 tools/eva_gate.py eva_out
+      - name: Upload the audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: eva-report
+          path: eva_out/eva_report.txt
