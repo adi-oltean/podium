@@ -243,11 +243,12 @@ def compiled(tmp_path_factory):
 # rounded by the standard) are BIT-exact across toolchains. sin/cos are
 # not correctly rounded in either libm, and this interpreter's (conda)
 # libm differs from the system glibc that gcc links — measured: 21 of
-# 72,000 stm values differ by exactly 1 ulp. Full cross-toolchain
-# bit-exactness for transcendentals is what the roadmap's CORE-MATH
-# item exists to buy; until then the honest tier-1 claim is:
-# bit-exact for arithmetic+sqrt kernels, <=1 ulp at <0.1% incidence
-# for sin/cos-bearing ones.
+# 72,000 stm values differ by exactly 1 ulp. This DEFAULT-mode tier-1
+# claim is therefore: bit-exact for arithmetic+sqrt kernels, <=1 ulp at
+# <0.1% incidence for sin/cos-bearing ones. That last tolerance is
+# RETIRED in correctly-rounded mode (emit_module(correctly_rounded=
+# True) + CORE-MATH): see tests/test_coremath.py, where stm is bit-exact
+# against the mpmath correctly-rounded oracle with zero incidence.
 _TRANSCENDENTAL = {"stm", "kepler_eccentric", "true_from_eccentric",
                    "eccentric_from_true", "propagate_true_anomaly",
                    "map_roe_to_lvlh", "map_lvlh_to_roe", "control_matrix"}

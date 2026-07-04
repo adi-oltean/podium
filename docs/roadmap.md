@@ -354,9 +354,18 @@ tudatpy 6-DOF oracle, torque allocation) carry into v0.7.
       harness) on emit changes + weekly: the tier-1 claim upgrades to
       "a compiler with a machine-checked semantics-preservation proof
       reproduces CPython bitwise"
-- [ ] Correctly-rounded transcendentals option (CORE-MATH) closing the
-      measured tier-1 sin/cos gap; tier-2 ULP-bounded golden vectors on
-      a cross-compiled target (qemu-aarch64)
+- [x] Correctly-rounded transcendentals option (#37, CORE-MATH):
+      `emit_module(correctly_rounded=True)` emits cr_sin/cr_cos from
+      vendored CORE-MATH (MIT, `third_party/core-math/`) instead of
+      libm, and `podium.emit.croracle` is an mpmath correctly-rounded
+      oracle. Receipts (tests/test_coremath.py): the compiled
+      cr_sin/cr_cos equal the oracle BIT-EXACT over the kernels'
+      argument ranges, and stm in CR mode is bit-exact against the
+      CR-oracle reference with ZERO incidence — the measured 21/72000
+      sin/cos tolerance is retired, not merely bounded. tier-2
+      qemu-aarch64 golden vectors still open
+- [ ] tier-2 ULP-bounded golden vectors on a cross-compiled target
+      (qemu-aarch64), split from the CORE-MATH item
 - [ ] CVXPYgen/QOCOGEN embedded generation of a Layer-0 problem with the
       verified-KKT-checker pattern (certificate checked by exact/interval
       arithmetic, R4-style)
@@ -436,6 +445,22 @@ tudatpy 6-DOF oracle, torque allocation) carry into v0.7.
       nav stream. Nice tie-back: the app runs r_var at the EVA-proven
       envelope floor — the sound-value gate constrains the flight
       configuration, not just the code
+
+## v0.7 — "Bit-exact everywhere" (current)
+
+Sweep up the v0.6 stretch items and push determinism to its limit. The
+CORE-MATH option above (#37) shipped as the first v0.7 delivery,
+retiring the last measured tier-1 tolerance. Remaining:
+
+- [ ] tier-2 golden vectors on a cross-compiled target (qemu-aarch64):
+      ULP-bounded now, and bit-exact once the CR option is wired into
+      the cross build
+- [ ] CVXPYgen/QOCOGEN embedded Layer-0 problem with a verified-KKT
+      checker (certificate re-checked in exact/interval arithmetic)
+- [ ] tudatpy 6-DOF cross-validation oracle (attitude + coupled
+      translation), complementing the Orekit translational lane
+- [ ] thruster torque allocation for the 6-DOF PTR (discrete
+      thruster-pair mapping) + path pointing constraints
 
 ## Cross-cutting, every release
 
