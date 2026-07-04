@@ -340,8 +340,22 @@ The layers exist; v0.6 composes them into one auditable whole.
 - [ ] CVXPYgen/QOCOGEN embedded generation of a Layer-0 problem with the
       verified-KKT-checker pattern (certificate checked by exact/interval
       arithmetic, R4-style)
-- [ ] 6-DOF attitude-coupled PTR + contact attitude (carried from v0.4);
-      thruster torque allocation
+- [x] 6-DOF attitude-coupled PTR (#33, `guidance/sixdof.py`): joint
+      13-state (r,v,q,w) planning with a BODY-FIXED thruster — thrust
+      direction is R(q)e1, so braking requires a slew the planner must
+      DISCOVER (receipt: ~90 deg swing + retro alignment at the final
+      burn, unprompted). PTR with FD discrete Jacobians, hard
+      trust-region boxes with accept/reject (soft weights alone let
+      steps blow up the attitude propagation — measured), and
+      contract-on-stall TR (the scp.py decay rule is backwards here
+      and produced a period-2 limit cycle — measured). Converges in 22
+      iterations, slack 0, defect 3e-5, independent nonlinear replay
+      in the terminal box. Two findings pinned: the thrust-attitude
+      bilinearity VANISHES at zero-thrust references (the coupling
+      needs seeding — slerp attitude + thrust seed), and the original
+      scenario was physically backwards (prograde terminal attitude
+      cannot brake — irreducible 0.097 m/s slack diagnosed at the
+      exact v_y row). Torque allocation to thruster pairs deferred
 - [x] End-to-end reference mission (#28, `podium.sim.mission`): one
       seeded scenario composing every layer — barrier-certified safe
       formation (certificate re-verified in exact rationals into the
