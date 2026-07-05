@@ -432,6 +432,20 @@ tudatpy 6-DOF oracle, torque allocation) carry into v0.7.
       non-diagonal Gram SOS, an indefinite polynomial rejected, and a
       monotonicity simulation. The defensible higher-degree
       Positivstellensatz contribution; #20 is now its degree-2 case
+- [x] Validated SOS synthesis (#52, `sos.validate_gram`): converts an
+      UNTRUSTED float SDP sum-of-squares certificate into an EXACT
+      rational one (validated-SOS tradition). Round-and-correct:
+      rationalize the float Gram, add a small diagonal margin (the
+      interior-point Gram is strictly PD -> PSD preserved), then absorb
+      the exact coefficient residual monomial by monomial (the
+      correction DECOUPLES since each Gram entry maps to one product
+      monomial — no linear solve). Receipt: an untrusted Clarabel SDP
+      synthesizes an SOS Gram for a quartic REQUIRING off-diagonal
+      entries, (x1^2+x1 x2+x2^2)^2; a naive rationalization has nonzero
+      residual (validation genuinely needed), validate_gram yields an
+      exact Gram passing the exact is_sos check with the off-diagonal
+      freedom used. Closes the float-synthesis -> exact-certificate
+      loop the paper flagged as open
 - [x] 6-DOF attitude-coupled PTR (#33, `guidance/sixdof.py`): joint
       13-state (r,v,q,w) planning with a BODY-FIXED thruster — thrust
       direction is R(q)e1, so braking requires a slew the planner must

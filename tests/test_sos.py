@@ -12,6 +12,7 @@ quadratic abort-safety barrier.
 from fractions import Fraction as F
 
 import numpy as np
+import pytest
 
 from podium.verify import sos
 
@@ -90,3 +91,49 @@ def test_duffing_sublevel_set_invariant_in_simulation():
         assert v <= v_prev + 1e-9
         assert v <= c + 1e-9
         v_prev = v
+
+
+@pytest.mark.slow
+def test_validated_sos_from_untrusted_sdp():
+    """Validated SOS: an UNTRUSTED float SDP synthesizes an SOS Gram for
+    a quartic that REQUIRES off-diagonal entries, q = (x1^2 + x1 x2 +
+    x2^2)^2; validate_gram round-and-corrects it into an EXACT rational
+    Gram that reproduces q identically and stays PSD, re-verified by the
+    exact is_sos checker. This is float synthesis -> exact certificate,
+    the pipeline the paper's higher-degree barrier synthesis needs."""
+    cp = pytest.importorskip("cvxpy")
+    # basis z = [x1^2, x1 x2, x2^2]
+    basis = [(2, 0), (1, 1), (0, 2)]
+    # target coefficients of (x1^2 + x1 x2 + x2^2)^2
+    target = {(4, 0): F(1), (3, 1): F(2), (2, 2): F(3),
+              (1, 3): F(2), (0, 4): F(1)}
+
+    g = cp.Variable((3, 3), symmetric=True)
+    cons = [g >> 1e-3 * np.eye(3)]              # strictly PD interior
+    cons += [g[0, 0] == 1, 2 * g[0, 1] == 2,    # x1^4, x1^3 x2
+             2 * g[0, 2] + g[1, 1] == 3,        # x1^2 x2^2
+             2 * g[1, 2] == 2, g[2, 2] == 1]    # x1 x2^3, x2^4
+    cp.Problem(cp.Minimize(cp.trace(g)), cons).solve(solver=cp.CLARABEL)
+    gf = g.value
+
+    # a naive rationalization does NOT reproduce the target exactly...
+    naive = [[F(float(gf[i][j])).limit_denominator(10**9)
+              for j in range(3)] for i in range(3)]
+    assert sos.psub(target, sos.gram_poly(basis, naive))  # residual != 0
+
+    # ...but the validated Gram does, and passes the exact SOS check.
+    g_exact = sos.validate_gram(target, basis, gf.tolist())
+    assert g_exact is not None
+    ok, prob = sos.is_sos(target, basis, g_exact)
+    assert ok, prob
+    # the certificate genuinely uses the off-diagonal freedom
+    assert g_exact[0][1] != 0 and g_exact[1][2] != 0
+
+
+def test_validate_gram_rejects_too_small_basis():
+    """If the target has a monomial no basis pair can produce, no Gram
+    can reproduce it and validate_gram returns None."""
+    basis = [(1, 0)]                            # z = [x1] only
+    target = {(2, 0): F(1), (0, 2): F(1)}       # x1^2 + x2^2 needs x2
+    assert sos.validate_gram(target, basis,
+                             [[1.0]]) is None

@@ -123,3 +123,55 @@ def is_sos(p: Poly, basis: list[Mono],
     if not is_psd(gram):
         problems.append("Gram is not positive semidefinite")
     return (not problems), problems
+
+
+def validate_gram(target: Poly, basis: list[Mono],
+                  gram_float: list[list[float]],
+                  margin: Fraction = Fraction(1, 10**6),
+                  max_den: int = 10**9) -> list[list[Fraction]] | None:
+    """Round-and-correct an UNTRUSTED float SOS Gram into an EXACT
+    rational Gram that reproduces `target` identically and stays PSD
+    (validated SOS). The synthesis (an SDP) may be floating point; the
+    shipped certificate is exact.
+
+    Method: rationalize the float Gram, inflate the diagonal by a small
+    rational `margin` (the float interior-point Gram is strictly PD, so
+    this preserves PSD with slack), then absorb the exact coefficient
+    residual monomial by monomial. Each Gram entry contributes to
+    exactly one product monomial, so the correction decouples: for each
+    residual monomial pick one entry with that product and adjust it.
+    Returns the exact Gram, or None if `target` has a monomial no basis
+    pair can produce (the basis is too small for an SOS form).
+    """
+    n = len(basis)
+    g = [[Frac(0)] * n for _ in range(n)]
+    for i in range(n):
+        for j in range(n):
+            g[i][j] = Frac(float(gram_float[i][j])).limit_denominator(max_den)
+    # symmetrize exactly, then add the PSD-slack margin on the diagonal
+    for i in range(n):
+        for j in range(i):
+            s = (g[i][j] + g[j][i]) / 2
+            g[i][j] = g[j][i] = s
+        g[i][i] += margin
+
+    # map each product monomial -> a preferred entry (diagonal first)
+    entry_for: dict[Mono, tuple[int, int]] = {}
+    for i in range(n):
+        for j in range(i, n):
+            m = tuple(basis[i][k] + basis[j][k] for k in range(len(basis[i])))
+            if m not in entry_for or i == j:  # prefer a diagonal entry
+                entry_for.setdefault(m, (i, j))
+                if i == j:
+                    entry_for[m] = (i, j)
+
+    residual = psub(target, gram_poly(basis, g))
+    for m, r in residual.items():
+        if m not in entry_for:
+            return None                       # basis cannot span target
+        i, j = entry_for[m]
+        delta = r if i == j else r / 2        # weight 1 (diag) or 2 (off)
+        g[i][j] += delta
+        if i != j:
+            g[j][i] += delta
+    return g
