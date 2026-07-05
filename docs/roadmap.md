@@ -452,9 +452,17 @@ Sweep up the v0.6 stretch items and push determinism to its limit. The
 CORE-MATH option above (#37) shipped as the first v0.7 delivery,
 retiring the last measured tier-1 tolerance. Remaining:
 
-- [ ] tier-2 golden vectors on a cross-compiled target (qemu-aarch64):
-      ULP-bounded now, and bit-exact once the CR option is wired into
-      the cross build
+- [x] tier-2 cross-architecture golden vectors (#38, `tier2.yml` +
+      `tools/tier2_build_run.sh`): the emitted kernels cross-compiled
+      for aarch64 (-ffp-contract=off, static) and replayed under
+      qemu-user reproduce the x86/CPython golden vectors — the full
+      tier-1 suite re-run on ARM. IEEE-754 binary64 is
+      architecture-independent, so arithmetic + sqrt kernels are
+      BIT-EXACT across ISAs; libm-trig carries the same cross-libm
+      tolerance as x86; and in CORE-MATH mode stm is BIT-EXACT on
+      aarch64 against the correctly-rounded oracle. Reuses the exact
+      test_cemit harness (same driver, vectors, reference); container
+      does apt + cross-gcc + qemu, host compares
 - [ ] CVXPYgen/QOCOGEN embedded Layer-0 problem with a verified-KKT
       checker (certificate re-checked in exact/interval arithmetic)
 - [ ] tudatpy 6-DOF cross-validation oracle (attitude + coupled

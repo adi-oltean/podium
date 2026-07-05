@@ -1,0 +1,37 @@
+name: tier2
+
+# Tier-2 cross-architecture golden vectors: the emitted kernels run
+# bit-identically on aarch64 (under qemu) as on x86/CPython. IEEE-754
+# binary64 with -ffp-contract=off is architecture-independent, so
+# arithmetic + sqrt are bit-exact across ISAs; libm-trig carries the
+# same cross-libm tolerance as x86, and it vanishes in the
+# correctly-rounded build (CORE-MATH), demonstrated bit-exact for stm.
+# The receipt runs a debian container that apt-installs the aarch64
+# cross toolchain + qemu-user-static (docker available on the runner).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/podium/core/**"
+      - "src/podium/nav/ekf.py"
+      - "src/podium/emit/**"
+      - "third_party/core-math/**"
+      - "tools/tier2_build_run.sh"
+      - "tests/test_tier2_qemu.py"
+      - ".github/workflows/tier2.yml"
+  workflow_dispatch:
+  schedule:
+    - cron: "51 8 * * 4"  # weekly drift check
+
+jobs:
+  aarch64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e . pytest hypothesis mpmath
+      - name: Cross-architecture golden vectors (aarch64 under qemu)
+        run: pytest tests/test_tier2_qemu.py -v
