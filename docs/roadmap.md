@@ -366,9 +366,19 @@ tudatpy 6-DOF oracle, torque allocation) carry into v0.7.
       qemu-aarch64 golden vectors still open
 - [ ] tier-2 ULP-bounded golden vectors on a cross-compiled target
       (qemu-aarch64), split from the CORE-MATH item
-- [ ] CVXPYgen/QOCOGEN embedded generation of a Layer-0 problem with the
-      verified-KKT-checker pattern (certificate checked by exact/interval
-      arithmetic, R4-style)
+- [x] Verified-KKT checker (#40, `verify/kkt.py`): the trusted half of
+      the R4 pattern. The online convex solver is UNTRUSTED; verify_qp
+      re-verifies a claimed QP solution's optimality in EXACT
+      `fractions.Fraction` arithmetic — stationarity, primal in/eq
+      feasibility, dual feasibility, and the complementary-slackness
+      duality gap — so the certificate carries no floating-point
+      uncertainty. Receipts: QPs with KNOWN rational optima verify to
+      residuals that are Fraction(0) EXACTLY (true optima, zero slack,
+      not merely 'small'); an untrusted Clarabel solution of a Layer-0
+      min-energy rendezvous QP certifies within 1e-5; perturbing the
+      primal or flipping a dual sign makes the exact residuals blow up
+      and the checker rejects. Embedded-solvergen wiring (feed a
+      QOCOGEN/CVXPYgen KKT dump to the checker) still open
 - [x] 6-DOF attitude-coupled PTR (#33, `guidance/sixdof.py`): joint
       13-state (r,v,q,w) planning with a BODY-FIXED thruster — thrust
       direction is R(q)e1, so braking requires a slew the planner must
