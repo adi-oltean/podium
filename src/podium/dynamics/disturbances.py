@@ -38,6 +38,7 @@ class DisturbanceModel:
     n: float
     aero: tuple[float, F64] | None = None
     srp: tuple[float, float, F64] | None = None
+    residual_dipole: F64 | None = None   # body-frame residual dipole [A m^2]
 
     def torque(
         self,
@@ -46,6 +47,7 @@ class DisturbanceModel:
         rho: float = 0.0,
         sun_body: F64 | None = None,
         illuminated: bool = True,
+        b_field_body: F64 | None = None,
     ) -> F64:
         """Total environmental body torque at one instant. Directions
         are in the body frame; disable any term by leaving its config
@@ -60,4 +62,7 @@ class DisturbanceModel:
             area, cr, r_cp = self.srp
             tau = tau + att.srp_torque(sun_body, area, cr, r_cp,
                                        const.SOLAR_PRESSURE, illuminated)
+        if self.residual_dipole is not None and b_field_body is not None:
+            tau = tau + att.magnetic_torque(self.residual_dipole,
+                                            b_field_body)
         return tau

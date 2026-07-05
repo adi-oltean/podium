@@ -97,6 +97,38 @@ def srp_torque(sun_dir_body: F64, area: float, cr: float, r_cp: F64,
     return tau
 
 
+def dipole_field(r_eci: F64, dipole_moment: float = 7.94e22,
+                 axis: F64 | None = None) -> F64:
+    """Geomagnetic field [T] of a centered dipole at position r_eci,
+
+        B = (mu0 m / 4 pi r^3) [3 (m_hat . r_hat) r_hat - m_hat],
+
+    with mu0/4pi = 1e-7. `axis` is the dipole unit vector in ECI
+    (default -z, i.e. the geomagnetic south pole near the north
+    geographic pole, aligned-dipole approximation). Magnitude at the
+    equatorial surface is ~3.1e-5 T and falls as 1/r^3."""
+    r = np.asarray(r_eci, dtype=np.float64)
+    rn = float(np.linalg.norm(r))
+    r_hat = r / rn
+    m_hat = (np.array([0.0, 0.0, -1.0]) if axis is None
+             else np.asarray(axis, dtype=np.float64)
+             / np.linalg.norm(axis))
+    coeff = 1.0e-7 * dipole_moment / rn**3
+    b: F64 = coeff * (3.0 * float(np.dot(m_hat, r_hat)) * r_hat - m_hat)
+    return b
+
+
+def magnetic_torque(dipole_body: F64, b_body: F64) -> F64:
+    """Magnetic disturbance torque tau = m x B, where m is the
+    spacecraft's residual (or commanded magnetorquer) magnetic dipole
+    [A m^2] and B the local geomagnetic field [T], both in the body
+    frame. The fourth classic environmental attitude disturbance; also
+    the actuation model for magnetic torquers."""
+    tau: F64 = np.cross(np.asarray(dipole_body, dtype=np.float64),
+                        np.asarray(b_body, dtype=np.float64))
+    return tau
+
+
 def kinetic_energy(w: F64, inertia: F64) -> float:
     return 0.5 * float(w @ (inertia @ w))
 

@@ -559,6 +559,18 @@ retiring the last measured tier-1 tolerance. Remaining:
       (nadir + relative wind rotating at n, Sun fixed) without
       exceeding saturation. Connects the disturbance dynamics to
       disturbance rejection — the proximity-ops attitude-hold problem
+- [x] Magnetic disturbance torque + dipole field (#48,
+      `attitude.magnetic_torque`, `attitude.dipole_field`,
+      `test_magnetic_torque.py`): the FOURTH classic disturbance,
+      tau = m x B, plus a centered-dipole geomagnetic field
+      (3(m.r)r - m form, EARTH_DIPOLE_MOMENT added; ~3.1e-5 T
+      equatorial surface, 1/r^3). Receipts: exact m x B; zero when
+      field-aligned; equatorial magnitude + 1/r^3 scaling + the pole =
+      2x equator factor; micro-Nm LEO torque; DisturbanceModel gains an
+      optional residual_dipole term. magnetic_torque doubles as the
+      magnetorquer actuation model. All four classic environmental
+      attitude disturbances (GG, aero, SRP, magnetic) now modeled and
+      analytically validated
 - [x] thruster/torque allocation (#39, `control/allocation.py`): maps
       the 6-DOF PTR's commanded body wrench (thrust + torque) onto a
       cluster of PUSH-ONLY discrete thrusters. ThrusterConfig ->
