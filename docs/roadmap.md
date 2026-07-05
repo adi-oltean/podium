@@ -472,6 +472,14 @@ tudatpy 6-DOF oracle, torque allocation) carry into v0.7.
       nonlinear loop. Validated from an untrusted SDP (#52); a 7-state
       simulation confirms cone-invariance with ||q|| preserved.
       Converts the paper's last SOS future-work into a shipped result
+- [x] Verification-modality coverage matrix (#55,
+      `tools/fault_coverage.py`, `test_fault_coverage.py`): fault
+      injection across artifact classes shows the lanes are
+      complementary, not redundant -- six of seven faults caught by
+      exactly one lane, zero false alarms, and certificate (corrupted
+      proof) faults invisible to every physics/trajectory check (only
+      the exact-arithmetic checker rejects them). Justifies the
+      multi-modal stack; docs/fault-coverage.md
 - [x] 6-DOF attitude-coupled PTR (#33, `guidance/sixdof.py`): joint
       13-state (r,v,q,w) planning with a BODY-FIXED thruster — thrust
       direction is R(q)e1, so braking requires a slew the planner must

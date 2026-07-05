@@ -162,6 +162,7 @@ disable_error_code = ["type-arg", "assignment", "operator", "union-attr"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 addopts = "-q"
 markers = [
     "slow: multi-orbit truth-model propagations (deselect with -m 'not slow')",

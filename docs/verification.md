@@ -30,6 +30,13 @@ patterns.
 | **Verified-compiler + cross-arch** | `compcert.yml`, `tier2.yml` | Golden vectors replay through CompCert (machine-checked semantics preservation) and on aarch64 under qemu (bit-identical across ISAs) |
 | **Independent physics + dynamics oracles** | `validate.yml` (Orekit), `test_attitude_analytic.py`, `test_gravity_gradient.py` | Truth model vs Orekit; attitude integrator vs exact Jacobi-elliptic / gravity-gradient closed forms |
 
+These modalities are **complementary, not redundant**: a fault-injection
+coverage matrix ([`docs/fault-coverage.md`](fault-coverage.md),
+`tools/fault_coverage.py`) shows six of seven injected fault classes are
+caught by exactly one lane, and that certificate faults (corrupted
+proofs) are invisible to every physics and trajectory check — only the
+exact-arithmetic checker for that certificate rejects them.
+
 The eight CI lanes are `ci` (receipts + golden vectors), `reach`,
 `eva`, `compcert`, `tier2`, `validate`, plus the evidence-gated
 `release` and the `pages` viewer deploy. Every tagged release ships an
