@@ -527,6 +527,16 @@ retiring the last measured tier-1 tolerance. Remaining:
       largest ordering diverges past 30 deg while the stable one
       librates). Extends the analytic attitude oracle to environmental
       torques
+- [x] Aerodynamic disturbance torque (#45,
+      `attitude.aerodynamic_torque`, `test_aero_torque.py`): the second
+      dominant LEO attitude disturbance — tau = r_cp x F_drag with
+      F_drag = -1/2 rho (Cd A) |v_rel| v_rel. Receipts: exact
+      r_cp x F_drag; zero when the cp is on the velocity line;
+      WEATHERVANE stability (cp behind the c.m. restores toward the
+      flow, cp ahead destabilizes); and the aero force matches the
+      truth-model drag (F = m a_drag, cd_area = m/bc). With gravity
+      gradient, the two dominant LEO attitude disturbances are now
+      modeled and analytically validated
 - [x] thruster/torque allocation (#39, `control/allocation.py`): maps
       the 6-DOF PTR's commanded body wrench (thrust + torque) onto a
       cluster of PUSH-ONLY discrete thrusters. ThrusterConfig ->

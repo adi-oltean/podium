@@ -54,6 +54,26 @@ def gravity_gradient_torque(nadir_body: F64, inertia: F64, n: float) -> F64:
     return tau
 
 
+def aerodynamic_torque(v_rel_body: F64, rho: float, cd_area: float,
+                       r_cp: F64) -> F64:
+    """Aerodynamic disturbance torque in the body frame,
+
+        F_drag = -1/2 rho (Cd A) |v_rel| v_rel,   tau = r_cp x F_drag,
+
+    where v_rel_body is the atmosphere-relative velocity in body
+    coordinates, cd_area = Cd*A, and r_cp is the center-of-pressure
+    offset from the center of mass (body frame). This is the second
+    dominant LEO attitude disturbance after gravity gradient. With the
+    center of pressure BEHIND the center of mass (downstream) the torque
+    weathervanes the body toward the flow — passive aerodynamic
+    stabilization. The force is consistent with the truth model's drag
+    (podium.dynamics.nonlinear): F = m*a_drag with cd_area = m/bc."""
+    v = np.asarray(v_rel_body, dtype=np.float64)
+    f_drag: F64 = -0.5 * rho * cd_area * float(np.linalg.norm(v)) * v
+    tau: F64 = np.cross(np.asarray(r_cp, dtype=np.float64), f_drag)
+    return tau
+
+
 def kinetic_energy(w: F64, inertia: F64) -> float:
     return 0.5 * float(w @ (inertia @ w))
 
