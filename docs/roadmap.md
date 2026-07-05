@@ -467,8 +467,20 @@ retiring the last measured tier-1 tolerance. Remaining:
       checker (certificate re-checked in exact/interval arithmetic)
 - [ ] tudatpy 6-DOF cross-validation oracle (attitude + coupled
       translation), complementing the Orekit translational lane
-- [ ] thruster torque allocation for the 6-DOF PTR (discrete
-      thruster-pair mapping) + path pointing constraints
+- [x] thruster/torque allocation (#39, `control/allocation.py`): maps
+      the 6-DOF PTR's commanded body wrench (thrust + torque) onto a
+      cluster of PUSH-ONLY discrete thrusters. ThrusterConfig ->
+      effectiveness matrix B (columns [d_i; r_i x d_i]); allocate()
+      solves the minimum-propellant LP (min sum u, B u = w, 0<=u<=umax,
+      scipy highs) with an NNLS fallback that honestly reports the
+      closest achievable wrench when a demand exceeds authority. A
+      24-thruster standard cluster with verified rank-6 authority.
+      Receipts: feasible wrenches reproduce to 1e-9 with u>=0, pure
+      couples realize with zero net force, the pseudoinverse is shown
+      to go NEGATIVE (why non-negativity matters), and every node of a
+      sixdof plan's (thrust,tau) trajectory allocates feasibly — the
+      guidance output is hardware-realizable. Path pointing constraints
+      still open
 
 ## Cross-cutting, every release
 

@@ -93,6 +93,8 @@ ignore = ["PLR0913", "PLR2004"]
 "src/podium/emit/solvergen.py" = ["PLC0415"]
 # mpmath imported lazily so the core stays dependency-free.
 "src/podium/emit/croracle.py" = ["PLC0415"]
+# scipy.optimize imported lazily so the core stays dependency-free.
+"src/podium/control/allocation.py" = ["PLC0415"]
 # driver generator: one branch per parameter/output form is the clear shape
 "src/podium/emit/evagen.py" = ["PLR0912"]
 # org.* packages exist only after orekit initVM — lazy imports required
