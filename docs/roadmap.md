@@ -446,6 +446,19 @@ tudatpy 6-DOF oracle, torque allocation) carry into v0.7.
       exact Gram passing the exact is_sos check with the off-diagonal
       freedom used. Closes the float-synthesis -> exact-certificate
       loop the paper flagged as open
+- [x] Exact SOS barrier for the quaternion-feedback closed loop (#53,
+      `test_quaternion_barrier.py`): the RPOD-core nonlinear system the
+      paper names. Single-axis quaternion feedback (state q_s,q_v,w;
+      tau = -kp q_v - kd w) is a quadratic vector field on the
+      unit-quaternion manifold; its Lyapunov barrier
+      V = 2kp(1-q_s) + 1/2 I w^2 has V-dot = -kd w^2 EXACTLY (the kp
+      q_v w cross terms cancel, for arbitrary rational gains), so
+      -V-dot certifies SOS and every sub-level set is an
+      infinite-horizon attitude-stability invariant. The certificate
+      is synthesized by an untrusted Clarabel SDP and validated to
+      exact via validate_gram (#52). A simulation confirms convergence
+      with the quaternion norm preserved. A real RPOD nonlinear closed
+      loop through the full exact-SOS pipeline
 - [x] 6-DOF attitude-coupled PTR (#33, `guidance/sixdof.py`): joint
       13-state (r,v,q,w) planning with a BODY-FIXED thruster — thrust
       direction is R(q)e1, so braking requires a slew the planner must
