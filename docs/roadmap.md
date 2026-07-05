@@ -548,6 +548,17 @@ retiring the last measured tier-1 tolerance. Remaining:
       scales linearly (Cr=2 twice Cr=1). Gravity gradient + aero + SRP
       are now the three modeled, analytically-validated environmental
       attitude disturbances
+- [x] Disturbance environment + rejection (#47,
+      `dynamics/disturbances.py`, `test_disturbances.py`): a
+      DisturbanceModel aggregates gravity gradient + aero + SRP into
+      one body torque (superposition; terms disable via None/rho=0).
+      Receipts: total == sum of the three exactly; clean disabling;
+      physically-reasonable micro-Nm magnitudes; and the CAPSTONE — a
+      quaternion-feedback controller holds an inertially-fixed attitude
+      within 1 deg over a full orbit against the combined disturbance
+      (nadir + relative wind rotating at n, Sun fixed) without
+      exceeding saturation. Connects the disturbance dynamics to
+      disturbance rejection — the proximity-ops attitude-hold problem
 - [x] thruster/torque allocation (#39, `control/allocation.py`): maps
       the 6-DOF PTR's commanded body wrench (thrust + torque) onto a
       cluster of PUSH-ONLY discrete thrusters. ThrusterConfig ->
