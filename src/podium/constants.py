@@ -11,3 +11,7 @@ J2_EARTH = 1.08262668e-3
 
 # Earth rotation rate [rad/s] (WGS84)
 OMEGA_EARTH = 7.2921159e-5
+
+# Solar-radiation-pressure constant at 1 AU [N/m^2]: the mean solar
+# irradiance (~1361 W/m^2) divided by the speed of light.
+SOLAR_PRESSURE = 4.5606e-6

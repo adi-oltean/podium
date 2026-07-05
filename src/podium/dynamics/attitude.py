@@ -74,6 +74,29 @@ def aerodynamic_torque(v_rel_body: F64, rho: float, cd_area: float,
     return tau
 
 
+def srp_torque(sun_dir_body: F64, area: float, cr: float, r_cp: F64,
+               pressure: float = 4.5606e-6, illuminated: bool = True) -> F64:
+    """Solar-radiation-pressure disturbance torque in the body frame,
+
+        F_srp = -P Cr A s_hat,   tau = r_cp x F_srp,
+
+    where s_hat is the unit direction TO the Sun in body coordinates
+    (the force pushes away from the Sun, hence the minus), P is the SRP
+    constant at the spacecraft's heliocentric distance (default 1 AU),
+    Cr in [1, 2] the reflectivity (1 absorbing, 2 perfect specular),
+    A the projected illuminated area, and r_cp the center-of-pressure
+    offset from the c.m. In eclipse (illuminated=False) the torque is
+    zero. SRP is the dominant environmental attitude disturbance at GEO;
+    negligible but nonzero in LEO except in Earth's shadow."""
+    if not illuminated:
+        return np.zeros(3)
+    s = np.asarray(sun_dir_body, dtype=np.float64)
+    s = s / np.linalg.norm(s)
+    f_srp: F64 = -pressure * cr * area * s
+    tau: F64 = np.cross(np.asarray(r_cp, dtype=np.float64), f_srp)
+    return tau
+
+
 def kinetic_energy(w: F64, inertia: F64) -> float:
     return 0.5 * float(w @ (inertia @ w))
 

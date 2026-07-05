@@ -537,6 +537,17 @@ retiring the last measured tier-1 tolerance. Remaining:
       truth-model drag (F = m a_drag, cd_area = m/bc). With gravity
       gradient, the two dominant LEO attitude disturbances are now
       modeled and analytically validated
+- [x] Solar-radiation-pressure torque (#46, `attitude.srp_torque`,
+      `test_srp_torque.py`): the third classic environmental
+      disturbance (dominant at GEO). tau = r_cp x F_srp,
+      F_srp = -P Cr A s_hat (s_hat to the Sun; force anti-sunward); P
+      from the 1-AU SRP constant (SOLAR_PRESSURE added to constants),
+      Cr in [1,2], with an illuminated flag for the eclipse cutoff.
+      Receipts: exact r_cp x F_srp; anti-sunward force of magnitude
+      P Cr A; zero on the sun line; eclipse zeroes it; reflectivity
+      scales linearly (Cr=2 twice Cr=1). Gravity gradient + aero + SRP
+      are now the three modeled, analytically-validated environmental
+      attitude disturbances
 - [x] thruster/torque allocation (#39, `control/allocation.py`): maps
       the 6-DOF PTR's commanded body wrench (thrust + torque) onto a
       cluster of PUSH-ONLY discrete thrusters. ThrusterConfig ->
