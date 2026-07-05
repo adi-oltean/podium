@@ -515,6 +515,18 @@ retiring the last measured tier-1 tolerance. Remaining:
       numerical lane would add coupled attitude+translation but is a
       heavier install; the analytic oracle covers the rotational core
       with a mathematical ground truth
+- [x] Gravity-gradient torque + libration validation (#44,
+      `attitude.gravity_gradient_torque`, `test_gravity_gradient.py`):
+      the dominant LEO environmental torque, tau = 3n^2 (o x I o) with
+      o the body-frame nadir. Validated against exact analytic results:
+      torque zero at the nadir-aligned equilibrium; the pitch torque is
+      exactly 3n^2(I_R-I_Y)sin(e)cos(e); the LVLH equilibrium locks onto
+      nadir (<0.1 deg/orbit) in an orbit-coupled propagation; the small
+      pitch-libration frequency matches n*sqrt(3(I_R-I_Y)/I_P) to
+      0.002%; and the stability boundary is captured (nadir-moment-
+      largest ordering diverges past 30 deg while the stable one
+      librates). Extends the analytic attitude oracle to environmental
+      torques
 - [x] thruster/torque allocation (#39, `control/allocation.py`): maps
       the 6-DOF PTR's commanded body wrench (thrust + torque) onto a
       cluster of PUSH-ONLY discrete thrusters. ThrusterConfig ->

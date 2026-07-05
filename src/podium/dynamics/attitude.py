@@ -37,6 +37,23 @@ def step(q: F64, w: F64, inertia: F64, torque_body: F64, dt: float) -> tuple[F64
     return q_out, w_out
 
 
+def gravity_gradient_torque(nadir_body: F64, inertia: F64, n: float) -> F64:
+    """Gravity-gradient torque in the body frame for a circular orbit,
+
+        tau = 3 n^2 (o_hat x I o_hat),
+
+    where o_hat is the unit NADIR direction (toward the primary's
+    centre) expressed in body coordinates and n is the orbital mean
+    motion. Vanishes when a principal axis points at nadir (the
+    gravity-gradient equilibrium); to first order it restores the body
+    toward the local-vertical/local-horizontal orientation, the basis
+    of passive gravity-gradient stabilization."""
+    o = np.asarray(nadir_body, dtype=np.float64)
+    o = o / np.linalg.norm(o)
+    tau: F64 = 3.0 * n * n * np.cross(o, inertia @ o)
+    return tau
+
+
 def kinetic_energy(w: F64, inertia: F64) -> float:
     return 0.5 * float(w @ (inertia @ w))
 
