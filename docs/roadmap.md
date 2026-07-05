@@ -459,6 +459,19 @@ tudatpy 6-DOF oracle, torque allocation) carry into v0.7.
       exact via validate_gram (#52). A simulation confirms convergence
       with the quaternion norm preserved. A real RPOD nonlinear closed
       loop through the full exact-SOS pipeline
+- [x] Three-axis quaternion safe-attitude-cone barrier (#54,
+      `test_quaternion3axis_cone.py`): the higher-degree frontier. The
+      FULL three-axis loop (7 states, ASYMMETRIC inertia) has
+      V-dot = -kd||w||^2 exactly — the kp coupling AND the gyroscopic
+      w x I w term both cancel (rigid-body rotation is workless) — and
+      a POSITIVSTELLENSATZ containment {V<=c} subset {q0>=q0_min} (a
+      safe attitude cone) holds via the exact identity
+      q0-q0_min = (1/2kp)(c-V) + (1/4kp)w'Iw with the remainder SOS. So
+      the attitude never leaves the cone for all time — an
+      infinite-horizon safe-cone certificate for the full three-axis
+      nonlinear loop. Validated from an untrusted SDP (#52); a 7-state
+      simulation confirms cone-invariance with ||q|| preserved.
+      Converts the paper's last SOS future-work into a shipped result
 - [x] 6-DOF attitude-coupled PTR (#33, `guidance/sixdof.py`): joint
       13-state (r,v,q,w) planning with a BODY-FIXED thruster — thrust
       direction is R(q)e1, so braking requires a slew the planner must
