@@ -204,3 +204,52 @@ def test_untrusted_ecos_socp_certified():
         float(rep.comp_slack), rep.s_in_cone, rep.z_in_cone)
     # the optimum is t = ||u|| with u the min-norm reach -> ~0.5831
     assert abs(float(rep.primal_obj) - np.hypot(0.5, 0.3)) < 1e-6
+
+
+@pytest.mark.slow
+def test_embedded_ecos_layer0_socp_certified():
+    """The embedded-solver + verified-KKT loop on a real Layer-0
+    guidance problem: a min-fuel rendezvous SOCP (per-step thrust cones
+    ||u_k|| <= t_k, min sum t_k, CW-STM reach) solved by the EMBEDDED
+    ECOS solver and re-verified exactly by certify_ecos."""
+    cp = pytest.importorskip("cvxpy")
+    pytest.importorskip("ecos")
+
+    nn = math.sqrt(const.MU_EARTH / 6_778_137.0**3)
+    ts = [0.0, 250.0, 500.0, 750.0]
+    tf = 1000.0
+    bmat = np.vstack([np.zeros((3, 3)), np.eye(3)])
+    blocks = [cw.stm(nn, tf - t) @ bmat for t in ts]      # 6x3 each
+    target = np.array([0.0, -8.0, 0.0, 0.0, 0.0, 0.0])
+
+    u = [cp.Variable(3) for _ in ts]
+    tmag = cp.Variable(len(ts))
+    cons = [cp.norm(u[k]) <= tmag[k] for k in range(len(ts))]
+    cons.append(sum(blocks[k] @ u[k] for k in range(len(ts))) == target)
+    prob = cp.Problem(cp.Minimize(cp.sum(tmag)), cons)
+
+    sol, rep = kkt.certify_ecos(prob)
+    assert sol["info"]["exitFlag"] == 0
+    assert rep.certified(tol=kkt.Frac(1, 10**4)), (
+        float(rep.stationarity), float(rep.conic_residual),
+        float(rep.comp_slack), rep.s_in_cone, rep.z_in_cone)
+    # the exact-certified objective matches the embedded solver's cost
+    assert abs(float(rep.primal_obj) - sol["info"]["pcost"]) < 1e-6
+    # at least one thrust cone is active (a real burn happened)
+    prob.solve(solver=cp.ECOS)
+    assert sum(np.linalg.norm(uk.value) for uk in u) > 1e-3
+
+
+def test_certify_ecos_rejects_tampered_primal():
+    """If the returned solution is corrupted, re-verification catches
+    it — the certificate is not a rubber stamp. (Done at the checker
+    level, since certify_ecos wraps a trustworthy solve.)"""
+    # a feasible standard-form point, then a tampered one
+    good = kkt.verify_socp(
+        c=[F(1)], a=[], b=[], g=[[F(-1)]], h=[F(-1)],
+        dims={"l": 1, "q": []}, x=[F(1)], y=[], z=[F(1)], s=[F(0)])
+    assert good.certified(tol=F(0))
+    tampered = kkt.verify_socp(
+        c=[F(1)], a=[], b=[], g=[[F(-1)]], h=[F(-1)],
+        dims={"l": 1, "q": []}, x=[F(3)], y=[], z=[F(1)], s=[F(0)])
+    assert not tampered.certified()   # slack now inconsistent

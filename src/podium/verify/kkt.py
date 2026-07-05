@@ -262,3 +262,44 @@ def verify_socp(
         primal_obj=obj,
         problems=problems,
     )
+
+
+def certify_ecos(problem: object,
+                 max_den: int = 10**12,
+                 ) -> tuple[dict[str, object], SOCPReport]:
+    """Solve a cvxpy SOCP with the EMBEDDED ECOS solver and re-verify
+    its solution exactly (verify_socp).
+
+    ECOS is the branchless, library-free interior-point C solver built
+    for embedded flight targets; invoked here through its Python
+    binding, it produces exactly the standard-form x/y/z/s a generated
+    embedded kernel would. This is the online-solver analogue of the
+    offline barrier and golden-vector certificates: the flight solver's
+    answer is trusted only after an exact re-check.
+
+    Returns (ecos_solution, SOCPReport). cvxpy/ecos/scipy are optional;
+    imported lazily so podium.verify stays dependency-free.
+    """
+    import cvxpy as cp  # noqa: PLC0415
+    import ecos  # type: ignore[import-untyped]  # noqa: PLC0415
+    from scipy import sparse  # type: ignore[import-untyped]  # noqa: PLC0415
+
+    data, _chain, _inv = problem.get_problem_data(cp.ECOS)  # type: ignore[attr-defined]
+    d = data["dims"]
+    dims = {"l": int(d.nonneg), "q": [int(m) for m in d.soc]}
+    g_sp = sparse.csc_matrix(data["G"])
+    a_sp = sparse.csc_matrix(data["A"])
+    sol = ecos.solve(data["c"], g_sp, data["h"], dims, a_sp, data["b"],
+                     verbose=False)
+    report = verify_socp(
+        c=rationalize_vec(data["c"].tolist(), max_den),
+        a=rationalize_mat(a_sp.toarray().tolist(), max_den),
+        b=rationalize_vec(data["b"].tolist(), max_den),
+        g=rationalize_mat(g_sp.toarray().tolist(), max_den),
+        h=rationalize_vec(data["h"].tolist(), max_den),
+        dims=dims,
+        x=rationalize_vec(sol["x"].tolist(), max_den),
+        y=rationalize_vec(sol["y"].tolist(), max_den),
+        z=rationalize_vec(sol["z"].tolist(), max_den),
+        s=rationalize_vec(sol["s"].tolist(), max_den))
+    return sol, report

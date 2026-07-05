@@ -391,6 +391,20 @@ tudatpy 6-DOF oracle, torque allocation) carry into v0.7.
       certifies exactly; an LP-as-SOCP with a rational optimum verifies
       to EXACTLY zero; and negating a cone dual / leaving the cone is
       rejected. QP + SOCP optimality certificates now both exact
+- [x] Embedded-solver + verified-KKT loop closed (#42,
+      `kkt.certify_ecos`): a real Layer-0 min-fuel rendezvous SOCP
+      (per-step thrust cones ||u_k||<=t_k, min sum t_k, CW-STM reach)
+      is compiled by cvxpy to ECOS standard form, solved by the
+      EMBEDDED ECOS solver (the branchless flight-target C, via its
+      binding), and re-verified exactly by verify_socp. Receipt: it
+      certifies within tolerance (stationarity/conic/comp-slack tiny,
+      cones satisfied), the certified objective matches the solver's
+      cost, and a burn is active. The online-solver analogue of the
+      offline barrier and golden-vector certificates — the flight
+      solver's answer is trusted only after an exact re-check. This is
+      the CVXPYgen/QOCOGEN item's substance without the Julia sidecar;
+      feeding a generated-C KKT dump (vs the ECOS binding) is the only
+      residual
 - [x] 6-DOF attitude-coupled PTR (#33, `guidance/sixdof.py`): joint
       13-state (r,v,q,w) planning with a BODY-FIXED thruster — thrust
       direction is R(q)e1, so braking requires a slew the planner must
