@@ -49,7 +49,6 @@ whenever the code they summarize changes:
 | `docs/architecture.md` | module boundaries, dataflow, truth-model fidelity, or conventions change | medium |
 | `docs/verification.md` | static-subset rules, contract semantics, or the verification pipeline change | medium |
 | `docs/comparative-analysis.md` | periodically (quarterly): competitor releases, ecosystem-gap claims ("no other open implementation") must be re-verified before repeating them | medium, time-driven |
-| `docs/trajectory-optimization.md` | guidance-layer capabilities or solver choices change | medium |
 | `docs/visualization.md` | viewer architecture changes | low |
 | `docs/plans/NN-*.md` | written at issue start, acceptance boxes checked at close; historical afterwards (do not retro-edit closed plans except to fix errors) | low after close |
 | Package docstrings (`src/podium/*/__init__.py`) | a module in that package lands or changes scope — these are the API-level docs | medium |

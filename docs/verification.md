@@ -1,9 +1,50 @@
 # Formal validation approach
 
-Podium assumes an **external abstract-interpretation tool** validates the
-flight-translated C code (we do not build an analyzer). The library's job is to
-produce code and contracts that such a tool can actually prove things about.
-This document defines the rules and the contract pipeline.
+Podium carries GNC algorithms from Python to verified flight C along a
+chain where **every link is independently checked**. The design goal
+(stated first as an aspiration, now largely shipped) is that no step is
+trusted on faith: the emitter is checked by golden vectors, the emitted
+C is checked by a sound static analyzer AND a formally-verified
+compiler, the online solvers are re-checked by exact-arithmetic KKT
+certificates, the closed loop is checked by reachability, and the truth
+model is checked against an independent astrodynamics stack. This
+document describes the shipped stack and the static-subset rules that
+make it possible.
+
+## What is shipped (verification modalities in CI)
+
+Nine independent modalities, each with its module, CI lane, and
+receipts. "Exact" means `fractions.Fraction` arithmetic with no floats
+in the trusted checker; "bit-exact" means identical IEEE-754 bit
+patterns.
+
+| Modality | Where | What it proves |
+|---|---|---|
+| **Contracts** | `podium.verify.contracts` | Input ranges/invariants; runtime-checked in the sandbox, rendered as ACSL on the emitted C |
+| **STL spec oracles** | `podium.sim.spec` | Mission properties (corridor, keep-out, docking rate) via robust temporal-logic semantics |
+| **Closed-loop reachability** | `tools/reach/` (JuliaReach), `reach.yml` | Flowpipe non-intersection with unsafe sets — LOS cone, velocity ceiling, abort keep-out — on the ARCH hybrid models, re-proven every commit (12 PROVEN/run) |
+| **Exact barrier certificates** | `podium.verify.barrier`, `test_barrier.py` | Infinite-horizon abort safety: SDP-synthesized (untrusted) barrier re-verified in exact rationals |
+| **Exact KKT certificates** | `podium.verify.kkt`, `test_kkt.py` | Online-solver optimality (QP + SOCP) re-verified in exact rationals, incl. the embedded ECOS solve of a Layer-0 problem |
+| **Golden vectors** | `podium.emit`, `test_cemit.py` | Python↔C equivalence: bit-exact for arithmetic/sqrt, correctly-rounded (CORE-MATH) for transcendentals |
+| **Sound static analysis** | `tools/eva_gate.py`, `eva.yml` | Frama-C/EVA proves the emitted C alarm-free (no div0/overflow/invalid access) over the contracted input ranges |
+| **Verified-compiler + cross-arch** | `compcert.yml`, `tier2.yml` | Golden vectors replay through CompCert (machine-checked semantics preservation) and on aarch64 under qemu (bit-identical across ISAs) |
+| **Independent physics + dynamics oracles** | `validate.yml` (Orekit), `test_attitude_analytic.py`, `test_gravity_gradient.py` | Truth model vs Orekit; attitude integrator vs exact Jacobi-elliptic / gravity-gradient closed forms |
+
+The eight CI lanes are `ci` (receipts + golden vectors), `reach`,
+`eva`, `compcert`, `tier2`, `validate`, plus the evidence-gated
+`release` and the `pages` viewer deploy. Every tagged release ships an
+audit bundle (`tools/build_audit_bundle.py`) that is byte-deterministic
+under a fixed seed and cannot publish unless the reference mission
+captures, all margins hold, the barrier certificate verifies, and EVA
+reports zero alarms.
+
+## From plan to shipped
+
+The original plan assumed an **external** abstract-interpretation tool
+would validate the flight C. That is now integrated: Frama-C/EVA runs
+in CI (`eva.yml`) against the emitted, ACSL-annotated kernels. The
+library's job — producing code and contracts a tool can prove things
+about — is unchanged; the tool is just wired in.
 
 ## Precedents this design follows
 
@@ -76,7 +117,7 @@ and consumed four ways:
 | Consumer | Form |
 |---|---|
 | Sandbox simulation | Runtime checks (raise on violation; disable with `PODIUM_NO_CONTRACTS=1`) |
-| C translation | Comment-annotation block per function for the abstract-interpretation tool: direction/nullness/size tags on pointers (`[in]`, `[notnull]`, `[len(6)]`), `[range(lo,hi)]` on every scalar that indexes, sizes, or is physically bounded |
+| C translation | The emitter renders each range contract as an **ACSL `requires`** clause (hex-float bounds, so the nearest-double boundary is provable) plus a `[spec]` annotation block; Frama-C/EVA (`eva.yml`) discharges them — 100% of the reached preconditions valid, zero alarms |
 | Invariants | `prove(cond, label)` calls become `PROVE(...)` obligations at the same program points, yielding per-invariant proof artifacts |
 | Docs | Ranges and units rendered into API reference |
 
@@ -86,39 +127,63 @@ is: **every scalar parameter of a core function carries a range contract.**
 The analysis harness (`main` that draws inputs nondeterministically from the
 declared ranges) is generated from the same metadata.
 
-## Python → C translation
+## Python → C translation (shipped: `podium.emit`)
 
 No existing Python compiler (Cython, Numba, Pythran) emits analyzer-friendly
-C — they produce CPython glue, C++ templates, or JIT machine code. The plan,
-following the CVXPYgen precedent, is a small AST-walking emitter over the
-static subset that Podium owns:
+C — they produce CPython glue, C++ templates, or JIT machine code. Podium
+owns a small AST-walking emitter (`podium.emit.cemit`) over the static subset,
+following the CVXPYgen precedent:
 
 - typed, fixed-shape float64 functions → flat C arrays with compile-time
-  extents and explicit index arithmetic;
-- `@contract` metadata → annotation comments + a range-driven analysis harness;
-- `prove()` → `PROVE(...)` macros (no-ops in production builds);
+  extents and explicit index arithmetic; bounded `for` loops, matmul/transpose
+  lowering, tuple returns as out-parameters (emitter v1/v2);
+- `@contract` metadata → ACSL `requires` clauses (hex-float bounds) plus a
+  `[spec]` annotation block and a range-driven analysis harness;
+- `@shapes` for pure matrix kernels that never reveal shapes via subscripts;
 - golden-vector equivalence tests between the Python and C artifacts as the
   translation's own validation.
 
-Because the subset forbids everything that makes Python hard to compile, the
-emitter stays small and auditable. Until it exists, the discipline still pays:
-static-subset Python is directly hand-translatable, function-for-function.
+20 flight kernels emit today — the quaternion, CW, Yamanaka-Ankersen, ROE, and
+EKF (Joseph `predict`/`update_sequential`) cores. The golden vectors are
+**bit-exact** for arithmetic/sqrt kernels and, in correctly-rounded mode
+(`emit_module(correctly_rounded=True)` linking vendored CORE-MATH), bit-exact
+for the transcendental-bearing kernels too — retiring the last cross-libm
+tolerance. A subset tripwire test pins the emitter inside CompCert's
+verified-compilable C99 forever (no VLAs, goto, switch, union, long double,
+`_Complex`, or dynamic allocation).
+
+The emitted C is then proven RTE-free by Frama-C/EVA over the contracted
+ranges (`eva.yml`), compiled by the formally-verified CompCert
+(`compcert.yml`), and run bit-identically on aarch64 under qemu
+(`tier2.yml`) — so the flight binary's behavior is tied to the C source by a
+machine-checked semantics-preservation proof, and to the Python semantics by
+the bitwise receipts.
 
 ## Layered assurance story
 
-1. **Design level** — closed-loop safety via reachability on the CW hybrid
-   model (ARCH-benchmark style export to CORA/JuliaReach); LMI/Lyapunov
-   certificates from the sandbox design tools.
-2. **Numerics level** — floating-point round-off bounds on straight-line
-   kernels; fixed-step truncation bounds versus validated integration.
-3. **Code level** — generated C proven RTE-free by the external abstract-
-   interpretation tool; contracts discharged as proof artifacts.
-4. **Runtime level** — golden-vector Python↔C equivalence in CI (two tiers:
-   bit-exact on host with pinned FP semantics; ULP-bounded on target); any
-   learned component wrapped in a run-time-assurance monitor whose backup
-   law and switching surface are the verified artifacts. As of 2026,
-   closed-loop reachability of NN docking policies remains open at the
-   full initial set, while certificate-based verification (neural
-   Lyapunov-barrier proofs) has succeeded on CW-scale benchmarks — the
-   certified path here stays classical, with a documented route for small
-   certificate-carrying learned components later.
+1. **Design level** *(shipped)* — closed-loop safety via reachability on the
+   CW hybrid models, re-proven every commit (`reach.yml`, JuliaReach), for
+   both the ARCH reference controller and Podium-synthesized LQR gains;
+   infinite-horizon abort safety via exact-rational barrier certificates.
+2. **Numerics level** *(shipped)* — correctly-rounded transcendentals
+   (CORE-MATH) close the cross-libm gap; fixed-step integrators validated
+   against exact analytic solutions (Jacobi-elliptic attitude, gravity-
+   gradient libration) and against Orekit for the translational truth model.
+3. **Code level** *(shipped)* — the emitted C is proven RTE-free by Frama-C/EVA
+   over the contracted ranges (`eva.yml`, zero alarms), compiled by the
+   formally-verified CompCert (`compcert.yml`), with contracts rendered as
+   ACSL preconditions discharged in the analysis.
+4. **Online-solver level** *(shipped)* — the untrusted convex solver's QP/SOCP
+   solution is re-verified for optimality by an exact-rational KKT checker
+   (`podium.verify.kkt`), including the embedded ECOS solve of a Layer-0
+   problem; the flight solver's answer is trusted only after an exact re-check.
+5. **Runtime level** *(shipped)* — golden-vector Python↔C equivalence in CI
+   (bit-exact on host; bit-identical cross-architecture on aarch64 under
+   qemu); every tagged release ships a byte-deterministic, evidence-gated
+   audit bundle.
+
+Open (documented route, not yet built): closed-loop reachability of NN docking
+policies at the full initial set remains hard; certificate-based verification
+(neural Lyapunov-barrier proofs) has succeeded on CW-scale benchmarks, so any
+learned component here would be wrapped in a run-time-assurance monitor whose
+backup law and switching surface are the verified classical artifacts.
