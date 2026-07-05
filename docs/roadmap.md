@@ -501,8 +501,20 @@ retiring the last measured tier-1 tolerance. Remaining:
       does apt + cross-gcc + qemu, host compares
 - [ ] CVXPYgen/QOCOGEN embedded Layer-0 problem with a verified-KKT
       checker (certificate re-checked in exact/interval arithmetic)
-- [ ] tudatpy 6-DOF cross-validation oracle (attitude + coupled
-      translation), complementing the Orekit translational lane
+- [x] Analytic torque-free attitude oracle (#43,
+      `test_attitude_analytic.py`): an independent 6-DOF ROTATIONAL
+      cross-validation using EXACT closed-form solutions rather than
+      another numerical stack (stronger than tudatpy, which is itself
+      an integrator). The asymmetric body's Euler equations are solved
+      by Jacobi elliptic functions (scipy ellipj); omega matches the
+      integrator to ~2e-13. The axisymmetric body's regular precession
+      — constant nutation cone about the conserved H, precession at
+      |H|/It, transverse spin at n(Ia-It)/It — is validated against
+      the integrated quaternion (nutation cos constant to 1e-9, H
+      conserved to 1e-10, precession rate within 1%). A tudatpy
+      numerical lane would add coupled attitude+translation but is a
+      heavier install; the analytic oracle covers the rotational core
+      with a mathematical ground truth
 - [x] thruster/torque allocation (#39, `control/allocation.py`): maps
       the 6-DOF PTR's commanded body wrench (thrust + torque) onto a
       cluster of PUSH-ONLY discrete thrusters. ThrusterConfig ->
