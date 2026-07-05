@@ -75,6 +75,25 @@ def dlqr(a: F64, b: F64, q: F64, r: F64, iters: int = 500) -> F64:
     return np.linalg.solve(r + btp @ b, btp @ a)
 
 
+def dlqr_cert(a: F64, b: F64, q: F64, r: F64,
+             iters: int = 500) -> tuple[F64, F64]:
+    """Discrete LQR returning both the gain K (u = -K x) and the
+    value-function matrix P (the Riccati solution). P is the Lyapunov
+    certificate of the closed loop A_cl = A - B K: it satisfies
+    P - A_cl' P A_cl = Q + K' R K >= 0, so x'Px is non-increasing along
+    closed-loop trajectories. See podium.verify.lyapunov, which
+    re-verifies that inequality in exact rational arithmetic."""
+    p = q.copy()
+    for _ in range(iters):
+        btp = b.T @ p
+        k = np.linalg.solve(r + btp @ b, btp @ a)
+        p = q + a.T @ p @ (a - b @ k)
+    btp = b.T @ p
+    k = np.linalg.solve(r + btp @ b, btp @ a)
+    p_sym: F64 = 0.5 * (p + p.T)
+    return k, p_sym
+
+
 def care(a: F64, b: F64, q: F64, r: F64) -> F64:
     """Continuous algebraic Riccati equation solver (sandbox side).
 

@@ -405,6 +405,20 @@ tudatpy 6-DOF oracle, torque allocation) carry into v0.7.
       the CVXPYgen/QOCOGEN item's substance without the Julia sidecar;
       feeding a generated-C KKT dump (vs the ECOS binding) is the only
       residual
+- [x] Certificate-carrying Lyapunov ellipsoid (#50,
+      `verify/lyapunov.py`, `lqr.dlqr_cert`): Feron-style credible
+      autocoding. An LQR value matrix P certifies its closed loop
+      A_cl = A - BK — {x'Px<=c} is invariant and contracting because
+      P - A_cl'PA_cl = Q + K'RK >= 0 — re-verified in EXACT rationals
+      (P >= 0 and the decrease >= 0, via the barrier module's
+      all-principal-minors PSD test). The decrease carries the full Q
+      margin so exact verification is robust to rationalization.
+      Receipts: the CW LQR P certifies exactly; x'Px is monotone and
+      the sublevel set invariant along trajectories; a bogus P
+      (identity) and the open-loop plant are rejected. The
+      control-Lyapunov member of the exact-arithmetic certificate
+      family (with barrier #20 and KKT #40/#41); the emitter can render
+      P as a quadratic PROVE/ACSL obligation
 - [x] 6-DOF attitude-coupled PTR (#33, `guidance/sixdof.py`): joint
       13-state (r,v,q,w) planning with a BODY-FIXED thruster — thrust
       direction is R(q)e1, so braking requires a slew the planner must
