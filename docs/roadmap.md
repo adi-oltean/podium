@@ -419,6 +419,19 @@ tudatpy 6-DOF oracle, torque allocation) carry into v0.7.
       control-Lyapunov member of the exact-arithmetic certificate
       family (with barrier #20 and KKT #40/#41); the emitter can render
       P as a quadratic PROVE/ACSL obligation
+- [x] Higher-degree exact SOS/Positivstellensatz certificates (#51,
+      `verify/sos.py`): generalizes the quadratic S-procedure barrier
+      (#20) to arbitrary-degree polynomial systems. Polynomials as
+      exponent-tuple->Fraction dicts with exact add/mul/scale/partial-
+      derivative/Lie-derivative; is_sos(p, basis, gram) certifies p is
+      SOS by the EXACT identity p = z'Gz plus exact PSD of G (no floats
+      in the trusted path). Flagship: a cubic Duffing oscillator with a
+      QUARTIC Lyapunov barrier — dV/dt = -x2^2 computed exactly (cubic
+      cross terms cancel), -dV/dt certified SOS, proving the sublevel
+      set is an INFINITE-HORIZON invariant of a nonlinear system. Plus
+      non-diagonal Gram SOS, an indefinite polynomial rejected, and a
+      monotonicity simulation. The defensible higher-degree
+      Positivstellensatz contribution; #20 is now its degree-2 case
 - [x] 6-DOF attitude-coupled PTR (#33, `guidance/sixdof.py`): joint
       13-state (r,v,q,w) planning with a BODY-FIXED thruster — thrust
       direction is R(q)e1, so braking requires a slew the planner must
