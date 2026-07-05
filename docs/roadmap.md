@@ -379,6 +379,18 @@ tudatpy 6-DOF oracle, torque allocation) carry into v0.7.
       primal or flipping a dual sign makes the exact residuals blow up
       and the checker rejects. Embedded-solvergen wiring (feed a
       QOCOGEN/CVXPYgen KKT dump to the checker) still open
+- [x] Verified-KKT checker for SOCP (#41): extends #40 to
+      second-order-cone programs — the conic Layer-0 form (keep-out /
+      thrust cones). verify_socp checks the conic KKT of a standard-
+      form SOCP (min c'x s.t. Ax=b, Gx+s=h, s in K) in exact Fractions:
+      stationarity, equality + conic primal residuals, complementary
+      slackness s'z, and exact cone membership of s and z. SOC
+      membership is sqrt-FREE — s0>=-tol and ||s1:||^2<=(s0+tol)^2 are
+      exact Fraction comparisons. Receipts: an untrusted ECOS solve
+      (native standard-form duals) of a min-norm-with-thrust-cone SOCP
+      certifies exactly; an LP-as-SOCP with a rational optimum verifies
+      to EXACTLY zero; and negating a cone dual / leaving the cone is
+      rejected. QP + SOCP optimality certificates now both exact
 - [x] 6-DOF attitude-coupled PTR (#33, `guidance/sixdof.py`): joint
       13-state (r,v,q,w) planning with a BODY-FIXED thruster — thrust
       direction is R(q)e1, so braking requires a slew the planner must

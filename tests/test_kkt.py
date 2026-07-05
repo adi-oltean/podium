@@ -117,3 +117,90 @@ def test_untrusted_solver_min_energy_rendezvous_certified():
         float(rep.stationarity), float(rep.eq_residual))
     # sanity: the certified objective matches the solver's
     assert abs(float(rep.primal_obj) - prob.value) < 1e-6
+
+
+# --- SOCP (#41): exact cone complementarity ---------------------------
+
+def test_soc_membership_predicate_is_exact():
+    """The sqrt-free 'within tol of the second-order cone' test, on
+    exact points: interior, boundary, exterior, and the tolerance
+    boundary — all decided in exact Fraction arithmetic."""
+    ok = kkt._soc_margin_ok
+    assert ok([F(2), F(1), F(1)], F(0))         # ||(1,1)||<2 interior
+    assert ok([F(1), F(1), F(0)], F(0))         # ||1||=1=s0 boundary
+    assert not ok([F(1), F(1), F(1)], F(0))     # ||(1,1)||=sqrt2>1 out
+    assert not ok([F(-1), F(0), F(0)], F(0))    # s0<0 out
+    # exterior point pulled in by a large enough tolerance:
+    # ||(1,1)||^2 = 2 <= (1+tol)^2 requires tol >= sqrt2 - 1 ~ 0.4142
+    assert not ok([F(1), F(1), F(1)], F(41, 100))
+    assert ok([F(1), F(1), F(1)], F(42, 100))
+
+
+def test_lp_as_socp_exact_zero_residual():
+    """A pure-nonneg-cone standard form (an LP) with a rational
+    optimum: min x s.t. x >= 1 -> x=1, s=0, z=1. Every conic-KKT
+    residual is EXACTLY zero and both cones hold at tol 0."""
+    rep = kkt.verify_socp(
+        c=[F(1)], a=[], b=[], g=[[F(-1)]], h=[F(-1)],
+        dims={"l": 1, "q": []},
+        x=[F(1)], y=[], z=[F(1)], s=[F(0)])
+    assert rep.stationarity == F(0)
+    assert rep.conic_residual == F(0)
+    assert rep.comp_slack == F(0)
+    assert rep.s_in_cone and rep.z_in_cone
+    assert rep.certified(tol=F(0))
+
+
+def test_negated_cone_dual_is_rejected():
+    """Flipping the cone dual out of K* fails membership exactly."""
+    rep = kkt.verify_socp(
+        c=[F(1)], a=[], b=[], g=[[F(-1)]], h=[F(-1)],
+        dims={"l": 1, "q": []},
+        x=[F(1)], y=[], z=[F(-1)], s=[F(0)])
+    assert not rep.z_in_cone
+    assert not rep.certified()
+
+
+@pytest.mark.slow
+def test_untrusted_ecos_socp_certified():
+    """An UNTRUSTED ECOS solve (native standard-form x/y/z/s duals) of
+    a min-norm-with-thrust-cone SOCP is verified exactly: min t s.t.
+    (t, u) in SOC and A u = b. The cone is active (t = ||u||) and the
+    conic KKT certifies within tolerance."""
+    ecos = pytest.importorskip("ecos")
+    from scipy import sparse  # noqa: PLC0415
+
+    # x = [u0,u1,u2, t]; min t
+    c = np.array([0.0, 0.0, 0.0, 1.0])
+    # equality A u = b  (underdetermined -> nontrivial min-norm)
+    a = sparse.csc_matrix(np.array([[1.0, 0.0, 0.0, 0.0],
+                                    [0.0, 1.0, 0.0, 0.0]]))
+    b = np.array([0.5, -0.3])
+    # conic s = (t, u) in SOC^4:  G x + s = h,  h = 0,  s = -G x
+    g = sparse.csc_matrix(np.array([
+        [0.0, 0.0, 0.0, -1.0],   # s0 = t
+        [-1.0, 0.0, 0.0, 0.0],   # s1 = u0
+        [0.0, -1.0, 0.0, 0.0],
+        [0.0, 0.0, -1.0, 0.0]]))
+    h = np.zeros(4)
+    dims = {"l": 0, "q": [4]}
+    sol = ecos.solve(c, g, h, dims, a, b, verbose=False)
+    assert sol["info"]["exitFlag"] == 0
+
+    rep = kkt.verify_socp(
+        c=kkt.rationalize_vec(c.tolist()),
+        a=kkt.rationalize_mat(a.toarray().tolist()),
+        b=kkt.rationalize_vec(b.tolist()),
+        g=kkt.rationalize_mat(g.toarray().tolist()),
+        h=kkt.rationalize_vec(h.tolist()),
+        dims=dims,
+        x=kkt.rationalize_vec(sol["x"].tolist()),
+        y=kkt.rationalize_vec(sol["y"].tolist()),
+        z=kkt.rationalize_vec(sol["z"].tolist()),
+        s=kkt.rationalize_vec(sol["s"].tolist()),
+        cone_tol=kkt.Frac(1, 10**6))
+    assert rep.certified(tol=kkt.Frac(1, 10**5)), (
+        float(rep.stationarity), float(rep.conic_residual),
+        float(rep.comp_slack), rep.s_in_cone, rep.z_in_cone)
+    # the optimum is t = ||u|| with u the min-norm reach -> ~0.5831
+    assert abs(float(rep.primal_obj) - np.hypot(0.5, 0.3)) < 1e-6

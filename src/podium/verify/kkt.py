@@ -151,3 +151,114 @@ def verify_qp(
         primal_obj=obj,
         problems=problems,
     )
+
+
+# --- second-order-cone programs ---------------------------------------
+
+def _soc_margin_ok(block: Vec, tol: Frac) -> bool:
+    """Exact 'within tol of the second-order cone' test, NO sqrt.
+    For (s0, s1..sk) the cone is s0 >= ||s1:||. Approximate membership
+    to tolerance tol is  s0 >= -tol AND ||s1:||^2 <= (s0+tol)^2  (the
+    latter only meaningful when s0+tol >= 0) — all exact Fraction
+    comparisons, so the verdict has no floating-point uncertainty."""
+    s0 = block[0]
+    if s0 < -tol:
+        return False
+    st = s0 + tol
+    if st < 0:
+        return False
+    sumsq = sum((r * r for r in block[1:]), Frac(0))
+    return sumsq <= st * st
+
+
+@dataclass
+class SOCPReport:
+    """Exact conic-KKT residuals of a claimed SOCP solution."""
+
+    stationarity: Frac       # max |c + A' y + G' z|
+    eq_residual: Frac        # max |A x - b|
+    conic_residual: Frac     # max |G x + s - h|
+    comp_slack: Frac         # |s' z|
+    s_in_cone: bool          # slack in K (within tol)
+    z_in_cone: bool          # dual in K* = K (within tol)
+    primal_obj: Frac         # c' x
+    problems: list[str] = field(default_factory=list)
+
+    def certified(self, tol: Frac = Frac(1, 10**6)) -> bool:
+        return (not self.problems
+                and self.s_in_cone and self.z_in_cone
+                and self.stationarity <= tol
+                and self.eq_residual <= tol
+                and self.conic_residual <= tol
+                and abs(self.comp_slack) <= tol)
+
+
+def _cone_blocks(v: Vec, dims: dict[str, object]) -> list[tuple[str, Vec]]:
+    """Split a cone-ordered vector into (kind, block) per ECOS dims:
+    l nonneg entries first, then each second-order cone of size q_i."""
+    out: list[tuple[str, Vec]] = []
+    n_nn = dims.get("l", 0)
+    i = int(n_nn) if isinstance(n_nn, int) else 0
+    if i:
+        out.append(("nn", v[:i]))
+    q = dims.get("q", [])
+    if isinstance(q, (list, tuple)):
+        for m in q:
+            mm = int(m)
+            out.append(("soc", v[i:i + mm]))
+            i += mm
+    return out
+
+
+def verify_socp(
+    c: Vec, a: Mat, b: Vec, g: Mat, h: Vec, dims: dict[str, object],
+    x: Vec, y: Vec, z: Vec, s: Vec, cone_tol: Frac = Frac(1, 10**6),
+) -> SOCPReport:
+    """Exact conic-KKT verification of a standard-form SOCP
+
+        minimize   c' x
+        subject to A x = b,  G x + s = h,  s in K
+
+    with K = R+^l x (product of second-order cones), from ECOS-style
+    output (x, y, z, s). Both K and its dual are self-dual, so z is
+    checked for membership in the same K. cone_tol parameterizes the
+    exact 'approximately in the cone' predicate for the slack and dual.
+    """
+    problems: list[str] = []
+
+    def _absmax(v: Vec) -> Frac:
+        return max((abs(t) for t in v), default=Frac(0))
+
+    n = len(x)
+    # stationarity c + A'y + G'z
+    aty = _mtv(a, y) if a else [Frac(0)] * n
+    gtz = _mtv(g, z) if g else [Frac(0)] * n
+    stat = [c[j] + aty[j] + gtz[j] for j in range(n)]
+
+    eq_res = (_absmax([xi - bi for xi, bi in zip(_mv(a, x), b)])
+              if a else Frac(0))
+    gx = _mv(g, x) if g else [Frac(0)] * len(s)
+    conic_res = _absmax([gx[i] + s[i] - h[i] for i in range(len(s))])
+    comp = sum((s[i] * z[i] for i in range(len(s))), Frac(0))
+
+    # cone membership of s (in K) and z (in K* = K), block by block
+    def _all_in_cone(v: Vec) -> bool:
+        for kind, blk in _cone_blocks(v, dims):
+            if kind == "nn":
+                if any(t < -cone_tol for t in blk):
+                    return False
+            elif not _soc_margin_ok(blk, cone_tol):
+                return False
+        return True
+
+    obj = sum((c[j] * x[j] for j in range(n)), Frac(0))
+    return SOCPReport(
+        stationarity=_absmax(stat),
+        eq_residual=eq_res,
+        conic_residual=conic_res,
+        comp_slack=comp,
+        s_in_cone=_all_in_cone(s),
+        z_in_cone=_all_in_cone(z),
+        primal_obj=obj,
+        problems=problems,
+    )
