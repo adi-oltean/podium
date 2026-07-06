@@ -147,7 +147,7 @@ def verify_qp(
 
     # primal objective 1/2 x' P x + q' x
     px = _mv(p, x) if p else [Frac(0)] * n
-    obj = (sum((x[i] * px[i] for i in range(n)), Frac(0)) / 2
+    obj = (sum((x[i] * px[i] for i in range(n)), Frac(0)) / Frac(2)
            + sum((q[i] * x[i] for i in range(n)), Frac(0)))
 
     return KKTReport(

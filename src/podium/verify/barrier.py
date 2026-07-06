@@ -125,8 +125,8 @@ def _homog(p: Mat, lin: list[Fraction], const: Fraction) -> Mat:
     m = _zeros(_H, _H)
     m[0][0] = const
     for i in range(_N):
-        m[0][i + 1] = lin[i] / 2
-        m[i + 1][0] = lin[i] / 2
+        m[0][i + 1] = lin[i] / Frac(2)
+        m[i + 1][0] = lin[i] / Frac(2)
         for j in range(_N):
             m[i + 1][j + 1] = p[i][j]
     return m

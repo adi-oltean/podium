@@ -177,6 +177,24 @@ def test_multi_constraint_bracket():
         p0, q0, r0, cons, [F(0), F(0)]) is None      # origin is inside both
 
 
+def test_int_data_stays_exact_rational():
+    """The trusted path divides by 2 and 4; these must stay EXACT even
+    when a caller passes int (not Fraction) data. In Python `int / 2` is a
+    float, which would silently corrupt the exact is_psd/_det checks -- so
+    the code divides by F(2)/F(4). Pass all-int data (including an int
+    multiplier) and confirm every result is a Fraction, not a float."""
+    p0i = [[1, 0], [0, 1]]
+    coni = ([[1, 0], [0, 1]], [-4, 0], -5)     # all-int keep-out data
+    m = bracket.lower_bound_matrix_multi(p0i, [0, 0], 0, [coni], [1], 0)
+    # int entries are exact; the hazard is a FLOAT sneaking in via `/2`
+    assert not any(isinstance(v, float) for row in m for v in row)
+    # the divided off-diagonals are exact Fractions, not floats
+    assert m[0][2] == F(2) and isinstance(m[0][2], F)
+    g = bracket.dual_value([[1, 0], [0, 1]], [0, 0], 0,
+                           [[1, 0], [0, 1]], [-4, 0], -5, F(0))
+    assert isinstance(g, F) and not isinstance(g, float)
+
+
 def test_hard_case_singular_optimum():
     """Theorem 2 (the singular 'hard case'): when A(lam*)=P0-lam*P1 is
     rank-deficient at the dual optimum (the trust-region hard case),

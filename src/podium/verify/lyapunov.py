@@ -98,7 +98,7 @@ def verify_lyapunov(a_cl: Mat, p: Mat) -> LyapunovReport:
     decrease = _sub(p, _matmul(_matmul(_transpose(a_cl), p), a_cl))
     # symmetrize exactly (A_cl'PA_cl is symmetric in exact arithmetic
     # when P is; guard against asymmetry from a non-symmetric P input)
-    dec_sym = [[(decrease[i][j] + decrease[j][i]) / 2 for j in range(n)]
+    dec_sym = [[(decrease[i][j] + decrease[j][i]) / Frac(2) for j in range(n)]
                for i in range(n)]
     dec_psd = is_psd(dec_sym)
     return LyapunovReport(p_positive=p_pos, decrease_psd=dec_psd,

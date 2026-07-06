@@ -78,7 +78,7 @@ def lower_bound_matrix(p0: Mat, q0: Vec, r0: F, p1: Mat, q1: Vec, r1: F,
     for i in range(n):
         for j in range(n):
             m[i][j] = p0[i][j] - lam * p1[i][j]
-        b = (q0[i] - lam * q1[i]) / 2
+        b = (q0[i] - lam * q1[i]) / F(2)      # / F(2): exact even for int data
         m[i][n] = b
         m[n][i] = b
     m[n][n] = r0 - lam * r1 - t
@@ -152,6 +152,19 @@ def certified_optimum(p0: Mat, q0: Vec, r0: F, p1: Mat, q1: Vec, r1: F,
 Con = tuple[Mat, Vec, F]        # (P_k, q_k, r_k) for f_k(x) >= 0
 
 
+def _check_multi(p0: Mat, q0: Vec, cons: list[Con]) -> int:
+    """Validate an m-constraint QCQP's shapes; raise ValueError on
+    malformed data instead of silently ignoring extra rows or raising an
+    opaque IndexError."""
+    n = len(q0)
+    if len(p0) != n or any(len(row) != n for row in p0):
+        raise ValueError("objective dimensions are inconsistent")
+    for pk, qk, _rk in cons:
+        if len(pk) != n or any(len(row) != n for row in pk) or len(qk) != n:
+            raise ValueError("constraint dimensions are inconsistent")
+    return n
+
+
 def lower_bound_matrix_multi(p0: Mat, q0: Vec, r0: F, cons: list[Con],
                              lams: Vec, t: F) -> Mat:
     """S-procedure LMI M(lam, t) for J* = min f0 s.t. f_k >= 0 (k=1..m):
@@ -172,8 +185,8 @@ def lower_bound_matrix_multi(p0: Mat, q0: Vec, r0: F, cons: list[Con],
     for i in range(n):
         for j in range(n):
             m[i][j] = a[i][j]
-        m[i][n] = b[i] / 2
-        m[n][i] = b[i] / 2
+        m[i][n] = b[i] / F(2)
+        m[n][i] = b[i] / F(2)
     m[n][n] = d
     return m
 
@@ -185,6 +198,9 @@ def certify_lower_bound_multi(p0: Mat, q0: Vec, r0: F, cons: list[Con],
     as the single-constraint case; here the S-lemma need not hold, so the
     best certifiable t (the Shor bound) can be strictly below J* -- an
     exactly-certified duality gap."""
+    _check_multi(p0, q0, cons)
+    if len(lams) != len(cons):
+        raise ValueError("len(lams) must equal the number of constraints")
     if any(lk < 0 for lk in lams):
         return False
     return is_psd(lower_bound_matrix_multi(p0, q0, r0, cons, lams, t))
@@ -194,6 +210,8 @@ def certify_upper_bound_multi(p0: Mat, q0: Vec, r0: F, cons: list[Con],
                               x: Vec) -> F | None:
     """Certified upper bound J* <= f0(x): returns f0(x) if x is EXACTLY
     feasible for ALL constraints (f_k(x) >= 0), else None."""
+    if _check_multi(p0, q0, cons) != len(x):
+        raise ValueError("x has the wrong dimension")
     for pk, qk, rk in cons:
         if _quad(pk, qk, rk, x) < 0:
             return None
@@ -235,7 +253,7 @@ def dual_value(p0: Mat, q0: Vec, r0: F, p1: Mat, q1: Vec, r1: F,
     if w is None:
         return None
     bw = sum((b[i] * w[i] for i in range(n)), F(0))     # b' A^{-1} b
-    return (r0 - lam * r1) - bw / 4
+    return (r0 - lam * r1) - bw / F(4)
 
 
 def recover_lower_bound(p0: Mat, q0: Vec, r0: F, p1: Mat, q1: Vec, r1: F,

@@ -151,7 +151,7 @@ def validate_gram(target: Poly, basis: list[Mono],
     # symmetrize exactly, then add the PSD-slack margin on the diagonal
     for i in range(n):
         for j in range(i):
-            s = (g[i][j] + g[j][i]) / 2
+            s = (g[i][j] + g[j][i]) / Frac(2)
             g[i][j] = g[j][i] = s
         g[i][i] += margin
 
@@ -170,7 +170,7 @@ def validate_gram(target: Poly, basis: list[Mono],
         if m not in entry_for:
             return None                       # basis cannot span target
         i, j = entry_for[m]
-        delta = r if i == j else r / 2        # weight 1 (diag) or 2 (off)
+        delta = r if i == j else r / Frac(2)  # weight 1 (diag) or 2 (off)
         g[i][j] += delta
         if i != j:
             g[j][i] += delta
