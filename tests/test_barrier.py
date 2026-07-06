@@ -5,6 +5,7 @@ trajectory corroboration against dense CW propagation."""
 
 import math
 from fractions import Fraction as Fr
+from itertools import combinations
 
 import numpy as np
 import pytest
@@ -21,6 +22,49 @@ CASE = barrier.AbortSafetyCase(
     radii=(Fr(10), Fr(500), Fr(30), Fr(10), Fr(20), Fr(30)),
     koz_radius=Fr(200),
 )
+
+
+def test_is_psd_ldl_edge_cases_and_equivalence():
+    """The exact PSD test (LDL^T elimination) accepts rank-deficient PSD
+    matrices, rejects indefinite and non-symmetric ones, and agrees with the
+    all-principal-minors characterization on random symmetric matrices."""
+
+    def _det(m):  # reference exact determinant
+        n = len(m)
+        a = [r[:] for r in m]
+        det = Fr(1)
+        for c in range(n):
+            p = next((r for r in range(c, n) if a[r][c] != 0), None)
+            if p is None:
+                return Fr(0)
+            if p != c:
+                a[c], a[p] = a[p], a[c]
+                det = -det
+            det *= a[c][c]
+            for r in range(c + 1, n):
+                f = a[r][c] / a[c][c]
+                for j in range(c, n):
+                    a[r][j] -= f * a[c][j]
+        return det
+
+    def minors_psd(m):  # reference: every principal minor >= 0
+        n = len(m)
+        for k in range(1, n + 1):
+            for sub in combinations(range(n), k):
+                if _det([[m[i][j] for j in sub] for i in sub]) < 0:
+                    return False
+        return True
+
+    assert barrier.is_psd([[Fr(0), Fr(0)], [Fr(0), Fr(1)]])       # rank-def PSD
+    assert not barrier.is_psd([[Fr(0), Fr(1)], [Fr(1), Fr(0)]])   # indefinite
+    assert not barrier.is_psd([[Fr(1), Fr(2)], [Fr(0), Fr(1)]])   # non-symmetric
+    rng = np.random.default_rng(3)
+    for _ in range(150):
+        n = int(rng.integers(1, 6))
+        b = rng.integers(-3, 4, size=(n, n))
+        m = ([[Fr(int(x)) for x in row] for row in (b + b.T)] if rng.random() < 0.5
+             else [[Fr(int(x)) for x in row] for row in (b.T @ b)])
+        assert barrier.is_psd(m) == minors_psd(m)
 
 
 def test_scaled_cw_matrix_matches_kernel():

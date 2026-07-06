@@ -41,7 +41,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from fractions import Fraction
-from itertools import combinations
 
 Frac = Fraction
 Mat = list[list[Fraction]]
@@ -189,19 +188,32 @@ def _det(m: Mat) -> Fraction:
 
 
 def is_psd(m: Mat) -> bool:
-    """Exact PSD test: every principal minor is >= 0 (Sylvester for
-    semidefiniteness). 2^7 - 1 = 127 exact determinants at our size."""
+    """Exact PSD test via symmetric (LDL^T) Gaussian elimination, in O(n^3)
+    exact rational operations. A symmetric matrix is positive semidefinite iff
+    every pivot is nonnegative and each zero pivot leaves the rest of its row
+    (hence, by symmetry, its column) in the Schur complement zero. The implied
+    factorization M = L D L^T with D >= 0 is itself the nonnegativity witness,
+    since z' M z = sum_i D_ii (l_i' z)^2. This replaces the earlier
+    all-principal-minors test, which was exponential in n."""
     n = len(m)
     for i in range(n):
         for j in range(n):
             if m[i][j] != m[j][i]:
                 return False
-    idx = list(range(n))
-    for k in range(1, n + 1):
-        for sub in combinations(idx, k):
-            mm = [[m[i][j] for j in sub] for i in sub]
-            if _det(mm) < 0:
+    a = [[m[i][j] for j in range(n)] for i in range(n)]
+    for k in range(n):
+        if a[k][k] < 0:
+            return False
+        if a[k][k] == 0:
+            if any(a[k][j] != 0 for j in range(k + 1, n)):
                 return False
+            continue
+        piv = a[k][k]
+        for i in range(k + 1, n):
+            if a[i][k] != 0:
+                f = a[i][k] / piv
+                for j in range(k, n):
+                    a[i][j] -= f * a[k][j]
     return True
 
 
