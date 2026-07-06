@@ -46,7 +46,8 @@ verification approach, and a reproducible end-to-end example.
 
 \section{Motivation and significance}
 
-Spacecraft rendezvous and docking place strong demands on software. The maneuvers
+Spacecraft rendezvous and docking place strong demands on
+software~\cite{fehse2003}. The maneuvers
 are safety-critical, and some unsafe commands or contact events cannot be
 corrected after the fact; they run convex and nonconvex optimization in the loop; and the flight code must be shown to be free
 of runtime errors and faithful to its specification. Mature simulation
@@ -61,7 +62,8 @@ make formal validation part of ordinary development.
 The library is motivated by three needs. Relative motion, approach corridors,
 keep-out zones, plume impingement, and docking contact are central to RPOD and
 are a modeling focus distinct from absolute orbit propagation. Convex trajectory
-optimization is now standard in guidance \cite{acikmese2007,malyuta2022}, but a
+optimization is now standard in guidance
+\cite{acikmese2007,acikmese2011,szmuk2018,malyuta2022}, but a
 floating-point quadratic program (QP) or second-order cone program (SOCP) solver
 can return a
 nominally optimal solution that violates a constraint under rounding, so Podium
@@ -110,8 +112,8 @@ reachability checks on every change.}
 
 Podium is organized as subpackages under \texttt{src/podium}. The \texttt{core}
 package holds the verifiable algorithm core: the Clohessy--Wiltshire dynamics and
-state-transition matrix, the Yamanaka--Ankersen matrix for elliptic orbits
-\cite{yamanaka2002}, relative orbital elements with Keplerian, $J_2$, and
+state-transition matrix \cite{clohessy1960}, the Yamanaka--Ankersen matrix for
+elliptic orbits \cite{yamanaka2002}, relative orbital elements with Keplerian, $J_2$, and
 $J_2$-plus-drag state-transition matrices \cite{koenig2017}, a quaternion kernel,
 and fixed-step integrators. The \texttt{dynamics} package holds the truth models:
 nonlinear relative motion with $J_2$ and differential drag over a seeded
@@ -187,10 +189,15 @@ Independent physics oracle & translational truth model cross-validated against O
 
 Two implementation choices support these guarantees. Several certificates are
 checked in exact rational arithmetic, with no floating point in the trusted
-checker: a barrier for abort safety, KKT conditions for the online convex solves,
-and bounds on the global optimum of the nonconvex docking subproblem. The
+checker: a barrier for abort safety \cite{prajna2004,ames2017}, KKT conditions
+for the online convex solves, and bounds on the global optimum of the nonconvex
+docking subproblem through the S-procedure \cite{yakubovich1971,polik2007} and
+its trust-region special case \cite{moresorensen1983}. The
 barrier and optimality-gap certificates are tolerance-free, their acceptance
-being an exact positive-semidefiniteness test together with exact feasibility.
+being an exact positive-semidefiniteness test together with exact feasibility;
+exact rational certificates of this kind build on a body of work in
+sum-of-squares and polynomial optimization and in verified semidefinite
+programming \cite{parrilo2003,lasserre2001,kaltofen2012,peyrl2008,davis2022}.
 The KKT check re-verifies an approximate solver output, so it computes the
 optimality residuals exactly and accepts the point when they lie within an
 explicit rational tolerance, which is then a certified bound on the point's
