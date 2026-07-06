@@ -84,7 +84,8 @@ def verify_lyapunov(a_cl: Mat, p: Mat) -> LyapunovReport:
     Fraction matrices (rationalize float syntheses first)."""
     problems: list[str] = []
     n = len(p)
-    if any(len(row) != n for row in p) or len(a_cl) != n:
+    if (any(len(row) != n for row in p) or len(a_cl) != n
+            or any(len(row) != n for row in a_cl)):
         problems.append("P and A_cl must be square and same size")
         return LyapunovReport(False, False, problems)
     # symmetry of P (a Lyapunov matrix is symmetric)

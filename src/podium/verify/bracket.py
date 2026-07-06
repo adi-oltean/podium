@@ -16,9 +16,11 @@ discipline as the barrier / KKT / Lyapunov / SOS checkers:
       M(lambda, t) = [[ P0 - lambda P1,        (q0 - lambda q1)/2 ],
                       [ (q0 - lambda q1)'/2,    r0 - lambda r1 - t ]]
 
-  positive semidefinite. Then t <= J* by weak duality (any dual-feasible
-  point lower-bounds the primal). `certify_lower_bound` checks
-  lambda >= 0 and is_psd(M) exactly -- no matrix inverse.
+  positive semidefinite. M >= 0 makes f0(x) - lambda f1(x) - t a GLOBAL
+  Lagrangian minorant (>= 0 for all x), so for feasible x (f1(x) >= 0) and
+  lambda >= 0, f0(x) >= t; hence t <= J* (weak duality / S-procedure).
+  `certify_lower_bound` checks lambda >= 0 and is_psd(M) exactly -- no
+  matrix inverse.
 
 * Upper bound. Any point feasible for the true nonconvex constraint gives
   J* <= its objective. `podium.verify.scvx_cut` produces such a point as
@@ -38,6 +40,19 @@ from podium.verify.barrier import _det, is_psd
 
 Vec = list[F]
 Mat = list[list[F]]
+
+
+def _check_qcqp(p0: Mat, q0: Vec, p1: Mat, q1: Vec) -> int:
+    """Validate QCQP data shapes (square n x n objectives, length-n
+    vectors); raise ValueError on malformed input rather than raising an
+    opaque IndexError or silently truncating later. Inputs must be exact
+    Fractions -- floats/NaN break the exact-arithmetic soundness contract."""
+    n = len(q0)
+    if (len(q1) != n or len(p0) != n or len(p1) != n
+            or any(len(row) != n for row in p0)
+            or any(len(row) != n for row in p1)):
+        raise ValueError("QCQP data dimensions are inconsistent")
+    return n
 
 
 def keepout_qcqp(center: tuple[F, ...], radius: F
@@ -75,6 +90,7 @@ def certify_lower_bound(p0: Mat, q0: Vec, r0: F, p1: Mat, q1: Vec, r1: F,
     """Exact certificate that t <= J* for the nonconvex QCQP: returns True
     iff lam >= 0 and M(lam, t) >= 0. All inputs Fractions (rationalize an
     SDP-dual solution first)."""
+    _check_qcqp(p0, q0, p1, q1)
     return lam >= 0 and is_psd(lower_bound_matrix(
         p0, q0, r0, p1, q1, r1, lam, t))
 
@@ -101,6 +117,8 @@ def certify_upper_bound(p0: Mat, q0: Vec, r0: F, p1: Mat, q1: Vec, r1: F,
     because its objective can dip BELOW J* and would otherwise collapse the
     bracket beneath the true optimum. Any exactly-feasible x gives a valid
     upper bound; a solver/KKT step is only for choosing a good x."""
+    if _check_qcqp(p0, q0, p1, q1) != len(x):
+        raise ValueError("x has the wrong dimension")
     if _quad(p1, q1, r1, x) < 0:            # exactly infeasible
         return None
     return _quad(p0, q0, r0, x)

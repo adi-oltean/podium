@@ -99,6 +99,10 @@ def certify_halfspace_koz(n: tuple[F, F], radius: F,
     problems: list[str] = []
     if n[0] * n[0] + n[1] * n[1] != 1:
         problems.append("n is not an exact rational unit vector")
+    if radius < 0:
+        # the S-procedure multiplier is 2R, which must be >= 0; a negative
+        # radius makes the certificate meaningless (the geometry inverts).
+        problems.append("radius must be nonnegative")
     _u2, h, lhs = _koz_polys(n, radius, center)
     gram = _exact_gram(n, radius, center)
     basis: list[Mono] = [(0, 0), (1, 0), (0, 1)]
