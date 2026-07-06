@@ -1,0 +1,35 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Podium: a verification-ready library for spacecraft rendezvous, proximity operations, and docking guidance, navigation, and control"
+abstract: >-
+  Podium is an open-source Python library for developing, testing, and formally
+  validating guidance, navigation, and control (GNC) algorithms for spacecraft
+  rendezvous, proximity operations, and docking (RPOD) in low- and medium-Earth
+  orbit. It provides relative-motion models, convex and sequential-convex
+  trajectory planners, a relative-navigation filter and controllers, a
+  deterministic simulator, a path that translates a restricted subset of the
+  Python source to C (checked by golden vectors, Frama-C/EVA, and CompCert), and
+  a verification layer of exact-rational certificates (barrier, KKT, and
+  optimality-gap) re-run in continuous integration.
+type: software
+authors:
+  - family-names: Oltean
+    given-names: Adi
+    affiliation: "Starcloud, Inc."
+version: 0.5.0
+date-released: "2026-07-06"
+license: MIT
+repository-code: "https://github.com/adi-oltean/podium"
+url: "https://github.com/adi-oltean/podium"
+keywords:
+  - rendezvous and docking
+  - proximity operations
+  - guidance navigation and control
+  - spacecraft
+  - relative orbital motion
+  - successive convexification
+  - formal verification
+  - exact rational arithmetic
+  - barrier certificates
+  - CompCert
+  - Frama-C
