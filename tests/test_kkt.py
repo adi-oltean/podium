@@ -199,9 +199,16 @@ def test_untrusted_ecos_socp_certified():
         z=kkt.rationalize_vec(sol["z"].tolist()),
         s=kkt.rationalize_vec(sol["s"].tolist()),
         cone_tol=kkt.Frac(1, 10**6))
-    assert rep.certified(tol=kkt.Frac(1, 10**5)), (
-        float(rep.stationarity), float(rep.conic_residual),
-        float(rep.comp_slack), rep.s_in_cone, rep.z_in_cone)
+    # The exact re-check MEASURES that ECOS's solution satisfies the conic
+    # KKT residuals to a tight tolerance. certified() itself requires EXACT
+    # conic-dual feasibility (stationarity == 0), which a floating-point
+    # solve does not provide, so for approximate output this is an exact
+    # residual report, not a suboptimality certificate (see SOCPReport).
+    tol = kkt.Frac(1, 10**5)
+    assert rep.stationarity <= tol
+    assert rep.conic_residual <= tol
+    assert abs(rep.comp_slack) <= tol
+    assert rep.s_in_cone and rep.z_in_cone
     # the optimum is t = ||u|| with u the min-norm reach -> ~0.5831
     assert abs(float(rep.primal_obj) - np.hypot(0.5, 0.3)) < 1e-6
 
@@ -230,10 +237,15 @@ def test_embedded_ecos_layer0_socp_certified():
 
     sol, rep = kkt.certify_ecos(prob)
     assert sol["info"]["exitFlag"] == 0
-    assert rep.certified(tol=kkt.Frac(1, 10**4)), (
-        float(rep.stationarity), float(rep.conic_residual),
-        float(rep.comp_slack), rep.s_in_cone, rep.z_in_cone)
-    # the exact-certified objective matches the embedded solver's cost
+    # exact residual measurement of the embedded solver's output (see the
+    # note in test_untrusted_ecos_socp_certified): the conic-KKT residuals
+    # are tight, though certified() requires exact conic-dual feasibility.
+    tol = kkt.Frac(1, 10**4)
+    assert rep.stationarity <= tol
+    assert rep.conic_residual <= tol
+    assert abs(rep.comp_slack) <= tol
+    assert rep.s_in_cone and rep.z_in_cone
+    # the exact-measured objective matches the embedded solver's cost
     assert abs(float(rep.primal_obj) - sol["info"]["pcost"]) < 1e-6
     # at least one thrust cone is active (a real burn happened)
     prob.solve(solver=cp.ECOS)
@@ -265,3 +277,72 @@ def test_indefinite_qp_is_rejected_as_nonconvex():
     assert rep.stationarity == F(0)                # KKT residuals vanish...
     assert not rep.certified()                     # ...but P is not PSD
     assert any("positive semidefinite" in p for p in rep.problems)
+
+
+def test_epsilon_stationary_lp_is_not_certified():
+    """SOUNDNESS REGRESSION: a small stationarity residual is NOT an
+    objective-gap bound when P is rank-deficient. min -eps*x s.t.
+    0 <= x <= M with x=0 is eps-stationary but 100 away from the true
+    optimum (x=M). The checker must NOT certify it: the residual is not
+    in range(P) = {0}, so the Lagrangian dual is unbounded and there is
+    no valid suboptimality bound."""
+    M = F(10**12)
+    eps = F(1, 10**10)
+    rep = kkt.verify_qp(
+        p=[[F(0)]], q=[-eps],
+        g=[[-F(1)], [F(1)]], h=[F(0), M], a=[], b=[],
+        x=[F(0)], mu=[F(0), F(0)], nu=[])
+    assert rep.stationarity == eps          # under any tol >= 1e-10
+    assert rep.duality_gap == F(0)          # complementarity term alone is 0
+    assert rep.suboptimality_bound is None  # no valid dual bound
+    assert not rep.certified()              # ...so NOT certified
+    assert not rep.certified(tol=F(1))      # not even at a loose tolerance
+
+
+def test_malformed_qp_shape_is_rejected():
+    """A too-short G/h/mu silently drops inequality rows from the
+    residuals; the checker must reject the malformed instance rather than
+    certify it."""
+    rep = kkt.verify_qp(
+        p=[[F(1)]], q=[F(0)],
+        g=[[F(-1)], [F(1)]], h=[F(-1)], a=[], b=[],   # h/mu shorter than G
+        x=[F(1)], mu=[F(1)], nu=[])
+    assert rep.problems
+    assert not rep.certified()
+
+
+def test_float_input_is_rejected():
+    """A float in the trusted path could round a residual to zero; the
+    exact-arithmetic contract is enforced, so a float instance is
+    rejected rather than accepted by cancellation."""
+    rep = kkt.verify_qp(
+        p=[[1.0]], q=[0.0], g=[], h=[], a=[], b=[],
+        x=[0.0], mu=[], nu=[])
+    assert any("Fraction" in m or "inexact" in m for m in rep.problems)
+    assert not rep.certified()
+
+
+def test_socp_uncovered_cone_tail_is_rejected():
+    """If dims do not cover all of s/z, a tail entry (here a negative,
+    out-of-cone slack) is never membership-checked; the coverage guard
+    rejects it."""
+    rep = kkt.verify_socp(
+        c=[F(1)], a=[], b=[], g=[[F(-1)], [F(0)]], h=[F(-1), F(0)],
+        dims={"l": 1, "q": []},                 # covers only 1 of 2 entries
+        x=[F(1)], y=[], z=[F(1), F(1)], s=[F(0), F(-5)])
+    assert rep.problems
+    assert not rep.certified()
+
+
+def test_suboptimality_bound_is_exact_for_pd_qp():
+    """For a positive-definite P the rigorous bound equals the true gap.
+    min 1/2 x^2 (optimum x=0, p*=0); the point x=1 has stationarity
+    residual r=1 and true suboptimality 1/2, and the checker reports
+    exactly 1/2 (= 1/2 r' P^-1 r) rather than the meaningless
+    complementarity gap 0."""
+    rep = kkt.verify_qp(p=[[F(1)]], q=[F(0)], g=[], h=[], a=[], b=[],
+                        x=[F(1)], mu=[], nu=[])
+    assert rep.duality_gap == F(0)                    # no constraints
+    assert rep.suboptimality_bound == F(1, 2)         # = true gap, exact
+    assert not rep.certified(tol=F(1, 10))            # 1/2 > 1/10
+    assert rep.certified(tol=F(1))                    # 1/2 <= 1

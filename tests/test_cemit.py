@@ -330,6 +330,36 @@ def test_rejects_outside_subset():
         cemit.emit_module([datarange])
 
 
+def test_rejects_negative_wrap_subscript():
+    """A possibly-negative subscript wraps to the end in Python but reads
+    out of bounds in C, so the emitter must reject it (defense at the
+    subset boundary, not only via golden vectors / Frama-C)."""
+    def rel(x):  # noqa: ANN001
+        s = 0.0
+        for i in range(3):
+            s = s + x[i - 1]        # i=0 -> x[-1] in Python, OOB in C
+        return s
+
+    with pytest.raises(cemit.EmitError):
+        cemit.emit_module([rel])
+
+    def negconst(x):  # noqa: ANN001
+        s = x[-1]                   # last element in Python, OOB in C
+        return s
+
+    with pytest.raises(cemit.EmitError):
+        cemit.emit_module([negconst])
+
+    # the safe forward form (i + c, used by the YA block kernels) still emits
+    def fwd(x):  # noqa: ANN001
+        s = 0.0
+        for i in range(3):
+            s = s + x[i + 3]
+        return s
+
+    assert "x[i + 3]" in cemit.emit_module([fwd])
+
+
 def test_acsl_rendering():
     @contract(n=Interval(1e-4, 1e-2), x=Interval(-10.0, 10.0))
     def scaled(x, n):  # noqa: ANN001

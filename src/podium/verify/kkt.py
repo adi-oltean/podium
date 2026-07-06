@@ -53,6 +53,53 @@ def _mtv(m: Mat, v: Vec) -> Vec:
             for j in range(n)]
 
 
+def _solve_exact(mat: Mat, rhs: Vec) -> Vec | None:
+    """Exact solve of ``mat z = rhs`` over the rationals by full
+    (Gauss--Jordan) elimination. Returns a particular solution (free
+    variables set to zero), or ``None`` if the system is inconsistent
+    (``rhs`` not in the range of ``mat``). For a symmetric PSD ``mat``,
+    ``rhs`` in the range means the quadratic form ``rhs' z`` is
+    well-defined (independent of the free-variable choice), which is all
+    the suboptimality correction below needs."""
+    n = len(mat)
+    a = [[mat[i][j] for j in range(n)] + [rhs[i]] for i in range(n)]
+    pivots: list[tuple[int, int]] = []
+    row = 0
+    for col in range(n):
+        sel = next((r for r in range(row, n) if a[r][col] != 0), None)
+        if sel is None:
+            continue
+        a[row], a[sel] = a[sel], a[row]
+        piv = a[row][col]
+        for r in range(n):
+            if r != row and a[r][col] != 0:
+                f = a[r][col] / piv
+                for c in range(col, n + 1):
+                    a[r][c] -= f * a[row][c]
+        pivots.append((row, col))
+        row += 1
+        if row == n:
+            break
+    # inconsistency: an all-zero coefficient row with a nonzero rhs
+    for r in range(n):
+        if a[r][n] != 0 and all(a[r][c] == 0 for c in range(n)):
+            return None
+    z = [Frac(0)] * n
+    for rr, cc in pivots:
+        z[cc] = a[rr][n] / a[rr][cc]
+    return z
+
+
+def _all_fractions(obj: object) -> bool:
+    """True iff every scalar leaf of the nested list ``obj`` is an exact
+    ``Fraction`` — enforces the no-float trusted-path discipline at the
+    checker boundary, so a float that would round a residual to zero
+    cannot enter."""
+    if isinstance(obj, list):
+        return all(_all_fractions(e) for e in obj)
+    return isinstance(obj, Fraction)
+
+
 def _rat(x: float, max_den: int = 10**12) -> Frac:
     return Frac(x).limit_denominator(max_den)
 
@@ -73,20 +120,33 @@ class KKTReport:
     eq_residual: Frac       # max |A x - b|
     ineq_violation: Frac    # max(0, (G x - h)_i)  — primal infeasibility
     dual_violation: Frac    # max(0, -mu_i)        — dual infeasibility
-    duality_gap: Frac       # sum_i mu_i (h - G x)_i
+    duality_gap: Frac       # sum_i mu_i (h - G x)_i  (complementarity only)
     primal_obj: Frac        # 1/2 x' P x + q' x
+    # Rigorous upper bound on p(x) - p*, or None when no valid dual bound
+    # exists (dual infeasible mu, non-convex P, or a stationarity residual
+    # outside the range of P so the Lagrangian dual is unbounded below).
+    suboptimality_bound: Frac | None = None
     problems: list[str] = field(default_factory=list)
 
     def certified(self, tol: Frac = Frac(1, 10**9)) -> bool:
-        """True iff every exact residual is within tol (and no
-        structural problem was found). For a convex QP this certifies
-        x is within `duality_gap` of the global optimum."""
+        """True iff (x, mu, nu) is a *rigorous* certificate that x is
+        within `tol` of the global optimum of the convex QP.
+
+        Soundness (see verify_qp): this requires a valid Lagrangian dual
+        point (mu >= 0 exactly, P >= 0, and the stationarity residual in
+        the range of P), from which `suboptimality_bound` is the EXACT
+        upper bound on p(x) - p*. A small stationarity residual is not by
+        itself an objective-gap bound: with a rank-deficient P (e.g. an
+        LP / min-fuel objective) an epsilon-stationary point can be
+        arbitrarily suboptimal, so such a point is not certified. Primal
+        feasibility is required within tol so that x is a usable
+        solution; the reported bound holds regardless."""
         return (not self.problems
-                and self.stationarity <= tol
+                and self.dual_violation == 0
                 and self.eq_residual <= tol
                 and self.ineq_violation <= tol
-                and self.dual_violation <= tol
-                and abs(self.duality_gap) <= tol)
+                and self.suboptimality_bound is not None
+                and abs(self.suboptimality_bound) <= tol)
 
 
 def verify_qp(
@@ -99,8 +159,31 @@ def verify_qp(
     or inequality-free problem."""
     problems: list[str] = []
     n = len(x)
+    # exact-arithmetic contract: reject any float in the trusted path
+    if not _all_fractions([p, q, g, h, a, b, x, mu, nu]):
+        problems.append("non-Fraction (inexact) input in trusted path")
+    # shape validation — otherwise a too-short G/h/mu or A/b/nu silently
+    # drops constraints from the residuals and a malformed point certifies
+    if len(q) != n:
+        problems.append("len(q) != n")
+    if len(g) != len(h) or len(mu) != len(g):
+        problems.append("G, h, mu lengths must match")
+    if any(len(row) != n for row in g):
+        problems.append("G rows must have width n")
+    if len(a) != len(b) or len(nu) != len(a):
+        problems.append("A, b, nu lengths must match")
+    if any(len(row) != n for row in a):
+        problems.append("A rows must have width n")
     if len(p) != n or any(len(row) != n for row in p):
         problems.append("P must be n x n")
+    if problems:
+        # a shape/exactness violation makes the residual arithmetic unsafe;
+        # return an uncertifiable report rather than risk indexing errors
+        return KKTReport(
+            stationarity=Frac(0), eq_residual=Frac(0),
+            ineq_violation=Frac(0), dual_violation=Frac(0),
+            duality_gap=Frac(0), primal_obj=Frac(0),
+            suboptimality_bound=None, problems=problems)
     # symmetry (exact) — a PSD-objective QP must have symmetric P
     for i in range(len(p)):
         for j in range(i):
@@ -150,6 +233,28 @@ def verify_qp(
     obj = (sum((x[i] * px[i] for i in range(n)), Frac(0)) / Frac(2)
            + sum((q[i] * x[i] for i in range(n)), Frac(0)))
 
+    # Rigorous upper bound on p(x) - p* via Lagrangian weak duality. With
+    # mu >= 0 and P >= 0, g(mu,nu) = inf_z L(z,mu,nu) <= p*, so
+    #   p(x) - p* <= p(x) - g(mu,nu)
+    #            = mu'(h - Gx) + nu'(b - Ax) + 1/2 r' P^+ r,
+    # where r is the stationarity residual and P^+ r solves P z = r. If r
+    # is not in the range of P the dual is unbounded below (no finite
+    # bound), and if mu has a negative entry the dual point is infeasible;
+    # in both cases there is no valid bound and we report None.
+    sub_bound: Frac | None = None
+    if not problems and dual_viol == 0:
+        z = _solve_exact(p, stat)
+        if z is not None:
+            correction = sum((stat[j] * z[j] for j in range(n)),
+                             Frac(0)) / Frac(2)
+            if a:
+                axv = _mv(a, x)
+                nu_term = sum((nu[i] * (b[i] - axv[i])
+                               for i in range(len(b))), Frac(0))
+            else:
+                nu_term = Frac(0)
+            sub_bound = gap + nu_term + correction
+
     return KKTReport(
         stationarity=_absmax(stat),
         eq_residual=eq_res,
@@ -157,6 +262,7 @@ def verify_qp(
         dual_violation=dual_viol,
         duality_gap=gap,
         primal_obj=obj,
+        suboptimality_bound=sub_bound,
         problems=problems,
     )
 
@@ -190,15 +296,29 @@ class SOCPReport:
     s_in_cone: bool          # slack in K (within tol)
     z_in_cone: bool          # dual in K* = K (within tol)
     primal_obj: Frac         # c' x
+    # Rigorous upper bound c'x - (-b'y - h'z) on c'x - p*, or None when
+    # (y, z) is not a valid dual point. An SOCP objective is linear, so
+    # unlike a strictly-convex QP there is no curvature to absorb a
+    # stationarity residual: the dual bound -b'y - h'z is valid only when
+    # stationarity is EXACTLY zero (exact conic-dual feasibility) and z is
+    # in the dual cone. An epsilon-stationary conic point can otherwise be
+    # arbitrarily suboptimal.
+    suboptimality_bound: Frac | None = None
     problems: list[str] = field(default_factory=list)
 
     def certified(self, tol: Frac = Frac(1, 10**6)) -> bool:
+        """True iff (x, y, z, s) is a rigorous certificate that x is
+        within `tol` of the conic optimum: a valid dual point exists
+        (`suboptimality_bound` is not None) bounding c'x - p*, and x is
+        primal-feasible within tol so it is a usable solution. Exactly
+        measuring the KKT residuals (which is always done) is not the same
+        as certifying optimality; use the residual fields for that."""
         return (not self.problems
                 and self.s_in_cone and self.z_in_cone
-                and self.stationarity <= tol
                 and self.eq_residual <= tol
                 and self.conic_residual <= tol
-                and abs(self.comp_slack) <= tol)
+                and self.suboptimality_bound is not None
+                and abs(self.suboptimality_bound) <= tol)
 
 
 def _cone_blocks(v: Vec, dims: dict[str, object]) -> list[tuple[str, Vec]]:
@@ -238,6 +358,33 @@ def verify_socp(
         return max((abs(t) for t in v), default=Frac(0))
 
     n = len(x)
+    # exact-arithmetic contract + shape/cone-coverage validation. Without
+    # the coverage check a cone block can leave a tail of s/z unexamined,
+    # so a negative (out-of-cone) tail entry is never caught and a
+    # malformed point certifies.
+    if not _all_fractions([c, a, b, g, h, x, y, z, s]):
+        problems.append("non-Fraction (inexact) input in trusted path")
+    lnn = dims.get("l", 0)
+    qd = dims.get("q", [])
+    cone_total = (int(lnn) if isinstance(lnn, int) else 0)
+    if isinstance(qd, (list, tuple)):
+        cone_total += sum(int(m) for m in qd)
+    if not (len(s) == len(z) == len(h) == cone_total):
+        problems.append("cone dims must cover all of s, z, h")
+    if len(c) != n:
+        problems.append("len(c) != n")
+    if len(a) != len(b) or any(len(row) != n for row in a):
+        problems.append("A, b shape mismatch")
+    if a and len(y) != len(a):
+        problems.append("len(y) must equal rows(A)")
+    if len(g) != len(h) or any(len(row) != n for row in g):
+        problems.append("G, h shape mismatch")
+    if problems:
+        return SOCPReport(
+            stationarity=Frac(0), eq_residual=Frac(0),
+            conic_residual=Frac(0), comp_slack=Frac(0),
+            s_in_cone=False, z_in_cone=False, primal_obj=Frac(0),
+            suboptimality_bound=None, problems=problems)
     # stationarity c + A'y + G'z
     aty = _mtv(a, y) if a else [Frac(0)] * n
     gtz = _mtv(g, z) if g else [Frac(0)] * n
@@ -260,14 +407,25 @@ def verify_socp(
         return True
 
     obj = sum((c[j] * x[j] for j in range(n)), Frac(0))
+    stat_val = _absmax(stat)
+    z_ok = _all_in_cone(z)
+    # rigorous bound c'x - (-b'y - h'z) on c'x - p*, valid only at exact
+    # conic-dual feasibility: stationarity exactly zero and z in the dual
+    # cone (see SOCPReport.suboptimality_bound).
+    sub: Frac | None = None
+    if stat_val == 0 and z_ok:
+        bty = sum((bi * yi for bi, yi in zip(b, y)), Frac(0))
+        htz = sum((hi * zi for hi, zi in zip(h, z)), Frac(0))
+        sub = obj + bty + htz
     return SOCPReport(
-        stationarity=_absmax(stat),
+        stationarity=stat_val,
         eq_residual=eq_res,
         conic_residual=conic_res,
         comp_slack=comp,
         s_in_cone=_all_in_cone(s),
-        z_in_cone=_all_in_cone(z),
+        z_in_cone=z_ok,
         primal_obj=obj,
+        suboptimality_bound=sub,
         problems=problems,
     )
 

@@ -324,6 +324,14 @@ class _Emitter(ast.NodeVisitor):
         parts = []
         for e in elts:
             if isinstance(e, ast.Constant) and isinstance(e.value, int):
+                # Python resolves a negative index end-relative (x[-1] is the
+                # last element); C reads out of bounds. Reject it so the two
+                # cannot silently disagree.
+                if e.value < 0:
+                    raise EmitError(
+                        f"{self.m.py_name}: negative constant subscript "
+                        f"[{e.value}] (Python wraps to the end, C reads out "
+                        f"of bounds)")
                 parts.append(f"[{e.value}]")
             elif isinstance(e, ast.Name) and e.id in self.loop_vars:
                 parts.append(f"[{e.id}]")
@@ -333,8 +341,18 @@ class _Emitter(ast.NodeVisitor):
                   and e.left.id in self.loop_vars
                   and isinstance(e.right, ast.Constant)
                   and isinstance(e.right.value, int)):
-                sym = "+" if isinstance(e.op, ast.Add) else "-"
-                parts.append(f"[{e.left.id} {sym} {e.right.value}]")
+                # a loop variable ranges over [0, bound); a negative net
+                # offset (e.g. i - 1) can make the index negative, which
+                # Python wraps to the end but C reads out of bounds.
+                off = (e.right.value if isinstance(e.op, ast.Add)
+                       else -e.right.value)
+                if off < 0:
+                    raise EmitError(
+                        f"{self.m.py_name}: subscript {e.left.id} - "
+                        f"{e.right.value} may be negative (Python wraps to "
+                        f"the end, C reads out of bounds)")
+                parts.append(f"[{e.left.id}]" if off == 0
+                             else f"[{e.left.id} + {off}]")
             else:
                 raise EmitError(f"{self.m.py_name}: unsupported subscript")
         return "".join(parts)
