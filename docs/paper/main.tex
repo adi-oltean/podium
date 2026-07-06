@@ -88,8 +88,8 @@ for deployment.
 \draw[->] (py) -- (emit);
 \draw[->] (emit) -- (cc);
 \draw[->] (cc) -- (asm);
-\node[box, above=7mm of emit, xshift=9mm] (eva) {Frama-C/EVA};
-\draw[->, dashed] (emit.north) |- (eva.west) node[pos=0.7, above, font=\footnotesize] {};
+\node[box, above=7mm of emit] (eva) {Frama-C/EVA};
+\draw[->, dashed] (emit.north) -- (eva.south);
 \node[draw, dashed, rounded corners, fit=(py)(asm)(eva),
       label=below:{\footnotesize golden vectors tie Python, C, and assembly}]
       (path) {};
