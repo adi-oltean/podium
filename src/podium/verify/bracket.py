@@ -147,6 +147,59 @@ def certified_optimum(p0: Mat, q0: Vec, r0: F, p1: Mat, q1: Vec, r1: F,
     return t_lb, j_ub, (t_lb is not None and j_ub is not None and t_lb == j_ub)
 
 
+# --- multiple constraints (Theorem 3) -----------------------------------
+
+Con = tuple[Mat, Vec, F]        # (P_k, q_k, r_k) for f_k(x) >= 0
+
+
+def lower_bound_matrix_multi(p0: Mat, q0: Vec, r0: F, cons: list[Con],
+                             lams: Vec, t: F) -> Mat:
+    """S-procedure LMI M(lam, t) for J* = min f0 s.t. f_k >= 0 (k=1..m):
+    A = P0 - sum_k lam_k P_k, off = (q0 - sum_k lam_k q_k)/2, corner =
+    r0 - sum_k lam_k r_k - t."""
+    n = len(q0)
+    a = [[p0[i][j] for j in range(n)] for i in range(n)]
+    b = [q0[i] for i in range(n)]
+    d = r0 - t
+    for k, (pk, qk, rk) in enumerate(cons):
+        lk = lams[k]
+        for i in range(n):
+            b[i] -= lk * qk[i]
+            for j in range(n):
+                a[i][j] -= lk * pk[i][j]
+        d -= lk * rk
+    m: Mat = [[F(0)] * (n + 1) for _ in range(n + 1)]
+    for i in range(n):
+        for j in range(n):
+            m[i][j] = a[i][j]
+        m[i][n] = b[i] / 2
+        m[n][i] = b[i] / 2
+    m[n][n] = d
+    return m
+
+
+def certify_lower_bound_multi(p0: Mat, q0: Vec, r0: F, cons: list[Con],
+                              lams: Vec, t: F) -> bool:
+    """Exact certificate t <= J* for the m-constraint nonconvex QCQP:
+    True iff every lam_k >= 0 and M(lam, t) >= 0. Same weak-duality proof
+    as the single-constraint case; here the S-lemma need not hold, so the
+    best certifiable t (the Shor bound) can be strictly below J* -- an
+    exactly-certified duality gap."""
+    if any(lk < 0 for lk in lams):
+        return False
+    return is_psd(lower_bound_matrix_multi(p0, q0, r0, cons, lams, t))
+
+
+def certify_upper_bound_multi(p0: Mat, q0: Vec, r0: F, cons: list[Con],
+                              x: Vec) -> F | None:
+    """Certified upper bound J* <= f0(x): returns f0(x) if x is EXACTLY
+    feasible for ALL constraints (f_k(x) >= 0), else None."""
+    for pk, qk, rk in cons:
+        if _quad(pk, qk, rk, x) < 0:
+            return None
+    return _quad(p0, q0, r0, x)
+
+
 # --- exact rational recovery of the dual lower bound (Theorem 1) --------
 
 def _solve(a: Mat, b: Vec) -> Vec | None:

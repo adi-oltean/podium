@@ -147,6 +147,36 @@ def test_certified_optimum_binds_provenance_across_problems():
     assert not closed_b
 
 
+def test_multi_constraint_bracket():
+    """Theorem 3 (multiple constraints): the exact-rational bracket
+    generalizes to m constraints. Two keep-outs
+    min ||x||^2 s.t. ||x-(2,0)|| >= 3 and ||x+(2,0)|| >= 3 have J* = 5 at
+    (0, +/-sqrt5) with BOTH constraints active. certify_lower_bound_multi
+    certifies t = 5 (rejects 6); the upper bound gates on feasibility for
+    ALL constraints; the exact bracket contains J*."""
+    p0 = [[F(1), F(0)], [F(0), F(1)]]
+    q0 = [F(0), F(0)]
+    r0 = F(0)
+
+    def keepout(cx, cy, rad):
+        return ([[F(1), F(0)], [F(0), F(1)]], [-2 * cx, -2 * cy],
+                cx * cx + cy * cy - rad * rad)
+
+    cons = [keepout(F(2), F(0), F(3)), keepout(F(-2), F(0), F(3))]
+    half = [F(1, 2), F(1, 2)]
+    assert bracket.certify_lower_bound_multi(p0, q0, r0, cons, half, F(5))
+    assert not bracket.certify_lower_bound_multi(p0, q0, r0, cons, half, F(6))
+    # a loose multiplier gives a valid but weaker certified lower bound
+    assert bracket.certify_lower_bound_multi(p0, q0, r0, cons,
+                                             [F(1, 4), F(1, 4)], F(5, 2))
+    # upper bound: exactly feasible for BOTH keep-outs -> valid; inside one
+    # ball -> rejected (None)
+    j_ub = bracket.certify_upper_bound_multi(p0, q0, r0, cons, [F(0), F(3)])
+    assert j_ub == F(9)                              # 5 <= J* <= 9
+    assert bracket.certify_upper_bound_multi(
+        p0, q0, r0, cons, [F(0), F(0)]) is None      # origin is inside both
+
+
 def test_hard_case_singular_optimum():
     """Theorem 2 (the singular 'hard case'): when A(lam*)=P0-lam*P1 is
     rank-deficient at the dual optimum (the trust-region hard case),
