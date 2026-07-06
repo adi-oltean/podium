@@ -480,6 +480,15 @@ tudatpy 6-DOF oracle, torque allocation) carry into v0.7.
       proof) faults invisible to every physics/trajectory check (only
       the exact-arithmetic checker rejects them). Justifies the
       multi-modal stack; docs/fault-coverage.md
+- [x] Certified successive convexification (#56,
+      `podium.verify.scvx_cut`, `test_certified_scvx.py`): a hard,
+      rational-unit keep-out cut is a SOUND convex inner-approximation
+      of the nonconvex `||r-c|| >= R`, certified exactly by a
+      Positivstellensatz identity (SOS block + multiplier 2R), so every
+      node of every SCvx iterate is feasible for the true nonconvex
+      problem -- not just the limit. The cut's SOS Gram validates from
+      an untrusted float SDP (validate_gram). docs/certified-scvx.md.
+      The P3 (SCvx <-> exact-certificate) demonstrator
 - [x] 6-DOF attitude-coupled PTR (#33, `guidance/sixdof.py`): joint
       13-state (r,v,q,w) planning with a BODY-FIXED thruster — thrust
       direction is R(q)e1, so braking requires a slew the planner must
