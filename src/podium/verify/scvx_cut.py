@@ -28,7 +28,7 @@ import math
 from dataclasses import dataclass, field
 from fractions import Fraction as F
 
-from podium.verify import sos
+from podium.verify import barrier, sos
 
 Mono = tuple[int, ...]      # (deg rx, deg ry)
 Poly = dict[Mono, F]
@@ -120,3 +120,66 @@ def gram_constraints(n: tuple[F, F], radius: F, center: tuple[F, F]
     _u2, _h, lhs = _koz_polys(n, radius, center)
     basis: list[Mono] = [(0, 0), (1, 0), (0, 1)]
     return basis, lhs
+
+
+# --- higher-degree (superquadric) certified cut -----------------------
+
+# degree-2 monomial basis for a quartic SOS block
+QUARTIC_BASIS: list[Mono] = [(0, 0), (1, 0), (0, 1), (2, 0), (1, 1), (0, 2)]
+
+
+@dataclass
+class CutReport:
+    """Exact S-procedure certificate for a polynomial keep-out cut:
+    q = z^T G z + sum_i c_i cut_i, with G PSD and each c_i >= 0, so
+    q >= 0 wherever all cut_i >= 0."""
+
+    certified: bool
+    problems: list[str]
+    gram: list[list[F]]
+
+
+def certify_cut(q: Poly, cuts: list[tuple[F, Poly]],
+                basis: list[Mono], gram: list[list[F]]) -> CutReport:
+    """Verify q = z^T G z + sum c_i cut_i exactly, with G PSD and every
+    multiplier c_i >= 0 -- a Positivstellensatz witness that q >= 0 on
+    the intersection of the cut half-/sub-spaces. All exact rational."""
+    problems: list[str] = []
+    recon = dict(sos.gram_poly(basis, gram))
+    for c, cut in cuts:
+        if c < 0:
+            problems.append("negative S-procedure multiplier")
+        recon = sos.padd(recon, sos.pscale(c, cut))
+    if sos.psub(q, recon):
+        problems.append("identity q = z^T G z + sum c*cut failed")
+    if not barrier.is_psd(gram):
+        problems.append("SOS Gram is not positive semidefinite")
+    return CutReport(not problems, problems, gram)
+
+
+def superquadric_diagonal_certificate(
+        p: F) -> tuple[Poly, Poly, F, list[Mono], list[list[F]]]:
+    """Quartic keep-out rx^4 + ry^4 >= 2 p^4 (nonconvex exterior) with
+    the tangent half-space cut rx + ry >= 2p at the diagonal boundary
+    point (p, p). Returns (q, cut, multiplier, basis, gram) for the
+    exact degree-4 Positivstellensatz
+
+        rx^4 + ry^4 - 2 p^4 = sigma0 + 4 p^3 (rx + ry - 2p),
+
+    sigma0 = (rx^2 - p^2)^2 + 2p^2 (rx - p)^2 + (same in ry), SOS.
+    """
+    q: Poly = {(4, 0): F(1), (0, 4): F(1), (0, 0): -2 * p**4}
+    cut: Poly = {(1, 0): F(1), (0, 1): F(1), (0, 0): -2 * p}
+    mult = 4 * p**3
+    squares: list[tuple[list[F], F]] = [
+        ([-p * p, F(0), F(0), F(1), F(0), F(0)], F(1)),   # rx^2 - p^2
+        ([-p * p, F(0), F(0), F(0), F(0), F(1)], F(1)),   # ry^2 - p^2
+        ([-p, F(1), F(0), F(0), F(0), F(0)], 2 * p * p),  # sqrt(2)p (rx-p)
+        ([-p, F(0), F(1), F(0), F(0), F(0)], 2 * p * p),  # sqrt(2)p (ry-p)
+    ]
+    gram = [[F(0)] * 6 for _ in range(6)]
+    for vec, w in squares:
+        for i in range(6):
+            for j in range(6):
+                gram[i][j] += w * vec[i] * vec[j]
+    return q, cut, mult, QUARTIC_BASIS, gram

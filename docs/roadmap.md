@@ -489,6 +489,15 @@ tudatpy 6-DOF oracle, torque allocation) carry into v0.7.
       problem -- not just the limit. The cut's SOS Gram validates from
       an untrusted float SDP (validate_gram). docs/certified-scvx.md.
       The P3 (SCvx <-> exact-certificate) demonstrator
+- [x] Higher-degree certified cut (#57, `scvx_cut.certify_cut`,
+      `superquadric_diagonal_certificate`): a genuinely nonconvex
+      QUARTIC superquadric keep-out rx^4+ry^4 >= 2p^4 with its tangent
+      half-space cut, certified sound by a degree-4 Positivstellensatz
+      over a 6x6 Gram (closed form rx^4+ry^4-2p^4 = sigma0 + 4p^3(rx+ry
+      -2p), sigma0 SOS). For a strictly inner cut, an untrusted float
+      SDP synthesizes multiplier + 6x6 Gram, validated to exact via
+      validate_gram. certify_cut is the general S-procedure witness
+      checker. Lifts certified convexification beyond degree 1
 - [x] 6-DOF attitude-coupled PTR (#33, `guidance/sixdof.py`): joint
       13-state (r,v,q,w) planning with a BODY-FIXED thruster — thrust
       direction is R(q)e1, so braking requires a slew the planner must

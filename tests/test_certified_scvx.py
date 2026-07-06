@@ -51,6 +51,72 @@ def test_non_unit_normal_is_rejected():
     assert any("unit" in p for p in rep.problems)
 
 
+def test_superquadric_quartic_cut_certifies_sound():
+    """A genuinely HIGHER-DEGREE certified cut: the quartic keep-out
+    rx^4 + ry^4 >= 2 with the tangent half-space rx + ry >= 2 is a sound
+    inner-approximation, certified by a degree-4 Positivstellensatz over
+    a 6x6 Gram."""
+    q, cut, mult, basis, gram = scvx_cut.superquadric_diagonal_certificate(F(1))
+    rep = scvx_cut.certify_cut(q, [(mult, cut)], basis, gram)
+    assert rep.certified, rep.problems
+
+
+def test_superquadric_cut_is_sound_numerically():
+    """On the cut {rx + ry >= 2}, the quartic keep-out rx^4+ry^4 >= 2
+    genuinely holds -- no point of the half-space lies inside the
+    keep-out."""
+    rng = np.random.default_rng(0)
+    pts = rng.uniform(-4, 4, size=(50_000, 2))
+    on_cut = pts[pts[:, 0] + pts[:, 1] >= 2.0]
+    q = on_cut[:, 0] ** 4 + on_cut[:, 1] ** 4 - 2.0
+    assert float(q.min()) >= -1e-9
+
+
+def test_certify_cut_rejects_bad_witness():
+    """A non-PSD Gram or a negative multiplier is rejected."""
+    q, cut, mult, basis, gram = scvx_cut.superquadric_diagonal_certificate(F(1))
+    bad_gram = [row[:] for row in gram]
+    bad_gram[3][3] -= F(2)                         # break PSD-ness
+    assert not scvx_cut.certify_cut(q, [(mult, cut)], basis, bad_gram).certified
+    assert not scvx_cut.certify_cut(q, [(-mult, cut)], basis, gram).certified
+
+
+@pytest.mark.slow
+def test_superquadric_gram_validated_from_untrusted_sdp():
+    """Higher-degree validated SOS on the quartic keep-out: an untrusted
+    float SDP synthesizes BOTH the multiplier and the 6x6 SOS Gram for a
+    (strictly inner) cut rx + ry >= 12/5, and validate_gram rounds the
+    Gram to an exact rational certificate. The gap keeps sigma0 strictly
+    positive so a full-rank Gram exists (the tangent cut is on the SOS
+    boundary -- sigma0 vanishes at (1,1) -- and has no interior)."""
+    cp = pytest.importorskip("cvxpy")
+    q, _tan, _m, basis, _g = scvx_cut.superquadric_diagonal_certificate(F(1))
+    cut: dict = {(1, 0): F(1), (0, 1): F(1), (0, 0): F(-12, 5)}
+
+    g = cp.Variable((6, 6), symmetric=True)
+    c = cp.Variable(nonneg=True)                    # S-procedure multiplier
+    cons = [g >> 1e-4 * np.eye(6)]
+    prods: dict[tuple, list] = {}
+    for i, bi in enumerate(basis):
+        for j, bj in enumerate(basis):
+            m = (bi[0] + bj[0], bi[1] + bj[1])
+            prods.setdefault(m, []).append(g[i, j])
+    mons = set(prods) | set(q) | set(cut)
+    for m in mons:
+        lhs = sum(prods.get(m, []))                 # z^T G z coeff
+        rhs = float(q.get(m, F(0))) - c * float(cut.get(m, F(0)))
+        cons.append(lhs == rhs)
+    cp.Problem(cp.Minimize(0), cons).solve(solver=cp.CLARABEL)
+    assert g.value is not None, "SDP feasible with a gap"
+
+    c_rat = F(float(c.value)).limit_denominator(10**6)
+    target = sos.psub(q, sos.pscale(c_rat, cut))    # sigma0 (exact)
+    g_exact = sos.validate_gram(target, basis, g.value.tolist())
+    assert g_exact is not None
+    rep = scvx_cut.certify_cut(q, [(c_rat, cut)], basis, g_exact)
+    assert rep.certified, rep.problems
+
+
 def _initial_reference():
     """A feasible detour: a semicircle of radius R+1.5 above the KOZ,
     with the straight run-in/run-out to start and goal."""

@@ -46,10 +46,34 @@ certified cuts. The receipts:
 - **Validated synthesis.** One cut's SOS Gram, synthesized by an
   untrusted float SDP, is validated to an exact rational certificate.
 
+## Higher-degree cuts
+
+The machinery is not limited to the linear (degree-1) half-space cut.
+For a genuinely nonconvex **quartic superquadric** keep-out
+`rx^4 + ry^4 >= 2p^4`, the tangent half-space `rx + ry >= 2p` at the
+diagonal boundary point `(p, p)` is certified sound by a degree-4
+Positivstellensatz over a 6×6 Gram (`certify_cut`,
+`superquadric_diagonal_certificate`):
+
+```
+rx^4 + ry^4 - 2p^4  =  sigma0(r)  +  4p^3 (rx + ry - 2p),
+sigma0 = (rx^2 - p^2)^2 + 2p^2 (rx - p)^2 + (same in ry)   (SOS)
+```
+
+so on `{rx + ry >= 2p}` the right side is `SOS + nonneg >= 0`. The
+soundness block `sigma0` lives in the degree-4 SOS cone (basis
+`[1, rx, ry, rx^2, rxry, ry^2]`, a 6×6 Gram with off-diagonal
+structure), and — for a strictly inner cut, where `sigma0` is strictly
+positive rather than boundary-tight — an untrusted float SDP synthesizes
+both the multiplier and the Gram, which `sos.validate_gram` rounds to an
+exact rational certificate. The `certify_cut` S-procedure checker
+verifies any such witness `q = z^T G z + sum_i c_i cut_i` (G PSD,
+`c_i >= 0`) exactly.
+
 ## Scope
 
 The guarantee is at the trajectory nodes; continuous-time (between-node)
-keep-out uses the dense CTCS cuts in `podium.guidance.scp`. Extending
-the certified sound cut to higher-degree (ellipsoidal / superquadric)
-keep-outs is the natural next step — the exact SOS machinery already
-supports it.
+keep-out uses the dense CTCS cuts in `podium.guidance.scp`. Wiring the
+higher-degree certified cut into the SCvx loop at arbitrary boundary
+points (via the validated per-cut SDP rather than the closed form) is
+the next integration step.
