@@ -25,6 +25,7 @@ patterns.
 | **Closed-loop reachability** | `tools/reach/` (JuliaReach), `reach.yml` | Flowpipe non-intersection with unsafe sets — LOS cone, velocity ceiling, abort keep-out — on the ARCH hybrid models, re-proven every commit (12 PROVEN/run) |
 | **Exact barrier certificates** | `podium.verify.barrier`, `test_barrier.py` | Infinite-horizon abort safety: SDP-synthesized (untrusted) barrier re-verified in exact rationals |
 | **Exact KKT certificates** | `podium.verify.kkt`, `test_kkt.py` | Online-solver optimality (QP + SOCP) re-verified in exact rationals, incl. the embedded ECOS solve of a Layer-0 problem |
+| **Exact optimality-gap certificates** | `podium.verify.bracket`, `test_bracket.py`, [`docs/optimality-gap-certificates.md`](optimality-gap-certificates.md) | Exact-rational bounds bracketing the global optimum of a nonconvex QCQP; four theorems (soundness, nonsingular recovery, singular hard case, multi-constraint certified gap) |
 | **Golden vectors** | `podium.emit`, `test_cemit.py` | Python↔C equivalence: bit-exact for arithmetic/sqrt, correctly-rounded (CORE-MATH) for transcendentals |
 | **Sound static analysis** | `tools/eva_gate.py`, `eva.yml` | Frama-C/EVA proves the emitted C alarm-free (no div0/overflow/invalid access) over the contracted input ranges |
 | **Verified-compiler + cross-arch** | `compcert.yml`, `tier2.yml` | Golden vectors replay through CompCert (machine-checked semantics preservation) and on aarch64 under qemu (bit-identical across ISAs) |

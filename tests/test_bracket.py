@@ -148,7 +148,7 @@ def test_certified_optimum_binds_provenance_across_problems():
 
 
 def test_multi_constraint_bracket():
-    """Theorem 3 (multiple constraints): the exact-rational bracket
+    """Theorem 4 (multiple constraints): the exact-rational bracket
     generalizes to m constraints. Two keep-outs
     min ||x||^2 s.t. ||x-(2,0)|| >= 3 and ||x+(2,0)|| >= 3 have J* = 5 at
     (0, +/-sqrt5) with BOTH constraints active. certify_lower_bound_multi
@@ -196,7 +196,7 @@ def test_int_data_stays_exact_rational():
 
 
 def test_hard_case_singular_optimum():
-    """Theorem 2 (the singular 'hard case'): when A(lam*)=P0-lam*P1 is
+    """Theorem 3 (the singular 'hard case'): when A(lam*)=P0-lam*P1 is
     rank-deficient at the dual optimum (the trust-region hard case),
     dual_value returns None (it needs A > 0) -- yet the EXACT certificate
     at (lam*, J*) still verifies, so soundness is unaffected; only the

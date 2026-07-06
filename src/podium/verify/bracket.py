@@ -147,7 +147,7 @@ def certified_optimum(p0: Mat, q0: Vec, r0: F, p1: Mat, q1: Vec, r1: F,
     return t_lb, j_ub, (t_lb is not None and j_ub is not None and t_lb == j_ub)
 
 
-# --- multiple constraints (Theorem 3) -----------------------------------
+# --- multiple constraints (Theorem 4) -----------------------------------
 
 Con = tuple[Mat, Vec, F]        # (P_k, q_k, r_k) for f_k(x) >= 0
 
@@ -218,7 +218,7 @@ def certify_upper_bound_multi(p0: Mat, q0: Vec, r0: F, cons: list[Con],
     return _quad(p0, q0, r0, x)
 
 
-# --- exact rational recovery of the dual lower bound (Theorem 1) --------
+# --- exact rational recovery of the dual lower bound (Theorem 2) --------
 
 def _solve(a: Mat, b: Vec) -> Vec | None:
     """Exact solution of A w = b (Fractions), or None if A is singular."""
@@ -264,7 +264,7 @@ def recover_lower_bound(p0: Mat, q0: Vec, r0: F, p1: Mat, q1: Vec, r1: F,
     certified lower bound (t <= J*, verified by certify_lower_bound), or
     None if the rounded lam is not dual-feasible. When lam_float is near a
     rational optimal multiplier lam*, low-denominator rounding recovers
-    lam* exactly and t = J* (Theorem 1)."""
+    lam* exactly and t = J* (Theorem 2)."""
     lam = F(lam_float).limit_denominator(max_den)
     if lam < 0:
         return None
