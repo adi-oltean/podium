@@ -125,6 +125,28 @@ def test_recover_exact_optimum_from_float_dual():
     assert bracket.closes(t, j_ub) and t == J_STAR
 
 
+def test_certified_optimum_binds_provenance_across_problems():
+    """certified_optimum binds both legs to ONE problem's data, so a lower
+    certificate valid for problem A cannot form a false closed bracket with
+    an upper point from a different problem B (the provenance hole the
+    round-3 ChatGPT audit flagged in the bare `closes` combiner)."""
+    # Problem A: min x^2 s.t. 1 >= 0.  J*_A = 0; t=0 IS a valid lower bound.
+    a = ([[F(1)]], [F(0)], F(0), [[F(0)]], [F(0)], F(1))
+    t_lb, j_ub, closed = bracket.certified_optimum(*a, F(0), F(0), [F(0)])
+    assert closed and t_lb == F(0) == j_ub          # correctly certifies J*=0
+
+    # Problem B: min x^2 - 1 s.t. 1 >= 0.  J*_B = -1; t=0 is NOT <= J*_B.
+    b = ([[F(1)]], [F(0)], F(-1), [[F(0)]], [F(0)], F(1))
+    # the naive combiner would falsely close: closes(0, f0_B(1)=0) is True
+    assert bracket.closes(F(0), F(0))
+    # but certified_optimum re-checks the lower leg against B's data and
+    # rejects t=0 (M not PSD), so no false closure forms.
+    t_lb_b, j_ub_b, closed_b = bracket.certified_optimum(
+        *b, F(0), F(0), [F(1)])
+    assert t_lb_b is None                            # t=0 not certified for B
+    assert not closed_b
+
+
 def test_upper_bound_rejects_tolerance_feasible_point():
     """A soundness hole the round-2 audit found: a point that PASSES
     kkt.verify_qp at the default tolerance can be EXACTLY infeasible for

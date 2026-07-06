@@ -107,9 +107,26 @@ def certify_upper_bound(p0: Mat, q0: Vec, r0: F, p1: Mat, q1: Vec, r1: F,
 
 
 def closes(lower_t: F, upper_j: "F | None") -> bool:
-    """The bracket certifies the exact global optimum iff a valid lower
-    bound and a valid (exactly-feasible) upper bound coincide."""
+    """Low-level combiner: True iff a valid lower bound and a valid
+    (exactly-feasible) upper bound coincide. NOTE: this only compares two
+    numbers -- it does not check they came from the same problem. Prefer
+    `certified_optimum`, which binds both legs to one QCQP's data."""
     return upper_j is not None and lower_t == upper_j
+
+
+def certified_optimum(p0: Mat, q0: Vec, r0: F, p1: Mat, q1: Vec, r1: F,
+                      lam: F, t: F, x: Vec) -> tuple["F | None", "F | None", bool]:
+    """Compose both bracket legs from ONE problem's data, so a lower-bound
+    certificate cannot be paired with an upper point from a *different*
+    problem (provenance binding). Returns (t_lb, j_ub, closed):
+    t_lb = t if certify_lower_bound holds else None; j_ub = the exact upper
+    bound if x is exactly feasible else None; closed is True iff both hold
+    and t_lb == j_ub -- in which case J* = t_lb = j_ub exactly. Because
+    both legs are checked against the same (P0..r1), a caller cannot form a
+    false closure by mixing certificates across problems."""
+    t_lb = t if certify_lower_bound(p0, q0, r0, p1, q1, r1, lam, t) else None
+    j_ub = certify_upper_bound(p0, q0, r0, p1, q1, r1, x)
+    return t_lb, j_ub, (t_lb is not None and j_ub is not None and t_lb == j_ub)
 
 
 # --- exact rational recovery of the dual lower bound (Theorem 1) --------
