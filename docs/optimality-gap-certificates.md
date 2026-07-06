@@ -107,9 +107,13 @@ condition, each verified by an exact PSD test.
 
 ## Notes
 
-- The exact PSD test is all-principal-minors nonnegativity, evaluated as exact
-  rational determinants. It avoids eigenvalues (in general irrational) and the
-  leading-minor Sylvester test (which certifies strict definiteness only); the
-  cost is exponential in the matrix dimension.
+- The exact PSD test is a symmetric (`LDL^T`) Gaussian elimination in exact
+  rationals, in `O(n^3)`: a symmetric matrix is PSD iff every pivot is `>= 0` and
+  each zero pivot leaves the rest of its row (hence, by symmetry, its column) in
+  the Schur complement zero. The factorization `M = L D L^T` with `D >= 0` is
+  itself the nonnegativity witness. This avoids eigenvalues (in general
+  irrational) and the leading-minor Sylvester test (which certifies strict
+  definiteness only), and replaces an earlier all-principal-minors test that was
+  exponential in `n`.
 - Full proofs are given in the accompanying paper; this document states the
   results and their code/test realization.
