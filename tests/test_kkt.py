@@ -253,3 +253,15 @@ def test_certify_ecos_rejects_tampered_primal():
         c=[F(1)], a=[], b=[], g=[[F(-1)]], h=[F(-1)],
         dims={"l": 1, "q": []}, x=[F(3)], y=[], z=[F(1)], s=[F(0)])
     assert not tampered.certified()   # slack now inconsistent
+
+
+def test_indefinite_qp_is_rejected_as_nonconvex():
+    """A stationary point of a non-convex (indefinite-P) QP is not a
+    global optimum. x=0 satisfies every KKT residual for min -1/2 x^2,
+    but the checker must reject it by verifying P >= 0 -- otherwise it
+    would 'certify' a maximum as optimal."""
+    rep = kkt.verify_qp(p=[[F(-1)]], q=[F(0)], g=[], h=[], a=[], b=[],
+                        x=[F(0)], mu=[], nu=[])
+    assert rep.stationarity == F(0)                # KKT residuals vanish...
+    assert not rep.certified()                     # ...but P is not PSD
+    assert any("positive semidefinite" in p for p in rep.problems)

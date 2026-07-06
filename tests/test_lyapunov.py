@@ -82,3 +82,15 @@ def test_exact_certificate_object_and_negatives():
     # the EllipsoidInvariant value is exact
     inv = ly.EllipsoidInvariant(ident)
     assert inv.value([F(2), F(0), F(0), F(0), F(0), F(0)]) == F(4)
+
+
+def test_zero_p_is_rejected_not_positive_definite():
+    """P = 0 is PSD and trivially non-increasing, but {x : x'Px <= c} is
+    all of R^n, not a bounded ellipsoid. The certificate requires P > 0
+    (positive definite), so the checker must reject P = 0."""
+    _a, _b, _k, _p, a_cl = _cw_lqr()
+    zero = [[F(0)] * 6 for _ in range(6)]
+    rep = ly.verify_lyapunov(ly.rationalize_matrix(a_cl.tolist()), zero)
+    assert rep.decrease_psd          # 0 - A'0A = 0 is trivially PSD...
+    assert not rep.p_positive        # ...but P = 0 is not positive definite
+    assert not rep.certified()

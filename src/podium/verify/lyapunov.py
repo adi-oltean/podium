@@ -26,7 +26,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from fractions import Fraction
 
-from podium.verify.barrier import Frac, Mat, is_psd
+from podium.verify.barrier import Frac, Mat, _det, is_psd
 
 Vec = list[Fraction]
 
@@ -66,7 +66,7 @@ class EllipsoidInvariant:
 
 @dataclass
 class LyapunovReport:
-    p_positive: bool          # P >= 0 (bounded ellipsoid)
+    p_positive: bool          # P > 0 (bounded ellipsoid sub-level set)
     decrease_psd: bool        # P - A_cl' P A_cl >= 0 (non-increasing)
     problems: list[str] = field(default_factory=list)
 
@@ -75,10 +75,13 @@ class LyapunovReport:
 
 
 def verify_lyapunov(a_cl: Mat, p: Mat) -> LyapunovReport:
-    """Exactly verify that P certifies the closed loop A_cl: P >= 0 and
-    the Lyapunov decrease P - A_cl' P A_cl >= 0, both by the exact
-    all-principal-minors PSD test. Inputs are Fraction matrices
-    (rationalize float syntheses first)."""
+    """Exactly verify that P certifies the closed loop A_cl: P > 0
+    (positive definite, so {x : x'Px <= c} is a bounded ellipsoid) and
+    the Lyapunov decrease P - A_cl' P A_cl >= 0, by the exact
+    all-principal-minors test. P > 0 is checked as PSD plus nonsingular
+    (a PSD matrix with nonzero determinant has all-positive eigenvalues);
+    without strictness P = 0 would spuriously certify. Inputs are
+    Fraction matrices (rationalize float syntheses first)."""
     problems: list[str] = []
     n = len(p)
     if any(len(row) != n for row in p) or len(a_cl) != n:
@@ -90,7 +93,7 @@ def verify_lyapunov(a_cl: Mat, p: Mat) -> LyapunovReport:
             if p[i][j] != p[j][i]:
                 problems.append(f"P not symmetric at ({i},{j})")
                 break
-    p_pos = is_psd(p)
+    p_pos = is_psd(p) and _det(p) != 0        # positive definite (P > 0)
     decrease = _sub(p, _matmul(_matmul(_transpose(a_cl), p), a_cl))
     # symmetrize exactly (A_cl'PA_cl is symmetric in exact arithmetic
     # when P is; guard against asymmetry from a non-symmetric P input)

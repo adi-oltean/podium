@@ -31,6 +31,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from fractions import Fraction
 
+from podium.verify.barrier import is_psd
+
 Frac = Fraction
 Vec = list[Fraction]
 Mat = list[list[Fraction]]
@@ -105,6 +107,12 @@ def verify_qp(
             if p[i][j] != p[j][i]:
                 problems.append(f"P not symmetric at ({i},{j})")
                 break
+    # convexity — KKT certifies a *global* optimum only for a convex QP,
+    # so the checker must verify P >= 0 rather than assume it. Without
+    # this, a saddle/stationary point of an indefinite QP would be
+    # wrongly certified as optimal.
+    if not problems and not is_psd(p):
+        problems.append("P is not positive semidefinite (QP not convex)")
 
     def _absmax(v: Vec) -> Frac:
         return max((abs(t) for t in v), default=Frac(0))
