@@ -49,6 +49,12 @@ physics- or trajectory-level check reaches.
 ## Reproduce
 
 ```
-python3 tools/fault_coverage.py     # prints the matrix + metrics
-pytest tests/test_fault_coverage.py # asserts the properties
+python3 tools/fault_coverage.py            # prints the matrix + metrics
+python3 tools/fault_coverage_figure.py OUT # renders OUT.svg + OUT.pdf
+pytest tests/test_fault_coverage.py        # asserts the properties
 ```
+
+`tools/fault_coverage_figure.py` renders the matrix as a publication
+figure (grouped by lane kind — physics / emitter / spec / exact
+certificates) directly from `build_matrix()`, so the figure can never
+drift from the asserted data.
