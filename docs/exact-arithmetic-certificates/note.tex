@@ -39,8 +39,8 @@ the exact-rational certificates in the Podium library (\texttt{podium.verify}):
 barrier certificates for abort safety, Karush--Kuhn--Tucker certificates for the
 online convex solves, control-Lyapunov certificates, sum-of-squares certificates,
 and an optimality-gap bracket for nonconvex quadratically constrained quadratic
-programs. None of the underlying mathematics is new; the note documents the exact,
-tolerance-free instantiation, its verification, and its relation to the
+programs. None of the underlying mathematics is new; the note documents the exact
+instantiation, its verification, and its relation to the
 exact-SOS/moment, rational-SDP-recovery, and QCQP-duality literature, so that a
 math-inclined reader can audit the certificate layer directly. Each result is
 exercised by a test in the repository. In detail, guidance and control software
@@ -54,8 +54,10 @@ barrier certificates; optimality of the online convex solves, via
 Karush--Kuhn--Tucker (KKT) conditions for quadratic and second-order cone
 programs; closed-loop stability, via Lyapunov ellipsoids from a discrete-time
 linear-quadratic regulator; and polynomial set containment, via sum-of-squares
-certificates. These certificates are standard; we give an exact, tolerance-free
-re-verification procedure and a reference implementation.
+certificates. These certificates are standard; we give exact re-verification
+procedures --- tolerance-free for the barrier, Lyapunov, sum-of-squares, and
+optimality-gap certificates, and an exact suboptimality bound for the KKT
+re-check of an approximate online solve --- and a reference implementation.
 
 For nonconvex quadratically constrained quadratic programs (QCQPs), we specialize
 the exact rational recovery of a semidefinite certificate, developed for
@@ -188,9 +190,9 @@ which certifies strict definiteness only. The trusted checker uses only exact
 rational arithmetic, so its conclusions carry no rounding error. For the barrier, Lyapunov, sum-of-squares, and optimality-gap
 certificates, acceptance is an exact identity together with the PSD test, with no
 tolerance. When the object under test is the output of an approximate solver, as
-for the online convex solves below, the residuals are still computed exactly, and
-acceptance requires them to lie within an explicit rational tolerance that then
-bounds the error.
+for the online convex solves below, the residuals are still computed exactly, but
+a rigorous bound on suboptimality is reported only when those exact residuals
+yield a valid Lagrangian dual point, not merely when they are small.
 
 \section{Four certificate families}
 \label{sec:family}
@@ -207,17 +209,26 @@ zone \cite{prajna2004,ames2017}.
 
 \paragraph{KKT certificates for the online solves.}
 The guidance layer solves a quadratic program (QP) and a second-order cone
-program (SOCP) online. Since the solver returns an approximate primal-dual point,
-the checker computes the KKT residuals exactly, stationarity, primal and dual
-feasibility, and complementary slackness, and accepts the point when each lies
-within an explicit rational tolerance $\varepsilon$; membership of a slack vector
+program (SOCP) online. The solver returns an approximate primal-dual point, and
+the checker computes its KKT residuals, stationarity, primal and dual
+feasibility, and complementary slackness, exactly. A small stationarity residual
+is not by itself a bound on suboptimality: with a rank-deficient objective (a
+linear or minimum-fuel program) an approximately stationary point can be
+arbitrarily far from optimal. The checker therefore reports a rigorous bound only
+when a valid Lagrangian dual point exists, namely when the multiplier is
+dual-feasible, the Hessian $P$ is PSD, and the stationarity residual $r$ lies in
+the range of $P$. The exact gap
+$\mu^\top(h - Gx) + \nu^\top(b - Ax) + \tfrac12\, r^\top P^{+} r$ then bounds
+$p(x) - p^\star$, the term $\tfrac12\, r^\top P^{+} r$ being the objective drop
+from the candidate to the exact minimizer of the Lagrangian, computed by solving
+$P z = r$ over the rationals. A SOCP objective is linear and so has no curvature
+to absorb a residual; a rigorous bound there instead requires exact conic-dual
+feasibility. Membership of a slack vector
 $s = (s_0, s_{1:}) \in \R \times \R^d$ in the second-order cone is decided without
-square roots through the algebraic condition $s_0 \ge -\varepsilon$ and
-$\lVert s_{1:}\rVert^2 \le (s_0 + \varepsilon)^2$. Because the residuals are
-exact, $\varepsilon$ is a certified bound on the point's suboptimality and
-infeasibility. The checker also verifies that the objective Hessian is PSD, so
-that the certificate concerns a global optimum of a convex program rather than a
-stationary point of unknown type.
+square roots through the algebraic condition $s_0 \ge 0$ and
+$\lVert s_{1:}\rVert^2 \le s_0^2$. In every case the checker verifies that the
+objective Hessian is PSD, so that the certificate concerns a global optimum of a
+convex program rather than a stationary point of unknown type.
 
 \paragraph{Lyapunov certificates for closed-loop stability.}
 A cost-to-go matrix $P$ from a discrete-time linear-quadratic regulator (LQR) is
