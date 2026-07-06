@@ -77,3 +77,36 @@ def certify_lower_bound(p0: Mat, q0: Vec, r0: F, p1: Mat, q1: Vec, r1: F,
     SDP-dual solution first)."""
     return lam >= 0 and is_psd(lower_bound_matrix(
         p0, q0, r0, p1, q1, r1, lam, t))
+
+
+def _quad(p: Mat, q: Vec, r: F, x: Vec) -> F:
+    """x'P x + q'x + r, exact."""
+    n = len(x)
+    val = r
+    for i in range(n):
+        val += q[i] * x[i]
+        for j in range(n):
+            val += x[i] * p[i][j] * x[j]
+    return val
+
+
+def certify_upper_bound(p0: Mat, q0: Vec, r0: F, p1: Mat, q1: Vec, r1: F,
+                        x: Vec) -> F | None:
+    """Certified upper bound. If x is EXACTLY feasible (f1(x) >= 0 in exact
+    rationals), return f0(x): then J* <= f0(x). Otherwise return None.
+
+    Feasibility is checked exactly and independently -- it does NOT trust a
+    solver's tolerance. A point that is only feasible-within-tolerance
+    (e.g. a KKT solution with a tiny inequality violation) is rejected,
+    because its objective can dip BELOW J* and would otherwise collapse the
+    bracket beneath the true optimum. Any exactly-feasible x gives a valid
+    upper bound; a solver/KKT step is only for choosing a good x."""
+    if _quad(p1, q1, r1, x) < 0:            # exactly infeasible
+        return None
+    return _quad(p0, q0, r0, x)
+
+
+def closes(lower_t: F, upper_j: "F | None") -> bool:
+    """The bracket certifies the exact global optimum iff a valid lower
+    bound and a valid (exactly-feasible) upper bound coincide."""
+    return upper_j is not None and lower_t == upper_j

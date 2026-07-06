@@ -25,16 +25,19 @@ def _qcqp():
 
 def _upper_bound(n):
     """Certified upper bound from a sound half-space cut n.(x-c) >= R and
-    the KKT-certified min-norm point on that half-space."""
+    the min-norm point on that half-space. The bound is gated on EXACT
+    feasibility (certify_upper_bound), not on the KKT tolerance."""
+    p0, q0, r0, p1, q1, r1 = _qcqp()
     sound = scvx_cut.certify_halfspace_koz(n, R, C).sound()
     ncx = n[0] * C[0] + n[1] * C[1]
     t = R + ncx                                     # x = t n on the cut
     x = [t * n[0], t * n[1]]
-    rep = kkt.verify_qp(
+    kkt_ok = kkt.verify_qp(
         p=[[F(2), F(0)], [F(0), F(2)]], q=[F(0), F(0)],
         g=[[-n[0], -n[1]]], h=[-(R + ncx)], a=[], b=[],
-        x=x, mu=[2 * t], nu=[])
-    return x[0]**2 + x[1]**2, sound, rep.certified()
+        x=x, mu=[2 * t], nu=[]).certified()
+    j_ub = bracket.certify_upper_bound(p0, q0, r0, p1, q1, r1, x)
+    return j_ub, sound, kkt_ok
 
 
 def test_lower_bound_certificate_is_exact_and_sound():
@@ -80,3 +83,25 @@ def test_bracket_is_a_real_exact_gap_for_a_suboptimal_cut():
     assert sound and kkt_ok
     assert j_lb <= J_STAR < j_ub           # strict gap
     assert j_ub == F(169, 25)              # exact rational upper bound
+
+
+def test_upper_bound_rejects_tolerance_feasible_point():
+    """A soundness hole the round-2 audit found: a point that PASSES
+    kkt.verify_qp at the default tolerance can be EXACTLY infeasible for
+    the true keep-out, with objective BELOW J* -- which would close the
+    bracket beneath the global optimum. certify_upper_bound gates on exact
+    feasibility, not the solver tolerance, so it rejects such a point and
+    the bracket cannot form a false closure."""
+    p0, q0, r0, p1, q1, r1 = _qcqp()
+    eps = F(1, 10**10)
+    x = [F(-2) + eps, F(0)]                # just inside the keep-out
+    # it passes KKT at the default tolerance (violation 1e-10 <= 1e-9)...
+    rep = kkt.verify_qp(
+        p=[[F(2), F(0)], [F(0), F(2)]], q=[F(0), F(0)],
+        g=[[F(1), F(0)]], h=[F(-2)], a=[], b=[],
+        x=x, mu=[F(4) - 2 * eps], nu=[])
+    assert rep.certified()
+    # ...but it is EXACTLY infeasible, so it is not a valid upper bound
+    j_ub = bracket.certify_upper_bound(p0, q0, r0, p1, q1, r1, x)
+    assert j_ub is None
+    assert not bracket.closes(F(4), j_ub)   # no false closed bracket
