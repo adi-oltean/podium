@@ -34,7 +34,7 @@ from __future__ import annotations
 
 from fractions import Fraction as F
 
-from podium.verify.barrier import is_psd
+from podium.verify.barrier import _det, is_psd
 
 Vec = list[F]
 Mat = list[list[F]]
@@ -110,3 +110,59 @@ def closes(lower_t: F, upper_j: "F | None") -> bool:
     """The bracket certifies the exact global optimum iff a valid lower
     bound and a valid (exactly-feasible) upper bound coincide."""
     return upper_j is not None and lower_t == upper_j
+
+
+# --- exact rational recovery of the dual lower bound (Theorem 1) --------
+
+def _solve(a: Mat, b: Vec) -> Vec | None:
+    """Exact solution of A w = b (Fractions), or None if A is singular."""
+    n = len(b)
+    m = [list(a[i]) + [b[i]] for i in range(n)]
+    for col in range(n):
+        piv = next((r for r in range(col, n) if m[r][col] != 0), None)
+        if piv is None:
+            return None
+        m[col], m[piv] = m[piv], m[col]
+        inv = F(1) / m[col][col]
+        m[col] = [v * inv for v in m[col]]
+        for r in range(n):
+            if r != col and m[r][col] != 0:
+                f = m[r][col]
+                m[r] = [m[r][k] - f * m[col][k] for k in range(n + 1)]
+    return [m[i][n] for i in range(n)]
+
+
+def dual_value(p0: Mat, q0: Vec, r0: F, p1: Mat, q1: Vec, r1: F,
+               lam: F) -> F | None:
+    """Exact Lagrangian dual value g(lam) = min_x [f0(x) - lam f1(x)],
+    defined (and equal to the largest t with M(lam, t) >= 0) when
+    A = P0 - lam P1 is positive definite. Returns None otherwise (the
+    singular 'hard case', A not PD). g(lam) <= J* for lam >= 0."""
+    n = len(q0)
+    a = [[p0[i][j] - lam * p1[i][j] for j in range(n)] for i in range(n)]
+    if not (is_psd(a) and _det(a) != 0):        # need A > 0
+        return None
+    b = [q0[i] - lam * q1[i] for i in range(n)]
+    w = _solve(a, b)
+    if w is None:
+        return None
+    bw = sum((b[i] * w[i] for i in range(n)), F(0))     # b' A^{-1} b
+    return (r0 - lam * r1) - bw / 4
+
+
+def recover_lower_bound(p0: Mat, q0: Vec, r0: F, p1: Mat, q1: Vec, r1: F,
+                        lam_float: float, max_den: int = 10**6
+                        ) -> tuple[F, F] | None:
+    """Round a floating-point dual multiplier (e.g. from an untrusted SDP
+    solve) to a rational lam and return (lam, t) with t = g(lam) an EXACT
+    certified lower bound (t <= J*, verified by certify_lower_bound), or
+    None if the rounded lam is not dual-feasible. When lam_float is near a
+    rational optimal multiplier lam*, low-denominator rounding recovers
+    lam* exactly and t = J* (Theorem 1)."""
+    lam = F(lam_float).limit_denominator(max_den)
+    if lam < 0:
+        return None
+    t = dual_value(p0, q0, r0, p1, q1, r1, lam)
+    if t is None or not certify_lower_bound(p0, q0, r0, p1, q1, r1, lam, t):
+        return None
+    return lam, t

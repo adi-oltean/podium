@@ -85,6 +85,46 @@ def test_bracket_is_a_real_exact_gap_for_a_suboptimal_cut():
     assert j_ub == F(169, 25)              # exact rational upper bound
 
 
+def test_dual_value_gives_certified_lower_bounds():
+    """g(lam) = dual_value(...) is an exact certified lower bound at every
+    rational lam in the PD region, and equals J* at the optimal lam*=2/5."""
+    p0, q0, r0, p1, q1, r1 = _qcqp()
+    for lam in [F(1, 3), F(3, 7), F(41, 100), F(2, 5)]:
+        g = bracket.dual_value(p0, q0, r0, p1, q1, r1, lam)
+        assert g is not None
+        assert bracket.certify_lower_bound(p0, q0, r0, p1, q1, r1, lam, g)
+        assert g <= J_STAR
+    assert bracket.dual_value(p0, q0, r0, p1, q1, r1, F(2, 5)) == J_STAR
+
+
+def test_recovery_converges_to_optimum_as_lambda_approaches_lam_star():
+    """As lam -> lam*=2/5 the certified rational lower bound g(lam) -> J*,
+    with the gap shrinking quadratically (~100x per 10x in |lam-lam*|)."""
+    p0, q0, r0, p1, q1, r1 = _qcqp()
+    gaps = []
+    for lam in [F(1, 3), F(39, 100), F(399, 1000)]:   # |lam-2/5| = 1/15, 1/100, 1/1000
+        g = bracket.dual_value(p0, q0, r0, p1, q1, r1, lam)
+        gaps.append(J_STAR - g)
+    assert gaps[0] > gaps[1] > gaps[2] > 0            # monotone to 0
+    # quadratic: a 10x closer lam cuts the gap by ~100x (allow slack)
+    assert gaps[1] / gaps[2] > 50
+
+
+def test_recover_exact_optimum_from_float_dual():
+    """Rounding a float SDP dual (~0.4003) to low denominator recovers the
+    exact rational optimum lam*=2/5, giving t = J* exactly -- a closed
+    exact bracket recovered from an untrusted floating-point solve."""
+    p0, q0, r0, p1, q1, r1 = _qcqp()
+    rec = bracket.recover_lower_bound(p0, q0, r0, p1, q1, r1, 0.4003,
+                                      max_den=100)
+    assert rec is not None
+    lam, t = rec
+    assert lam == F(2, 5) and t == J_STAR             # exact recovery
+    # and it composes into a closed exact bracket with the upper leg
+    j_ub, _sound, _kkt = _upper_bound((F(-1), F(0)))
+    assert bracket.closes(t, j_ub) and t == J_STAR
+
+
 def test_upper_bound_rejects_tolerance_feasible_point():
     """A soundness hole the round-2 audit found: a point that PASSES
     kkt.verify_qp at the default tolerance can be EXACTLY infeasible for
