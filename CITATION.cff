@@ -33,3 +33,12 @@ keywords:
   - barrier certificates
   - CompCert
   - Frama-C
+preferred-citation:
+  type: article
+  title: "Podium: An Open-Source Library for Rendezvous and Docking Guidance, Navigation, and Control with Integrated Formal Verification"
+  authors:
+    - family-names: Oltean
+      given-names: Adi
+      affiliation: "Starcloud, Inc."
+  year: 2026
+  doi: 10.5281/zenodo.21225268
