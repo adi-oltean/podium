@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "podium-gnc"
-version = "0.5.0"
+version = "0.7.0"
 description = "Podium: physics-precise RPOD (rendezvous, proximity operations & docking) GNC library, simulation sandbox, and visualization for LEO/MEO"
 readme = "README.md"
 license = { file = "LICENSE" }
