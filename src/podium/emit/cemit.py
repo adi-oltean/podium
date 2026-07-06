@@ -253,9 +253,29 @@ class _Emitter(ast.NodeVisitor):
         self.tmp_n = 0
         self.idx_n = 0
         self.loop_vars: set[str] = set()
+        self.loop_bounds: dict[str, int] = {}  # loop var -> exclusive bound
 
     def cn(self, name: str) -> str:
         return self.outs_map.get(name, name)
+
+    def _dim_size(self, name: str, dim: int) -> int | None:
+        """Declared size of dimension ``dim`` of array ``name``, or None if
+        not known at emit time (parameters, locals, temporaries)."""
+        shape: tuple[int, ...] | None = None
+        if name in self.m.param_shapes:
+            shape = self.m.param_shapes[name]
+        elif name in self.m.param_arrays:
+            shape = (self.m.param_arrays[name],)
+        elif name in self.m.allocs:
+            shape = self.m.allocs[name][0]
+        elif name in self.env:
+            shape = self.env[name]
+        if shape is None or dim >= len(shape):
+            return None
+        # a param indexed only by loop variables has no size inferred from
+        # constant subscripts (recorded as 0); treat that as "unknown", not
+        # as a real zero-length array.
+        return shape[dim] or None
 
     def _fresh_idx(self) -> str:
         self.idx_n += 1
@@ -286,7 +306,7 @@ class _Emitter(ast.NodeVisitor):
                     return f"({self.expr(e.left)} {sym} {self.expr(e.right)})"
             raise EmitError(f"{self.m.py_name}: unsupported operator")
         if isinstance(e, ast.Subscript) and isinstance(e.value, ast.Name):
-            return self.cn(e.value.id) + self._index_c(e.slice)
+            return self.cn(e.value.id) + self._index_c(e.slice, e.value.id)
         if isinstance(e, ast.Compare):
             if len(e.ops) != 1:
                 raise EmitError(f"{self.m.py_name}: chained comparison")
@@ -317,12 +337,16 @@ class _Emitter(ast.NodeVisitor):
                 return g
         raise EmitError(f"{self.m.py_name}: loop bound not compile-time")
 
-    def _index_c(self, node: ast.expr) -> str:
+    def _index_c(self, node: ast.expr, arr: str | None = None) -> str:
         """Subscript index -> C brackets: constant ints, loop vars,
-        loop-var +/- constant arithmetic, or tuples mixing them."""
+        loop-var + constant arithmetic, or tuples mixing them. Every index
+        is checked to stay within the array's declared bounds where those
+        are known, so the emitted C cannot read out of bounds where Python
+        would raise IndexError."""
         elts = node.elts if isinstance(node, ast.Tuple) else [node]
         parts = []
-        for e in elts:
+        for dim, e in enumerate(elts):
+            size = self._dim_size(arr, dim) if arr is not None else None
             if isinstance(e, ast.Constant) and isinstance(e.value, int):
                 # Python resolves a negative index end-relative (x[-1] is the
                 # last element); C reads out of bounds. Reject it so the two
@@ -332,8 +356,17 @@ class _Emitter(ast.NodeVisitor):
                         f"{self.m.py_name}: negative constant subscript "
                         f"[{e.value}] (Python wraps to the end, C reads out "
                         f"of bounds)")
+                if size is not None and e.value >= size:
+                    raise EmitError(
+                        f"{self.m.py_name}: subscript [{e.value}] out of "
+                        f"bounds for size {size}")
                 parts.append(f"[{e.value}]")
             elif isinstance(e, ast.Name) and e.id in self.loop_vars:
+                bound = self.loop_bounds.get(e.id)
+                if size is not None and bound is not None and bound > size:
+                    raise EmitError(
+                        f"{self.m.py_name}: loop {e.id} in range({bound}) "
+                        f"indexes past size {size}")
                 parts.append(f"[{e.id}]")
             elif (isinstance(e, ast.BinOp)
                   and isinstance(e.op, (ast.Add, ast.Sub))
@@ -351,6 +384,20 @@ class _Emitter(ast.NodeVisitor):
                         f"{self.m.py_name}: subscript {e.left.id} - "
                         f"{e.right.value} may be negative (Python wraps to "
                         f"the end, C reads out of bounds)")
+                # a positive offset can over-read; verify the maximum index
+                # (bound-1)+off stays within the declared size. Relative
+                # indexing requires both to be known so it can be proved safe.
+                bound = self.loop_bounds.get(e.left.id)
+                if bound is None or size is None:
+                    raise EmitError(
+                        f"{self.m.py_name}: offset subscript {e.left.id} + "
+                        f"{off} needs a known loop bound and array size to be "
+                        f"proved in bounds")
+                if (bound - 1) + off >= size:
+                    raise EmitError(
+                        f"{self.m.py_name}: subscript {e.left.id} + {off} "
+                        f"reaches index {(bound - 1) + off} >= size {size} "
+                        f"(out of bounds in C)")
                 parts.append(f"[{e.left.id}]" if off == 0
                              else f"[{e.left.id} + {off}]")
             else:
@@ -646,7 +693,8 @@ class _Emitter(ast.NodeVisitor):
                     self.lines.append(f"{indent}double {tgt.id} = {rhs};")
                 return
             if isinstance(tgt, ast.Subscript) and isinstance(tgt.value, ast.Name):
-                lhs = self.cn(tgt.value.id) + self._index_c(tgt.slice)
+                lhs = self.cn(tgt.value.id) + self._index_c(tgt.slice,
+                                                            tgt.value.id)
                 self.lines.append(f"{indent}{lhs} = {self.expr(st.value)};")
                 return
             raise EmitError(f"{fn}: unsupported assignment target")
@@ -662,7 +710,7 @@ class _Emitter(ast.NodeVisitor):
             elif isinstance(st.target, ast.Subscript) \
                     and isinstance(st.target.value, ast.Name):
                 lhs = self.cn(st.target.value.id) \
-                    + self._index_c(st.target.slice)
+                    + self._index_c(st.target.slice, st.target.value.id)
             else:
                 raise EmitError(f"{fn}: unsupported augmented target")
             self.lines.append(f"{indent}{lhs} {sym} {self.expr(st.value)};")
@@ -673,12 +721,14 @@ class _Emitter(ast.NodeVisitor):
             if var is None:
                 raise EmitError(f"{fn}: loop target must be a name")
             self.loop_vars.add(var)
+            self.loop_bounds[var] = bound
             self.lines.append(
                 f"{indent}for (int {var} = 0; {var} < {bound}; {var}++) {{")
             for s in st.body:
                 self.stmt(s, indent + "    ")
             self.lines.append(f"{indent}}}")
             self.loop_vars.discard(var)
+            self.loop_bounds.pop(var, None)
             if st.orelse:
                 raise EmitError(f"{fn}: for-else unsupported")
             return

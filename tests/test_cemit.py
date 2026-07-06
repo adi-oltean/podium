@@ -350,14 +350,26 @@ def test_rejects_negative_wrap_subscript():
     with pytest.raises(cemit.EmitError):
         cemit.emit_module([negconst])
 
-    # the safe forward form (i + c, used by the YA block kernels) still emits
+    # the safe forward form (i + c into a KNOWN-size array, as the YA block
+    # kernels do) still emits
     def fwd(x):  # noqa: ANN001
-        s = 0.0
+        out = np.zeros(6)
         for i in range(3):
-            s = s + x[i + 3]
-        return s
+            out[i + 3] = x[i]      # i+3 <= 5 < 6, provably in bounds
+        return out
 
-    assert "x[i + 3]" in cemit.emit_module([fwd])
+    assert "[i + 3]" in cemit.emit_module([fwd])
+
+    # but a positive offset that provably over-reads a known-size array is
+    # rejected (Python would raise IndexError; C would read past the array)
+    def over():
+        out = np.zeros(5)
+        for i in range(5):
+            out[i + 1] = 1.0       # i=4 -> out[5], out of bounds
+        return out
+
+    with pytest.raises(cemit.EmitError):
+        cemit.emit_module([over])
 
 
 def test_acsl_rendering():
