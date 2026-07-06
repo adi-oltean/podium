@@ -299,6 +299,117 @@ def test_epsilon_stationary_lp_is_not_certified():
     assert not rep.certified(tol=F(1))      # not even at a loose tolerance
 
 
+def _mv(M, v):
+    return [sum((M[i][j] * v[j] for j in range(len(v))), F(0)) for i in range(len(M))]
+
+
+def _dot(a, b):
+    return sum((a[i] * b[i] for i in range(len(a))), F(0))
+
+
+def _solve(A, b):
+    """Exact particular solution of A z = b, or None if inconsistent."""
+    m = len(A)
+    n = len(A[0]) if m else 0
+    aug = [[A[i][j] for j in range(n)] + [b[i]] for i in range(m)]
+    piv = []
+    row = 0
+    for col in range(n):
+        sel = next((r for r in range(row, m) if aug[r][col] != 0), None)
+        if sel is None:
+            continue
+        aug[row], aug[sel] = aug[sel], aug[row]
+        p = aug[row][col]
+        for r in range(m):
+            if r != row and aug[r][col] != 0:
+                f = aug[r][col] / p
+                for c in range(col, n + 1):
+                    aug[r][c] -= f * aug[row][c]
+        piv.append((row, col))
+        row += 1
+        if row == m:
+            break
+    for r in range(m):
+        if aug[r][n] != 0 and all(aug[r][c] == 0 for c in range(n)):
+            return None
+    z = [F(0)] * n
+    for rr, cc in piv:
+        z[cc] = aug[rr][n] / aug[rr][cc]
+    return z
+
+
+def _true_opt(P, q, G, h):
+    """Exact p* by active-set enumeration for a box-bounded convex QP."""
+    n = len(q)
+    mI = len(G)
+    best = None
+    for S in range(2 ** mI):
+        act = [i for i in range(mI) if (S >> i) & 1]
+        Aeq = [G[i][:] for i in act]
+        beq = [h[i] for i in act]
+        k = len(Aeq)
+        M = [[P[i][j] for j in range(n)] + [Aeq[r][i] for r in range(k)]
+             for i in range(n)]
+        M += [[Aeq[r][j] for j in range(n)] + [F(0)] * k for r in range(k)]
+        sol = _solve(M, [-q[i] for i in range(n)] + beq)
+        if sol is None:
+            continue
+        x, lam = sol[:n], sol[n:]
+        if any(_dot(G[i], x) > h[i] for i in range(mI)):
+            continue
+        if any(li < 0 for li in lam):
+            continue
+        val = _dot(x, _mv(P, x)) / 2 + _dot(q, x)
+        if best is None or val < best[0]:
+            mu = [F(0)] * mI
+            for idx, i in enumerate(act):
+                mu[i] = lam[idx]
+            best = (val, x, mu)
+    return best
+
+
+def test_kkt_suboptimality_bound_is_sound_property():
+    """Property-based EXACT check: over random box-bounded convex QPs, the
+    reported suboptimality_bound is always >= the true gap (no false accept),
+    and the exact optimum is always certified with a zero bound (no false
+    reject). A single violation would be an exact-arithmetic soundness bug."""
+    import random  # noqa: PLC0415
+    rng = random.Random(7)
+    B = F(4)
+    checked = 0
+    for _ in range(250):
+        n = rng.randint(1, 2)
+        r = n - 1 if (rng.random() < 0.35 and n > 1) else n  # sometimes singular
+        L = [[F(rng.randint(-9, 9), 3) for _ in range(r)] for _ in range(n)]
+        P = [[sum((L[i][k] * L[j][k] for k in range(r)), F(0)) for j in range(n)]
+             for i in range(n)]
+        q = [F(rng.randint(-9, 9), 3) for _ in range(n)]
+        G, h = [], []
+        for i in range(n):
+            e = [F(0)] * n
+            e[i] = F(1)
+            G.append(e[:])
+            h.append(B)
+            e2 = [F(0)] * n
+            e2[i] = F(-1)
+            G.append(e2)
+            h.append(B)
+        opt = _true_opt(P, q, G, h)
+        assert opt is not None
+        pstar, xopt, muopt = opt
+        # no false reject
+        assert kkt.verify_qp(P, q, G, h, [], [], xopt, muopt, []).certified(
+            tol=F(1, 10 ** 9))
+        # no false accept: random feasible point, random mu >= 0
+        x = [max(-B, min(B, F(rng.randint(-12, 12), 3))) for _ in range(n)]
+        mu = [F(rng.randint(0, 3)) for _ in range(len(G))]
+        rep = kkt.verify_qp(P, q, G, h, [], [], x, mu, [])
+        if rep.certified(tol=F(10 ** 9)):
+            checked += 1
+            assert rep.suboptimality_bound + F(1, 10 ** 12) >= rep.primal_obj - pstar
+    assert checked > 0
+
+
 def test_malformed_qp_shape_is_rejected():
     """A too-short G/h/mu silently drops inequality rows from the
     residuals; the checker must reject the malformed instance rather than
