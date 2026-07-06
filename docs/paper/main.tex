@@ -7,7 +7,9 @@
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,fit}
 \usepackage{booktabs}
+\usepackage{array}
 \usepackage{microtype}
+\setlength{\emergencystretch}{3em}
 \usepackage[hidelinks]{hyperref}
 \usepackage{url}
 
@@ -168,7 +170,7 @@ summarizes them.
 QP: quadratic program. SOCP: second-order cone program. QCQP: quadratically
 constrained quadratic program. ISA: instruction-set architecture.}
 \label{tab:lanes}
-\begin{tabular}{@{}ll@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.34\linewidth}>{\raggedright\arraybackslash}p{0.62\linewidth}@{}}
 \toprule
 Check & Guarantee \\
 \midrule
@@ -202,7 +204,7 @@ across rebuilds.
 \section{Illustrative example}
 
 Two artifacts illustrate the library at different depths. A one-command demo,
-\texttt{examples/vbar\_approach.py}, plans a one-kilometer approach along the
+\texttt{examples/\allowbreak vbar\_approach.py}, plans a one-kilometer approach along the
 target's velocity axis (a V-bar approach, in the local-vertical/local-horizontal
 frame) on the Clohessy--Wiltshire discretization and propagates it under the
 linear Clohessy--Wiltshire dynamics; Figure~\ref{fig:vbar} shows its trajectory.
