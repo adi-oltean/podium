@@ -1,10 +1,16 @@
 # Exact optimality-gap certificates for nonconvex QCQPs
 
-This document states the four results implemented in
+This document is a short index: it states the four results implemented in
 [`src/podium/verify/bracket.py`](../src/podium/verify/bracket.py) and maps each
-to the function that realizes it and the test that checks it. The numbering here
-is the one used in the accompanying paper. Every bound below is an exact rational
-(`fractions.Fraction`); the trusted checker uses no floating point.
+to the function that realizes it and the test that checks it. The full
+constructions, proofs, and prior-art positioning are in the companion technical
+note [`docs/exact-arithmetic-certificates/note.pdf`](exact-arithmetic-certificates/note.pdf)
+(source alongside it), which also covers the barrier, KKT, Lyapunov, and
+sum-of-squares certificates. The note is honestly scoped: none of the underlying
+mathematics is new, and it positions the exact-arithmetic instantiation against
+the exact-SOS/moment, rational-SDP-recovery, and QCQP-duality literature. Every
+bound below is an exact rational (`fractions.Fraction`); the trusted checker uses
+no floating point.
 
 ## Problem
 
