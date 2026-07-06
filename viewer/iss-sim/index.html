@@ -60,6 +60,20 @@ JavaScript port of those laws (Python is the source of truth; constants are
 identical). It reads the sim's own HUD telemetry from the page and clicks the
 sim's own control buttons — Podium GNC in the loop, SpaceX's vehicle model.</p>
 
+<div class="card" style="border-left:3px solid #c98; background:#2a2420;">
+<p style="margin:0;"><b>Fidelity disclaimer.</b> <code>iss-sim.spacex.com</code> is
+SpaceX's public <em>manual-docking trainer</em> — a kinematic 6-DOF pose
+simulator (each click commands a fixed translational or attitude <em>rate</em>;
+the pose integrates at that rate) with no orbital mechanics and no rigid-body
+inertia/torque model. Its per-click gain is undocumented, so Podium's autopilot
+reverse-engineers it empirically. Flying Podium's docking laws here is a
+<b>demonstration and a black-box test of the terminal pulsed-docking
+controller</b> — it genuinely surfaced real bugs (a deadband stall and its
+frame-rate scaling) — but it is <b>not a fidelity benchmark and not a validation
+of orbital GNC</b>. No dynamical accuracy is claimed or guaranteed for the
+underlying simulator.</p>
+</div>
+
 <div class="card">
 <table class="gates">
 <tr><td class="dim">closing-rate profile</td><td><code>v = clamp(range/60, 0.16, 3.0) m/s</code></td></tr>
