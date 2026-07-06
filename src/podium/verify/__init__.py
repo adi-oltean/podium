@@ -18,8 +18,15 @@ flow invariants, re-verified by an exact rational checker (no floats in
 the trusted path).
 """
 
-from podium.verify import barrier, kkt, lyapunov, scvx_cut, sos  # noqa: F401
+from podium.verify import (  # noqa: F401
+    barrier,
+    bracket,
+    kkt,
+    lyapunov,
+    scvx_cut,
+    sos,
+)
 from podium.verify.contracts import Interval, contract, prove, shapes
 
-__all__ = ["Interval", "barrier", "contract", "kkt", "lyapunov", "prove",
-           "scvx_cut", "shapes", "sos"]
+__all__ = ["Interval", "barrier", "bracket", "contract", "kkt", "lyapunov",
+           "prove", "scvx_cut", "shapes", "sos"]
