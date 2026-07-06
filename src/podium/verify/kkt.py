@@ -369,13 +369,15 @@ def verify_socp(
     cone_total = (int(lnn) if isinstance(lnn, int) else 0)
     if isinstance(qd, (list, tuple)):
         cone_total += sum(int(m) for m in qd)
+        if any(int(m) < 1 for m in qd):
+            problems.append("each second-order cone must have size >= 1")
     if not (len(s) == len(z) == len(h) == cone_total):
         problems.append("cone dims must cover all of s, z, h")
     if len(c) != n:
         problems.append("len(c) != n")
     if len(a) != len(b) or any(len(row) != n for row in a):
         problems.append("A, b shape mismatch")
-    if a and len(y) != len(a):
+    if len(y) != len(a):
         problems.append("len(y) must equal rows(A)")
     if len(g) != len(h) or any(len(row) != n for row in g):
         problems.append("G, h shape mismatch")
@@ -409,11 +411,27 @@ def verify_socp(
     obj = sum((c[j] * x[j] for j in range(n)), Frac(0))
     stat_val = _absmax(stat)
     z_ok = _all_in_cone(z)
+
+    def _in_cone_exact(v: Vec) -> bool:
+        """Membership in K with NO tolerance (cone_tol = 0). The dual bound
+        below is valid only for a z that is EXACTLY dual-feasible; the
+        tolerance-based z_ok is for the residual report, not for the bound."""
+        for kind, blk in _cone_blocks(v, dims):
+            if kind == "nn":
+                if any(t < 0 for t in blk):
+                    return False
+            else:
+                s0 = blk[0]
+                if s0 < 0 or sum((e * e for e in blk[1:]), Frac(0)) > s0 * s0:
+                    return False
+        return True
+
     # rigorous bound c'x - (-b'y - h'z) on c'x - p*, valid only at exact
-    # conic-dual feasibility: stationarity exactly zero and z in the dual
-    # cone (see SOCPReport.suboptimality_bound).
+    # conic-dual feasibility: stationarity exactly zero and z EXACTLY in the
+    # dual cone (see SOCPReport.suboptimality_bound). A z that is only within
+    # cone_tol of K* is not a valid dual point and must not yield a bound.
     sub: Frac | None = None
-    if stat_val == 0 and z_ok:
+    if stat_val == 0 and _in_cone_exact(z):
         bty = sum((bi * yi for bi, yi in zip(b, y)), Frac(0))
         htz = sum((hi * zi for hi, zi in zip(h, z)), Frac(0))
         sub = obj + bty + htz

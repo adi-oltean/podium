@@ -445,6 +445,23 @@ def test_socp_uncovered_cone_tail_is_rejected():
     assert not rep.certified()
 
 
+def test_socp_dual_within_tol_but_not_in_cone_is_not_certified():
+    """SOUNDNESS REGRESSION: the SOCP suboptimality bound requires z EXACTLY
+    in the dual cone. A dual within cone_tol of K* but not in it (a slightly
+    negative nonneg-cone entry) is not a valid dual point, so no rigorous
+    bound is issued even though the tolerance-based membership passes. LP
+    min eps*x s.t. 0<=x<=1; the claimed x=1 is eps-suboptimal."""
+    eps = F(1, 10_000_000)
+    rep = kkt.verify_socp(
+        c=[eps], a=[], b=[],
+        g=[[F(-1)], [F(1)]], h=[F(0), F(1)],
+        dims={"l": 2, "q": []},
+        x=[F(1)], y=[], z=[F(0), -eps], s=[F(1), F(0)])
+    assert rep.z_in_cone                      # tolerance-based report is True
+    assert rep.suboptimality_bound is None    # ...but no valid dual bound
+    assert not rep.certified(tol=F(0))        # ...so NOT certified
+
+
 def test_suboptimality_bound_is_exact_for_pd_qp():
     """For a positive-definite P the rigorous bound equals the true gap.
     min 1/2 x^2 (optimum x=0, p*=0); the point x=1 has stationarity
