@@ -147,6 +147,36 @@ def test_certified_optimum_binds_provenance_across_problems():
     assert not closed_b
 
 
+def test_hard_case_singular_optimum():
+    """Theorem 2 (the singular 'hard case'): when A(lam*)=P0-lam*P1 is
+    rank-deficient at the dual optimum (the trust-region hard case),
+    dual_value returns None (it needs A > 0) -- yet the EXACT certificate
+    at (lam*, J*) still verifies, so soundness is unaffected; only the
+    smooth recovery is. The interior approximation from the PD side
+    converges to J* only LINEARLY (not quadratically).
+
+    Instance: min -x1^2 + 2 x2^2 + 2 x2 s.t. 1 - ||x||^2 >= 0; A(lam) =
+    diag(-1+lam, 2+lam) is singular at lam*=1; analytic J* = -4/3.
+    """
+    p0 = [[F(-1), F(0)], [F(0), F(2)]]
+    q0 = [F(0), F(2)]
+    r0 = F(0)
+    p1 = [[F(-1), F(0)], [F(0), F(-1)]]
+    q1 = [F(0), F(0)]
+    r1 = F(1)
+    j = F(-4, 3)
+    # A(1) = diag(0, 3) is singular -> dual_value cannot use it
+    assert bracket.dual_value(p0, q0, r0, p1, q1, r1, F(1)) is None
+    # but the exact rank-deficient certificate at (lam*, J*) verifies
+    assert bracket.certify_lower_bound(p0, q0, r0, p1, q1, r1, F(1), j)
+    # interior approximation (lam -> 1+) -> J*, LINEARLY: gap shrinks ~10x
+    # per 10x closer to lam*=1 (quadratic recovery would be ~100x)
+    ga = j - bracket.dual_value(p0, q0, r0, p1, q1, r1, F(101, 100))
+    gb = j - bracket.dual_value(p0, q0, r0, p1, q1, r1, F(1001, 1000))
+    assert ga > gb > 0
+    assert 8 < ga / gb < 12
+
+
 def test_upper_bound_rejects_tolerance_feasible_point():
     """A soundness hole the round-2 audit found: a point that PASSES
     kkt.verify_qp at the default tolerance can be EXACTLY infeasible for
