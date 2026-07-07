@@ -55,17 +55,18 @@ try:
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots(figsize=(9, 4))
-    ax.plot(traj[:, 1], traj[:, 0], lw=1.2, color="C0",
+    # Grayscale, print-safe: series are distinguished by SHAPE, not color.
+    ax.plot(traj[:, 1], traj[:, 0], lw=1.2, color="black",
             label="closed-loop trajectory")
-    ax.scatter(burn_y, burn_x, marker=".", s=28, color="red", zorder=5,
-               label="impulse points")
-    ax.scatter([x0[1]], [x0[0]], marker="o", s=55, color="black", zorder=6,
-               label="start (1 km)")
-    ax.scatter([dock[1]], [dock[0]], marker="*", s=170, color="orange",
-               edgecolors="black", linewidths=0.4, zorder=6,
+    ax.scatter(burn_y, burn_x, marker="+", s=45, color="black",
+               linewidths=1.0, zorder=5, label="impulse points")
+    ax.scatter([x0[1]], [x0[0]], marker="o", s=60, facecolors="black",
+               edgecolors="black", zorder=6, label="start (1 km)")
+    ax.scatter([dock[1]], [dock[0]], marker="*", s=200, facecolors="0.75",
+               edgecolors="black", linewidths=0.6, zorder=6,
                label="hold point (10 m)")
-    ax.scatter([0], [0], marker="s", s=55, color="green", zorder=6,
-               label="target")
+    ax.scatter([0], [0], marker="s", s=60, facecolors="0.5",
+               edgecolors="black", zorder=6, label="target")
     ax.set_xlabel("along-track y [m]")
     ax.set_ylabel("radial x [m]")
     ax.set_title(

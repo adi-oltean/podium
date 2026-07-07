@@ -169,7 +169,7 @@ than the guidance planners or controllers, whose online solves are instead
 covered by the certificate layer below.
 
 \paragraph{Software metadata.}
-Repository \texttt{github.com/adi-oltean/podium}; language Python 3.10+; license
+Language Python 3.10+; license
 MIT; NumPy required, with optional CVXPY and Clarabel for the solver-backed paths
 and optional verification tooling (Frama-C, CompCert, JuliaReach). Continuous integration runs
 on GitHub Actions. The examples and the per-release audit bundle are the primary
@@ -261,9 +261,8 @@ online QP or SOCP solve (for the conic case, an embedded ECOS solve when that
 optional solver is installed) against its own optimality conditions, run in
 continuous integration as part of the verification suite (\texttt{test\_kkt.py})
 rather than inside the reference-mission loop. An interactive playback of the same burn plan
-under the nonlinear truth model is hosted, as a current project demo, at
-\url{https://adi-oltean.github.io/podium/} as static HTML
-with no build step, and the emitted flight kernels are exercised in
+under the nonlinear truth model is available as a self-contained static web page
+linked from the repository, and the emitted flight kernels are exercised in
 \texttt{examples/cfs\_nav\_app/}, a NASA Core Flight System (cFS) application,
 with build and run steps in its \texttt{README}.
 
