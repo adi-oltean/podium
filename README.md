@@ -1,6 +1,6 @@
 # Podium
 
-[![Paper DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21225268.svg)](https://doi.org/10.5281/zenodo.21225268)
+[![Paper DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21225267.svg)](https://doi.org/10.5281/zenodo.21225267)
 
 **Physics-precise RPOD (rendezvous, proximity operations & docking) GNC library, simulation sandbox, and visualization — focused on LEO/MEO.**
 
@@ -105,8 +105,8 @@ dv1, dv2 = cw.two_impulse(x0, np.zeros(6), n, 1500.0)
 |---|---|
 | [`docs/architecture.md`](docs/architecture.md) | Frames, units, module boundaries, sim engine design |
 | [`docs/comparative-analysis.md`](docs/comparative-analysis.md) | Survey of existing simulators; build-on vs interop decisions |
-| [`docs/paper/podium-paper.pdf`](docs/paper/podium-paper.pdf) | The tool paper describing the library (DOI [10.5281/zenodo.21225268](https://doi.org/10.5281/zenodo.21225268)) |
-| [`docs/exact-arithmetic-certificates/note.pdf`](docs/exact-arithmetic-certificates/note.pdf) | Technical note: constructions, proofs, and prior art for the exact-rational certificates |
+| [`docs/paper/podium-paper.pdf`](docs/paper/podium-paper.pdf) | The tool paper describing the library (DOI [10.5281/zenodo.21225267](https://doi.org/10.5281/zenodo.21225267)) |
+| [`docs/exact-arithmetic-certificates/note.pdf`](docs/exact-arithmetic-certificates/note.pdf) | Technical note: constructions, proofs, and prior art for the exact-rational certificates (DOI [10.5281/zenodo.21247381](https://doi.org/10.5281/zenodo.21247381)) |
 | [`docs/optimality-gap-certificates.md`](docs/optimality-gap-certificates.md) | Index of the optimality-gap results mapped to code and tests |
 | [`docs/verification.md`](docs/verification.md) | The ten shipped verification modalities, static-subset rules, contract→ACSL mapping, layered assurance |
 | [`docs/visualization.md`](docs/visualization.md) | Rendering architecture (patterns adopted from fermi) |
@@ -117,11 +117,15 @@ dv1, dv2 = cw.two_impulse(x0, np.zeros(6), n, 1500.0)
 
 The library is described in the tool paper:
 
-> Adi Oltean. *Podium: An Open-Source Library for Rendezvous and Docking Guidance, Navigation, and Control with Integrated Formal Verification.* 2026. [`docs/paper/podium-paper.pdf`](docs/paper/podium-paper.pdf). DOI: [10.5281/zenodo.21225268](https://doi.org/10.5281/zenodo.21225268).
+> Adi Oltean. *Podium: An Open-Source Library for Rendezvous and Docking Guidance, Navigation, and Control with Integrated Formal Verification.* 2026. [`docs/paper/podium-paper.pdf`](docs/paper/podium-paper.pdf). DOI: [10.5281/zenodo.21225267](https://doi.org/10.5281/zenodo.21225267).
 
-The mathematics behind the exact-rational certificates — the constructions, proofs, and prior-art positioning for the barrier, KKT, control-Lyapunov, sum-of-squares, and optimality-gap certificates — is collected in a companion technical note ([`docs/exact-arithmetic-certificates/note.pdf`](docs/exact-arithmetic-certificates/note.pdf)); the optimality-gap results are also indexed to their code and tests in [`docs/optimality-gap-certificates.md`](docs/optimality-gap-certificates.md).
+The mathematics behind the exact-rational certificates — the constructions, proofs, and prior-art positioning for the barrier, KKT, control-Lyapunov, sum-of-squares, and optimality-gap certificates — is collected in a companion technical note, itself citable:
 
-To cite the software itself, use [`CITATION.cff`](CITATION.cff) (GitHub's "Cite this repository" button); each tagged release is also archived on Zenodo with its own DOI.
+> Adi Oltean. *Exact-Rational Certificates in Podium: Constructions, Proofs, and Prior Art.* Technical note, 2026. [`docs/exact-arithmetic-certificates/note.pdf`](docs/exact-arithmetic-certificates/note.pdf). DOI: [10.5281/zenodo.21247381](https://doi.org/10.5281/zenodo.21247381).
+
+The optimality-gap results are also indexed to their code and tests in [`docs/optimality-gap-certificates.md`](docs/optimality-gap-certificates.md).
+
+To cite the software itself, use [`CITATION.cff`](CITATION.cff) (GitHub's "Cite this repository" button); the code is archived on Zenodo (software DOI [10.5281/zenodo.21225268](https://doi.org/10.5281/zenodo.21225268)), with a version DOI per tagged release.
 
 ## License
 

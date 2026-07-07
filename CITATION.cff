@@ -21,6 +21,7 @@ date-released: "2026-07-06"
 license: MIT
 repository-code: "https://github.com/adi-oltean/podium"
 url: "https://github.com/adi-oltean/podium"
+doi: "10.5281/zenodo.21225268"
 keywords:
   - rendezvous and docking
   - proximity operations
@@ -41,4 +42,4 @@ preferred-citation:
       given-names: Adi
       affiliation: "Starcloud, Inc."
   year: 2026
-  doi: 10.5281/zenodo.21225268
+  doi: 10.5281/zenodo.21225267
