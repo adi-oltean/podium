@@ -415,29 +415,35 @@ on the library can be re-checked independently.
 \section{Limitations}
 
 The guarantees are deliberately scoped. The cross-architecture bit-exactness of
-the emitted C holds for the scalar arithmetic and square-root class, and relies
-on IEEE-754 binary64 with fused-multiply-add contraction disabled; correctly
-rounded sine and cosine are bit-exact in that mode, while the remaining libm
-transcendentals and matrix products fall in documented tolerance classes rather
-than being bit-identical. The abort-safety barrier is certified for the linear
-Clohessy--Wiltshire drift of a fixed formation: it bounds the linearized abort
-but does not itself quantify the gap to the nonlinear, $J_2$-and-drag,
-actuator- and sensor-perturbed trajectory, for which robustness margins or
-stochastic and hybrid safety proofs would be required. The exact-rational
-certificate checkers are exact but run offline in continuous integration on
-per-primitive problems; their rational entries can grow with problem size, so
-scaling to full trajectory horizons is open, and they are not intended for online
-safety monitoring. The verifiable subset is intentionally restricted---statically
-shaped arrays, bounded loops, and no dynamic allocation---which suits the
-fixed-shape flight-math kernels but excludes variable-horizon, adaptive, or
-event-triggered logic; such logic lives in the untrusted planner and controller
-layers, whose online solves are covered by the certificate layer rather than the
-emitted-C path. Finally, Podium produces verification \emph{evidence}---analyzable
-and compiled code, sound-analysis and compiler receipts, and exact
-certificates---rather than a completed qualification under a standard such as
-DO-178C or ECSS; mapping that evidence to a certification case, and benchmarking
-the generated kernels and solvers against production baselines, are outside the
-present scope.
+the emitted C holds for the scalar arithmetic and square-root class, which is
+correctly rounded and hence bit-identical across conforming hardware under
+IEEE-754 binary64 with fused-multiply-add contraction disabled; correctly rounded
+sine and cosine are bit-exact in that mode, while the remaining libm
+transcendentals and matrix products fall in documented tolerance classes. The
+abort-safety barrier is certified exactly for the linear Clohessy--Wiltshire
+drift of a fixed formation---the standard e/i-vector passive-safety analysis, here
+machine-checked over $\Q$---and bounds the linearized abort; the residual gap to
+the nonlinear, $J_2$-and-drag, actuator- and sensor-perturbed trajectory is not
+certified by the barrier but is exercised by the nonlinear closed-loop
+reachability and temporal-logic checks, so exact synthesis on the linear model and
+high-fidelity nonlinear simulation are complementary rather than substitutes. The
+exact-rational checkers run offline in continuous integration as a pre-deployment
+gate that adds nothing to the flight loop; their rational entries stay small on
+the per-primitive problems, and bounding their growth at full trajectory scale is
+the open scaling direction. The verifiable subset is intentionally restricted to
+statically shaped arrays, bounded loops, and no dynamic allocation---the memory-
+and timing-determinism discipline of high-integrity flight software (MISRA-C, the
+JPL Power of Ten)---so the emitted kernels are allocation-free and of fixed,
+bounded complexity, and thus flight-suitable by construction; variable-horizon,
+adaptive, and event-triggered logic is deliberately excluded from this path and
+lives in the untrusted planner and controller layers, whose online solves the
+certificate layer covers. Finally, Podium produces verification
+\emph{evidence}---sound-analysis and verified-compiler receipts, exact
+certificates, and golden-vector equivalence---of kinds recognized in
+high-assurance software practice, rather than a completed qualification under a
+standard such as DO-178C or ECSS; mapping that evidence onto a certification case,
+and benchmarking the generated kernels and solvers against production baselines,
+are outside the present scope.
 
 \section{Conclusions}
 
