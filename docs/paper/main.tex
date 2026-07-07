@@ -414,7 +414,12 @@ on the library can be re-checked independently.
 
 \section{Limitations}
 
-The guarantees are deliberately scoped. The cross-architecture bit-exactness of
+The guarantees are deliberately scoped, and each is conditional on its
+assumptions: the sound-analysis result holds while inputs remain within the
+declared contracts, and the certificates hold for the stated models and problem
+data, so establishing at the system level that flight inputs stay within contract
+and that the models bound reality belongs to the surrounding assurance case rather
+than the library. The cross-architecture bit-exactness of
 the emitted C holds for the scalar arithmetic and square-root class, which is
 correctly rounded and hence bit-identical across conforming hardware under
 IEEE-754 binary64 with fused-multiply-add contraction disabled; correctly rounded
