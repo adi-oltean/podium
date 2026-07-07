@@ -26,7 +26,7 @@ patterns.
 | **Exact barrier certificates** | `podium.verify.barrier`, `test_barrier.py` | Infinite-horizon abort safety: SDP-synthesized (untrusted) barrier re-verified in exact rationals |
 | **Exact KKT certificates** | `podium.verify.kkt`, `test_kkt.py` | Online QP/SOCP solves re-verified in exact rationals: an exact-rational suboptimality bound (QP) or exact conic-dual re-check (SOCP), incl. the embedded ECOS solve of a Layer-0 problem |
 | **Exact optimality-gap certificates** | `podium.verify.bracket`, `test_bracket.py`, [`docs/optimality-gap-certificates.md`](optimality-gap-certificates.md) | Exact-rational bounds bracketing the global optimum of a nonconvex QCQP; four theorems (soundness, nonsingular recovery, singular hard case, multi-constraint certified gap) |
-| **Golden vectors** | `podium.emit`, `test_cemit.py` | Python↔C equivalence: bit-exact for scalar arithmetic/sqrt (and CORE-MATH transcendentals); matrix products agree up to floating-point reassociation |
+| **Golden vectors** | `podium.emit`, `test_cemit.py` | Python↔C equivalence: bit-exact for scalar arithmetic/sqrt (and CORE-MATH sine/cosine); other libm transcendentals within one ulp; matrix products agree up to floating-point reassociation |
 | **Sound static analysis** | `tools/eva_gate.py`, `eva.yml` | Frama-C/EVA proves the emitted C alarm-free (no div0/overflow/invalid access) over the contracted input ranges |
 | **Verified-compiler + cross-arch** | `compcert.yml`, `tier2.yml` | Golden vectors replay through CompCert (machine-checked semantics preservation) and on aarch64 under qemu (bit-identical across ISAs) |
 | **Independent physics + dynamics oracles** | `validate.yml` (Orekit), `test_attitude_analytic.py`, `test_gravity_gradient.py` | Truth model vs Orekit; attitude integrator vs exact Jacobi-elliptic / gravity-gradient closed forms |
@@ -158,9 +158,10 @@ following the CVXPYgen precedent:
 20 flight kernels emit today — the quaternion, CW, Yamanaka-Ankersen, ROE, and
 EKF (Joseph `predict`/`update_sequential`) cores. The golden vectors are
 **bit-exact** for arithmetic/sqrt kernels and, in correctly-rounded mode
-(`emit_module(correctly_rounded=True)` linking vendored CORE-MATH), bit-exact
-for the transcendental-bearing kernels too — retiring the last cross-libm
-tolerance. A subset tripwire test pins the emitter inside CompCert's
+(`emit_module(correctly_rounded=True)` linking vendored CORE-MATH sine and
+cosine), for the sin/cos-bearing kernels as well; kernels that call other libm
+transcendentals (for example `atan2` in the anomaly kernels) remain within a
+one-ulp cross-libm tolerance. A subset tripwire test pins the emitter inside CompCert's
 verified-compilable C99 forever (no VLAs, goto, switch, union, long double,
 `_Complex`, or dynamic allocation).
 
@@ -177,8 +178,8 @@ the bitwise receipts.
    CW hybrid models, re-proven every commit (`reach.yml`, JuliaReach), for
    both the ARCH reference controller and Podium-synthesized LQR gains;
    infinite-horizon abort safety via exact-rational barrier certificates.
-2. **Numerics level** *(shipped)* — correctly-rounded transcendentals
-   (CORE-MATH) close the cross-libm gap; fixed-step integrators validated
+2. **Numerics level** *(shipped)* — correctly-rounded sine and cosine
+   (CORE-MATH) close the cross-libm gap for the sin/cos kernels; fixed-step integrators validated
    against exact analytic solutions (Jacobi-elliptic attitude, gravity-
    gradient libration) and against Orekit for the translational truth model.
 3. **Code level** *(shipped)* — the emitted C is proven RTE-free by Frama-C/EVA

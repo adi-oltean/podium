@@ -27,8 +27,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Trajectory optimization (convex / successive convexification)
-opt = ["cvxpy>=1.4", "clarabel>=0.7"]
+# Trajectory optimization (convex / successive convexification) and the
+# embedded ECOS solver whose SOCP output the conic-KKT checker re-verifies
+opt = ["cvxpy>=1.4", "clarabel>=0.7", "ecos>=2.0"]
 # Contact/capture truth model (probe-drogue docking)
 contact = ["mujoco>=3.2"]
 # Interactive 3-D visualization
@@ -46,6 +47,7 @@ dev = [
     # but CI runs them)
     "cvxpy>=1.4",
     "clarabel>=0.7",
+    "ecos>=2.0",
     "matplotlib>=3.7",
     "mujoco>=3.2",
     # correctly-rounded transcendental oracle (CORE-MATH receipts)
