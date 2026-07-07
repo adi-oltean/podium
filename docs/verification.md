@@ -127,12 +127,15 @@ and consumed four ways:
 |---|---|
 | Sandbox simulation | Runtime checks (raise on violation; disable with `PODIUM_NO_CONTRACTS=1`) |
 | C translation | The emitter renders each range contract as an **ACSL `requires`** clause (hex-float bounds, so the nearest-double boundary is provable) plus a `[spec]` annotation block; Frama-C/EVA (`eva.yml`) discharges them — 100% of the reached preconditions valid, zero alarms |
-| Invariants | `prove(cond, label)` calls become `PROVE(...)` obligations at the same program points, yielding per-invariant proof artifacts |
-| Docs | Ranges and units rendered into API reference |
+| Invariants *(planned)* | `prove(cond, label)` is a runtime assertion today; lowering it to `PROVE(...)`/ACSL obligations at the same program points is planned, not yet emitted |
+| Docs *(planned)* | Rendering ranges and units into an API reference is planned |
 
 Unconstrained numeric inputs are the leading cause of failed proofs in
 interval-domain analyzers (everything downstream widens to top), so the rule
-is: **every scalar parameter of a core function carries a range contract.**
+is that **every scalar parameter of a core function should carry a range
+contract**; where one is missing, the EVA driver falls back to an explicit
+`DEFAULT_RANGES` operating assumption recorded in the generated driver, and those
+remaining gaps are listed there.
 The analysis harness (`main` that draws inputs nondeterministically from the
 declared ranges) is generated from the same metadata.
 
@@ -191,9 +194,10 @@ the bitwise receipts.
    embedded ECOS solve of a Layer-0 problem. The checker runs in continuous
    integration as a verification test, not inside the flight loop.
 5. **Runtime level** *(shipped)* — golden-vector Python↔C equivalence in CI
-   (bit-exact on host; bit-identical cross-architecture on aarch64 under
-   qemu); every tagged release ships a byte-deterministic, evidence-gated
-   audit bundle.
+   under the documented equality/tolerance policy (scalar arithmetic/sqrt and
+   CORE-MATH transcendentals bit-exact; matrix products within tolerance for
+   reassociation), replayed cross-architecture on aarch64 under qemu; every
+   tagged release ships a byte-deterministic, evidence-gated audit bundle.
 
 Open (documented route, not yet built): closed-loop reachability of NN docking
 policies at the full initial set remains hard; certificate-based verification

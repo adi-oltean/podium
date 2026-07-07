@@ -27,10 +27,13 @@ project (interstellar-mission explorer with a real-time three.js chase cam).
 > point's own frame — so full blend shows the true curved
 > inertial-space arc, and range is provably blend-invariant.
 
-A single `viewer/index.html` plus a vendored `three.min.js`; no bundler, no
-node toolchain. Simulations export a compact JSON (`sim.to_viewer_json()`)
-with decimated trajectory, attitude keyframes, burn events, and geometry
-descriptors; the viewer loads it via a file picker or URL parameter.
+Two zero-build pages — `viewer/index.html` (2-D canvas) and `viewer/3d/index.html`
+(three.js, vendored as ES modules under `viewer/vendor/three-<ver>/`) — with no
+bundler and no node toolchain. Simulations export a compact JSON
+(`Trace.to_viewer_json()`) with decimated trajectory, attitude keyframes, burn
+events, and geometry descriptors; each page ships with that data embedded, so it
+renders with no external request. (A file-picker / URL-parameter loader is not
+part of the shipped pages.)
 
 Patterns adopted from fermi (and why):
 

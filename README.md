@@ -96,7 +96,7 @@ dv1, dv2 = cw.two_impulse(x0, np.zeros(6), n, 1500.0)
 - **LVLH conventions:** x radial (zenith), y along-track, z cross-track; SI units everywhere; quaternions scalar-first, body→reference.
 - **Truth vs. flight separation:** truth models may use anything in SciPy; flight algorithms live in `podium.core` under the static-subset rules ([`docs/verification.md`](docs/verification.md)) and are exercised in the sim through the same step-function interface they will have in C.
 - **Determinism:** fixed-step master clock, seeded noise, no wall-clock or platform dependence in results.
-- **Contracts as data:** every core function declares input ranges/invariants via `podium.verify`; checked at runtime in the sandbox, and rendered as ACSL preconditions on the emitted C that Frama-C/EVA discharges in CI.
+- **Contracts as data:** core functions declare input ranges/invariants via `podium.verify` (with explicit `DEFAULT_RANGES` operating assumptions recorded in the generated driver for any remaining gaps); checked at runtime in the sandbox, and rendered as ACSL preconditions on the emitted C that Frama-C/EVA discharges in CI.
 
 ## Documentation
 
