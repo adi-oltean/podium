@@ -429,7 +429,11 @@ assumptions: the sound-analysis result holds while inputs remain within the
 declared contracts, and the certificates hold for the stated models and problem
 data, so establishing at the system level that flight inputs stay within contract
 and that the models bound reality belongs to the surrounding assurance case rather
-than the library. The cross-architecture bit-exactness of
+than the library. The verified path establishes runtime-error freedom and
+faithful Python-to-C-to-assembly translation on the tested inputs, not functional
+correctness against an external specification---a logic error in the source is
+carried through faithfully---nor solver convergence, the per-solve certificates
+instead bounding or refusing a returned solution. The cross-architecture bit-exactness of
 the emitted C holds for the scalar arithmetic and square-root class, which is
 correctly rounded and hence bit-identical across conforming hardware under
 IEEE-754 binary64 with fused-multiply-add contraction disabled; correctly rounded
