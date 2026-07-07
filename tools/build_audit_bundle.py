@@ -12,6 +12,9 @@ Produces in <outdir>:
   meta.json       tag/commit/toolchain stamps — SEPARATE from
                   bundle.json so the latter stays byte-comparable
                   across rebuilds of identical code
+  SHA256SUMS      sha-256 of the byte-deterministic files (kernels.c,
+                  eva_driver.c, bundle.json) in `sha256sum -c` format, so
+                  a third party can confirm an identical-source rebuild
 
 Hard gate: exits nonzero unless the mission CAPTURES, every IDSS
 margin is positive, and the barrier certificate verifies. A tag cannot
@@ -22,6 +25,7 @@ Usage: python3 tools/build_audit_bundle.py <outdir> [--tag TAG] [--sha SHA]
 """
 
 import argparse
+import hashlib
 import json
 import pathlib
 import platform
@@ -64,6 +68,14 @@ def main() -> int:
     }
     (out / "meta.json").write_text(json.dumps(meta, indent=1,
                                               sort_keys=True) + "\n")
+
+    # SHA-256 manifest over the byte-deterministic files only (identical
+    # source -> identical bytes -> identical digests). meta.json is excluded
+    # because it carries variable toolchain stamps by design.
+    manifest = "".join(
+        f"{hashlib.sha256((out / name).read_bytes()).hexdigest()}  {name}\n"
+        for name in ("kernels.c", "eva_driver.c", "bundle.json"))
+    (out / "SHA256SUMS").write_text(manifest)
 
     failures = []
     if not res.captured:

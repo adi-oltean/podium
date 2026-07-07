@@ -40,6 +40,7 @@ jobs:
             audit/kernels.c
             audit/eva_driver.c
             audit/eva_report.txt
+            audit/SHA256SUMS
       - name: Create release with evidence attached
         if: startsWith(github.ref, 'refs/tags/')
         env:
@@ -47,7 +48,7 @@ jobs:
         run: >
           gh release create "${{ github.ref_name }}"
           audit/bundle.json audit/meta.json audit/kernels.c
-          audit/eva_driver.c audit/eva_report.txt
+          audit/eva_driver.c audit/eva_report.txt audit/SHA256SUMS
           --title "${{ github.ref_name }}"
           --notes "Evidence-gated release: reference mission captured
           with all IDSS/STL margins positive, abort-safety barrier

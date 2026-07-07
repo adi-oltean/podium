@@ -155,7 +155,10 @@ mode, for sine and cosine as well; the remaining libm transcendentals (for
 example, the inverse-trigonometric calls in the anomaly kernels) stay within a
 one-unit-in-the-last-place tolerance, and matrix products agree only up to
 floating-point reassociation, since the emitted row-major loops and NumPy's Basic Linear Algebra Subprograms (BLAS)
-accumulate in a different order. The same vectors are replayed through the
+accumulate in a different order. The vectors are regenerated deterministically
+from a fixed per-kernel seed rather than stored as fixtures, so the suite is
+reproduced identically on every run and cannot drift. The same vectors are
+replayed through the
 CompCert verified compiler~\cite{compcert2009}, which machine-checks semantics
 preservation from C to assembly on x86-64 for the supported C subset and calling
 convention; the emitted C additionally reproduces the golden vectors bit-for-bit
@@ -241,8 +244,10 @@ vectors (above) and carried to assembly by CompCert, so the validated algorithm
 and the compiled algorithm agree on the tested inputs. Every tagged
 release ships a byte-deterministic audit bundle: a build script gates the mission
 capture, the temporal-logic and docking-interface margins, and the barrier
-certificate, and emits the bundle alongside the generated flight C and a fresh
-Frama-C/EVA report.
+certificate, and emits the bundle alongside the generated flight C, a fresh
+Frama-C/EVA report, and a SHA-256 manifest over the byte-deterministic files with
+the recorded toolchain versions, so that an identical-source rebuild is
+independently verifiable.
 
 Figure~\ref{fig:recovery} and Table~\ref{tab:receipts} make these certificates
 concrete on the keep-out QCQP primitive. As the rational dual multiplier
