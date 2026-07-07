@@ -468,6 +468,33 @@ $\bar x$ give an interval $[t, f_0(\bar x)]$ that contains $J^\star$, with both
 endpoints exact rationals and $f_0(\bar x) - t > 0$ a certified duality gap.
 \end{theorem}
 
+\begin{proof}
+The lower-bound argument of Theorem~\ref{thm:sound} uses only that a multiplier
+$\lambda \ge 0$ with $M(\lambda, t) \succeq 0$ makes
+$f_0(x) - \sum_{k=1}^{m} \lambda_k f_k(x) - t$ a global quadratic minorant; it
+does not use $m = 1$. For any feasible $x$ one has $f_k(x) \ge 0$ and
+$\lambda_k \ge 0$, so
+\[
+  f_0(x) - t \;\ge\; \sum_{k=1}^{m} \lambda_k\, f_k(x) \;\ge\; 0,
+\]
+hence $t \le f_0(x)$ for every feasible $x$, and therefore $t \le J^\star$.
+Taking the supremum over rational $\lambda \ge 0$ and $t$ with
+$M(\lambda, t) \succeq 0$ gives $d^\star \le J^\star$.
+
+That the inequality can be strict for $m \ge 2$ is classical: exactness of the
+S-procedure is a two-quadratic phenomenon---the S-lemma holds for a single
+constraint but not in general for two or more \cite{polik2007}---so the Shor
+relaxation of a multi-constraint QCQP need not be tight; the
+Celis--Dennis--Tapia family below furnishes instances with $d^\star < J^\star$.
+
+Finally, let $t$ be a certified lower bound, so $\lambda \ge 0$ and
+$M(\lambda, t) \succeq 0$ pass the exact PSD test, and let $\bar x$ be exactly
+feasible, so $f_k(\bar x) \ge 0$ for every $k$, each checked over $\Q$. Then
+$t \le d^\star \le J^\star \le f_0(\bar x)$, so $J^\star \in [t, f_0(\bar x)]$
+with both endpoints exact rationals, and $f_0(\bar x) - t \ge 0$ is a certified
+bound on the duality gap; when it is positive it certifies a nonzero gap exactly.
+\end{proof}
+
 \begin{remark}
 For $m = 1$ with a strictly feasible point the S-lemma gives $d^\star = J^\star$,
 so the bracket can close (Theorem~\ref{thm:recovery}). For $m \ge 2$ this strong
@@ -477,8 +504,7 @@ $J^\star$ under a compactness (Archimedean) condition, each verified by an exact
 PSD test.
 \end{remark}
 
-The soundness argument is that of Theorem~\ref{thm:sound} with the sum taken over
-$m$ constraints. In a sweep of
+The implementation exhibits the strict case: in a sweep of
 forty random two-constraint instances of Celis--Dennis--Tapia type,\footnote{The
 Celis--Dennis--Tapia problem minimizes a quadratic over the intersection of two
 quadratic constraints; it is the standard example in which the Shor relaxation
