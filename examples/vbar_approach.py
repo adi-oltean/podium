@@ -1,9 +1,12 @@
 """V-bar glideslope approach: 1 km behind the target to a 10 m hold point.
 
-Run:  python examples/vbar_approach.py
+Run:  python examples/vbar_approach.py            # show the plot
+      python examples/vbar_approach.py out.pdf    # save the plot instead
 Prints the burn plan and total delta-v; plots the LVLH trajectory if
 matplotlib is installed.
 """
+
+import sys
 
 import numpy as np
 
@@ -27,10 +30,16 @@ for t, dv in zip(times, dvs):
     print(f"{t:8.1f}  {dv[0]:9.4f}  {dv[1]:9.4f}  {dv[2]:9.4f}  {np.linalg.norm(dv):10.4f}")
 print(f"\nTotal delta-v: {np.abs(np.linalg.norm(dvs, axis=1)).sum():.3f} m/s")
 
-# Reconstruct the trajectory at 1 Hz for plotting.
+dv_total = float(np.linalg.norm(dvs, axis=1).sum())
+
+# Reconstruct the trajectory at 1 Hz for plotting, recording the impulse
+# points (the cusps where each burn changes the velocity).
 traj = []
+burn_y, burn_x = [], []
 x = x0.copy()
 for i in range(PULSES - 1):
+    burn_y.append(x[1])
+    burn_x.append(x[0])
     x[3:6] += dvs[i]
     seg = times[i + 1] - times[i]
     for s in range(int(seg)):
@@ -38,21 +47,38 @@ for i in range(PULSES - 1):
     x = cw.stm(N, seg) @ x
 traj = np.array(traj)
 
+out_path = sys.argv[1] if len(sys.argv) > 1 else None
 try:
+    if out_path is not None:
+        import matplotlib
+        matplotlib.use("Agg")  # headless: save without a display
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots(figsize=(9, 4))
-    ax.plot(traj[:, 1], traj[:, 0], lw=1.2)
-    ax.scatter([x0[1]], [x0[0]], marker="o", label="start")
-    ax.scatter([dock[1]], [dock[0]], marker="*", s=120, label="hold point")
-    ax.scatter([0], [0], marker="s", label="target")
+    ax.plot(traj[:, 1], traj[:, 0], lw=1.2, color="C0",
+            label="closed-loop trajectory")
+    ax.scatter(burn_y, burn_x, marker=".", s=28, color="red", zorder=5,
+               label="impulse points")
+    ax.scatter([x0[1]], [x0[0]], marker="o", s=55, color="black", zorder=6,
+               label="start (1 km)")
+    ax.scatter([dock[1]], [dock[0]], marker="*", s=170, color="orange",
+               edgecolors="black", linewidths=0.4, zorder=6,
+               label="hold point (10 m)")
+    ax.scatter([0], [0], marker="s", s=55, color="green", zorder=6,
+               label="target")
     ax.set_xlabel("along-track y [m]")
     ax.set_ylabel("radial x [m]")
-    ax.set_title("V-bar glideslope approach (LVLH)")
-    ax.legend()
+    ax.set_title(
+        f"V-bar glideslope approach in the LVLH frame "
+        f"($\\Delta v$ = {dv_total:.2f} m/s)")
+    ax.legend(loc="lower left")
     ax.grid(True, alpha=0.3)
     ax.invert_xaxis()  # approach from behind reads left-to-right
     plt.tight_layout()
-    plt.show()
+    if out_path is not None:
+        fig.savefig(out_path)
+        print(f"\nSaved figure to {out_path}")
+    else:
+        plt.show()
 except ImportError:
     print("(install matplotlib for the trajectory plot)")
