@@ -121,3 +121,43 @@ simulation frameworks.
 | TinyMPC / CVXPYgen | C / Python, MIT | Active (ICRA'24/'26) | Embedded MPC codegen incl. SOC glideslope constraints | (build on — guidance backend, not a sim) |
 | heyoka.py | C++/Python, MPL-2.0 | v7.11 active | Taylor integration, free variational STMs | Scope is propagation, not RPOD |
 | KSP tools (kRPC, kspdg) | mixed | kspdg active as AIAA challenge | Community visibility | Game physics; not validation-grade |
+
+## Trajectory-optimization and verification landscape (update 2026-07-06)
+
+The survey above is of *simulation frameworks*. Two adjacent landscapes matter
+for what distinguishes Podium — the convex/sequential-convex guidance layer and
+the exact-rational verification layer — and are surveyed at length in the tool
+paper's related work. Neither is an RPOD library, and none couples the three
+things Podium does (sequential-convex planners + exact-rational per-solve
+certificates re-run in CI + a restricted Python-to-C flight-code path checked by
+golden vectors, Frama-C/EVA, and CompCert).
+
+### Sequential-convex / trajectory-optimization codebases
+
+| Tool | Language / license | RPOD relevance | Why it is not the core |
+|---|---|---|---|
+| **SCPToolbox.jl** (UW-ACL) | Julia, MIT | Open SCvx / GuSTO / PTR / LCvx toolbox; ships planar-rendezvous and Apollo transposition-and-docking examples | Algorithms only — no certificate layer, no verified-code path, not RPOD-packaged; the closest open SCP-for-rendezvous prior art |
+| **GuSTO.jl** (Stanford ASL) | Julia | SCP with convergence guarantees; free-flyer berthing hardware demo | Same: planner only |
+| **OpenSCvx / ct-scvx** | Python/JAX | Continuous-time constraint-satisfaction SCvx; in-house C generation | No exact-rational certificate; floating-point |
+| **successive\_rendezvous** (Malyuta et al.) | Python/CVXPY | Released 6-DoF Apollo transposition-and-docking via SCvx | Research code, planner only |
+| **PIPG / factorization-free SCP** (Chari, Açıkmeşe) | Python | First-order rendezvous SCP solver | Solver/planner, no certificates or verified C |
+| **STROM** (Kang, Yang) | Julia/CUDA | Certifiably-optimal nonconvex trajectory optimization via sparse moment-SOS SDP (chain-block) | Certificate is **floating-point** GPU SDP, not exact-rational; not RPOD |
+
+### Verification / certificate tooling
+
+| Tool | Language / license | Role | Why it is not the core |
+|---|---|---|---|
+| **RealCertify** | Maple | Exact rational SOS non-negativity certificates | General polynomials, not online, not RPOD, not in CI |
+| **ValidSDP** | Coq | Machine-checked SDP/SOS positivity certificates | Proof-assistant checker for polynomial inequalities; not a GNC stack |
+| **VSDP** | MATLAB/INTLAB | Rigorous interval bounds / infeasibility certificates for conic programs | Interval, not exact rational; not RPOD |
+| **Credible autocoding** (Feron et al.); **verified MPC solver** (Davy, Cohen–Feron–Garoche) | C + Frama-C/ACSL | Autocode/verify convex-optimization solver code | Not RPOD, not exact-rational per-solve certificates, no CompCert stack |
+| **Copilot / CopilotVerifier** (NASA/Galois) | Haskell DSL → C | Restricted-source → C monitors, Frama-C/CompCert-compatible, CI, bisimulation proof | Runtime monitors, not guidance; not RPOD |
+| **CVXPYgen** | Python → C | Embedded C from CVXPY convex problems | Codegen only, no formal verification or certificates |
+| **CvxLean** | Lean 4 | Verified convex-optimization problem reductions | Formal reductions, not an RPOD certificate stack |
+| **EIQP** (Wu, Xiao, Braatz) | C | Execution-time-certified, infeasibility-detecting QP solver | Solver with a WCET bound, no per-solve exact certificate |
+
+Podium's contribution relative to both landscapes is the *integration*: an
+open, RPOD-focused library that couples a sequential-convex planner, exact-rational
+tolerance-free certificates re-run in continuous integration, and a restricted
+Python-to-C flight-code path checked by golden vectors, Frama-C/EVA, and CompCert.
+See the tool paper (`docs/paper/`) for the full comparison and citations.
