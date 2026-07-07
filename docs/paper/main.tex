@@ -27,7 +27,7 @@ Integrated Formal Verification}
 \begin{abstract}
 Podium is an open-source Python library for developing, testing, and formally
 validating guidance, navigation, and control (GNC) algorithms for spacecraft
-rendezvous, proximity operations, and docking (RPOD) in low- and medium-Earth
+rendezvous, proximity operations, and docking (RPOD) in low and medium Earth
 orbit. It provides relative-motion models, convex and sequential-convex
 trajectory planners, a relative-navigation filter and controllers, a
 deterministic simulator, and a verification layer. A set of flight kernels---the
@@ -36,7 +36,7 @@ written in a restricted, statically analyzable Python subset, translated to
 C, shown alarm-free on contracted (or explicitly assumed) input ranges by the
 Frama-C Evolved Value Analysis (EVA) plug-in, and
 compiled with the CompCert verified compiler, with the
-emitted C checked against the Python reference on golden vectors. Several guarantees are re-verified
+emitted C checked against the Python reference on golden vectors. The barrier, KKT, and optimality-gap guarantees are re-verified
 in exact rational arithmetic in the trusted checker: tolerance-free barrier
 certificates for abort safety, Karush--Kuhn--Tucker (KKT) certificates that, when
 a valid Lagrangian dual point exists, give an exact rational bound on the
@@ -147,16 +147,16 @@ correctly rounded implementations of sine and cosine from CORE-MATH~\cite{corema
 abstract-interpretation analyzer~\cite{framac2015} shows the emitted C free of runtime alarms (division by zero,
 overflow, invalid access) on the contracted input ranges. The generated C is
 checked against the Python reference on a suite of golden vectors: bit-exact for
-scalar arithmetic and square root, and, in the correctly-rounded (CORE-MATH)
+scalar arithmetic and square root, and, in the correctly rounded (CORE-MATH)
 mode, for sine and cosine as well; the remaining libm transcendentals (for
-example the inverse-trigonometric calls in the anomaly kernels) stay within a
+example, the inverse-trigonometric calls in the anomaly kernels) stay within a
 one-unit-in-the-last-place tolerance, and matrix products agree only up to
-floating-point reassociation, since the emitted row-major loops and NumPy's BLAS
+floating-point reassociation, since the emitted row-major loops and NumPy's Basic Linear Algebra Subprograms (BLAS)
 accumulate in a different order. The same vectors are replayed through the
 CompCert verified compiler~\cite{compcert2009}, which machine-checks semantics
 preservation from C to assembly on x86-64 for the supported C subset and calling
 convention; the emitted C additionally reproduces the golden vectors bit-for-bit
-on a second instruction-set architecture (ISA), aarch64, under an ordinary
+on a second instruction-set architecture (ISA), AArch64, under an ordinary
 cross-compiler and emulator. The golden vectors thus tie the Python reference,
 the emitted C, and the compiled assembly on the tested inputs. This emitted,
 analyzed, and compiled path covers the flight kernels---the relative-motion state
@@ -167,7 +167,7 @@ covered by the certificate layer below.
 \paragraph{Software metadata.}
 Language Python 3.10+; license
 MIT; NumPy required, with optional CVXPY and Clarabel for the solver-backed paths
-and optional verification tooling (Frama-C, CompCert, JuliaReach). Continuous integration runs
+and optional verification tooling (Frama-C, CompCert, JuliaReach). Continuous integration (CI) runs
 on GitHub Actions. The examples and the per-release audit bundle are the primary
 distribution channel; the library is in active development (v0.x).
 
@@ -207,7 +207,7 @@ keep-out QCQP---a primitive of the docking geometry, not yet wired into the
 full-horizon planner---through the S-procedure~\cite{yakubovich1971,polik2007}
 and its trust-region special case~\cite{moresorensen1983}. The
 barrier and optimality-gap certificates are tolerance-free, their acceptance
-being an exact positive-semidefiniteness test together with exact feasibility;
+being an exact positive semidefiniteness test together with exact feasibility;
 exact rational certificates of this kind build on a body of work in
 sum-of-squares and polynomial optimization and in verified semidefinite
 programming~\cite{parrilo2003,lasserre2001,kaltofen2012,peyrl2008,davis2022}. The
@@ -220,11 +220,11 @@ optimality residuals exactly and, when a valid Lagrangian dual point exists,
 reports an exact rational bound on the point's suboptimality. For a strictly
 convex quadratic program this bound accounts for the stationarity residual
 through the problem's curvature; a small residual alone is not a suboptimality
-bound, since with a rank-deficient objective (an LP or minimum-fuel problem) an
+bound, since with a rank-deficient objective (a linear program or minimum-fuel problem) an
 approximately stationary point can be arbitrarily suboptimal. For a second-order
 cone program, whose objective is linear, a rigorous bound instead requires exact
 conic-dual feasibility. In every case the checker itself introduces no rounding
-error. Second, the emitted flight C is tied to the Python reference by the golden
+error. Second, the emitted flight-code C is tied to the Python reference by the golden
 vectors (above) and carried to assembly by CompCert, so the validated algorithm
 and the compiled algorithm agree on the tested inputs. Every tagged
 release ships a byte-deterministic audit bundle: a build script gates the mission
@@ -235,8 +235,8 @@ Frama-C/EVA report.
 \section{Illustrative example}
 
 Two artifacts illustrate the library at different depths. A one-command demo,
-\texttt{examples/\allowbreak vbar\_approach.py}, plans a one-kilometer approach along the
-target's velocity axis (a V-bar approach, in the local-vertical/local-horizontal
+\texttt{examples/\allowbreak vbar\_approach.py}, plans a 1\,km approach along the
+target's velocity axis (a V-bar approach, in the local vertical/local horizontal
 frame) on the Clohessy--Wiltshire discretization and propagates it under the
 linear Clohessy--Wiltshire dynamics; Figure~\ref{fig:vbar} shows its trajectory.
 It is a readable entry point (Python 3.10+, dependencies in
@@ -244,7 +244,7 @@ It is a readable entry point (Python 3.10+, dependencies in
 
 The reference mission (\texttt{podium.sim.mission}, exercised by
 \texttt{test\_mission.py} in continuous integration) composes the layers end to
-end: a sequential-convex (PTR) planner produces the approach, the plan is
+end: a penalized trust-region (PTR) sequential-convex planner produces the approach, the plan is
 propagated through the nonlinear relative-motion truth model, the closed-loop
 trajectory is checked against range-channel Signal Temporal Logic phase
 specifications, and the passive-drift abort safety (the safe free-drift
@@ -252,8 +252,8 @@ trajectory after a thruster cutoff) is certified in exact rational arithmetic by
 the barrier---an invariant of the linear Clohessy--Wiltshire drift for a fixed
 safe formation, which bounds the linearized abort. Richer truth forces ($J_2$,
 differential drag) and corridor/keep-out specifications are supported but are not
-enabled in this reference configuration. The exact-rational KKT and conic-KKT checkers, which re-verify an
-online QP or SOCP solve (for the conic case, an embedded ECOS solve when that
+enabled in this reference configuration. The exact-rational KKT and conic KKT checkers, which re-verify an
+online QP or SOCP solve (for the conic case, an Embedded Conic Solver (ECOS) solve when that
 optional solver is installed) against its own optimality conditions, run in
 continuous integration as part of the verification suite (\texttt{test\_kkt.py})
 rather than inside the reference-mission loop. An interactive playback of the same burn plan
@@ -265,7 +265,7 @@ with build and run steps in its \texttt{README}.
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.86\linewidth]{vbar.pdf}
-\caption{Trajectory of the \texttt{vbar\_approach.py} demo: a one-kilometer V-bar
+\caption{Trajectory of the \texttt{vbar\_approach.py} demo: a 1\,km V-bar
 glideslope approach to a 10\,m hold point in the local-vertical/local-horizontal
 (LVLH) frame, planned on the Clohessy--Wiltshire discretization and propagated
 under the linear Clohessy--Wiltshire dynamics. The verified pipeline (nonlinear
@@ -286,7 +286,7 @@ tools on each axis.
 \caption{Feature coverage of representative open tools: each covers at most one or
 two of the three prongs Podium combines. \checkmark{} full, $\sim$ partial, blank
 none. Prong (i): a
-sequential-convex planner; (ii): exact-rational per-solve certificates re-run in
+sequential convex programming (SCP) planner; (ii): exact-rational per-solve certificates re-run in
 continuous integration; (iii): a restricted high-level-source-to-C path checked
 by golden vectors, Frama-C/EVA, and CompCert. RPOD marks a rendezvous/docking
 focus.}
@@ -313,8 +313,8 @@ Basilisk~\cite{basilisk2020}                        & & & & \checkmark \\
 
 On trajectory optimization, the open SCPToolbox.jl~\cite{scptoolbox2022} and
 GuSTO.jl~\cite{gusto2019} implement the sequential-convex family with
-rendezvous and free-flyer examples, ct-scvx~\cite{elango2025} adds continuous-time
-feasibility with in-house C generation, and successive\_rendezvous~\cite{successive_rendezvous2020} is a released 6-DoF Apollo transposition-and-docking
+rendezvous and free-flyer examples; ct-scvx~\cite{elango2025} adds continuous-time
+feasibility with in-house C generation, and successive\_rendezvous~\cite{successive_rendezvous2020} is a released six-degree-of-freedom Apollo transposition-and-docking
 implementation. Prong (i) for RPOD is thus
 established open art, and none of these carries a certificate or verified-code
 layer. On certificates, RealCertify~\cite{magron2018}, the Coq-checked ValidSDP~\cite{validsdp}, and verified SDP~\cite{jansson2009} produce exact-rational or
@@ -325,7 +325,7 @@ semidefinite programming; but none is online, RPOD-specific, tolerance-free over
 $\Q$, and re-run in continuous integration. On verified code, the Copilot
 toolchain~\cite{copilot2023} couples a restricted high-level source with a C
 path, formal proof, and CI (for runtime monitors, not guidance); credible
-autocoding~\cite{feron2013,cohen2020} and verified model-predictive-control
+autocoding~\cite{feron2013,cohen2020} and verified model predictive control
 solvers~\cite{davy2018} autocode convex-optimization solvers to
 contract-annotated C, and execution-time-certified embedded QP solvers~\cite{eiqp2025} bound the online iteration count; verified spacecraft control
 programs~\cite{mokhov2018} and
@@ -336,7 +336,7 @@ certificates with an RPOD library. The simulators Basilisk~\cite{basilisk2020} a
 Orekit~\cite{orekit2010} and GMAT~\cite{gmat2020} support proximity-operations
 modeling but no planner, certificate, or verified-code layer.
 
-The novelty is therefore not any single prong but their integration: a publicly
+The novelty is therefore not any single prong but the integration of all three: a publicly
 released, RPOD-focused library that, in one codebase, couples sequential-convex
 planners with exact-rational \emph{per-solve} certificates re-run in continuous
 integration and a restricted Python-to-C flight-code path checked by golden
@@ -354,8 +354,8 @@ RPOD scenarios from the outset and treats formal validation as a continuous
 activity. Its flight kernels, exact-arithmetic certificates, and verified
 flight-code path are designed so that validation evidence applies to the same
 code path intended for deployment, and so that its guarantees can be reproduced by
-any user. The positive-semidefiniteness subchecks common to these certificates are
-an $O(n^3)$ symmetric $LDL^\top$ factorization whose factors are themselves the
+any user. The positive semidefiniteness checks common to these certificates use
+an $O(n^3)$ symmetric $LDL^\top$ factorization, whose factors are the
 nonnegativity witness. Scaling the certificates from the per-primitive matrices to
 full trajectory horizons, and broadening mission coverage, are the main directions
 of continued development.
