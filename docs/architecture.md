@@ -42,7 +42,7 @@ Some algorithms straddle the line deliberately — e.g. LQR: the Riccati recursi
 
 - **Fixed-step master clock** at the GNC rate (default 10 Hz). Truth dynamics integrate at an integer multiple (default 10× → 100 Hz RK4). No adaptive stepping in the loop — determinism and replayability outrank integrator elegance; adaptive SciPy integrators are used only offline to bound fixed-step truncation error.
 - **Determinism:** identical config + seed ⇒ bit-identical trajectories. All randomness flows from one seeded generator; no wall-clock, no dict-ordering dependence, no platform-dependent reductions.
-- **Events** are evaluated on the master clock with bisection refinement between steps: docking-interface contact, keep-out-zone entry, approach-corridor departure, abort triggers.
+- **Events** are evaluated on the master clock, with linear interpolation for threshold crossings via `Trace.crossing_times` (between-step bisection refinement is not yet implemented): docking-interface contact, keep-out-zone entry, approach-corridor departure, abort triggers.
 - **Monte Carlo:** dispersion campaigns are (config, seed-list) pairs; results are structured arrays written to `.npz`. Because single runs are deterministic, any MC outlier replays exactly for debugging.
 
 ## Truth models (sandbox side)
@@ -51,9 +51,9 @@ Some algorithms straddle the line deliberately — e.g. LQR: the Riccati recursi
 - Tschauner-Hempel (Yamanaka-Ankersen STM) for eccentric targets; CW for near-circular.
 - Relative orbital elements (quasi-nonsingular ROE) with Koenig closed-form Keplerian/J2 STMs for perturbed multi-orbit relative motion, plus the e/i-vector passive-safety geometry (`podium.guidance.safety`). ROE STMs propagate mean elements; the osculating/mean distinction is handled truth-side and documented in the tests.
 - Rigid-body attitude with reaction-wheel and thruster torques; thruster minimum-impulse-bit and rise/tail-off shaping.
-- Sensor models with error budgets: relative GNSS, docking camera (bearing + fiducial pose), lidar, gyro/star tracker.
+- Sensor models with error budgets: relative GNSS, docking camera (bearing + fiducial pose), lidar. (Gyro / star-tracker models are not yet implemented.)
 
-Fidelity hierarchy: every linearized model used by guidance is validated in CI against the nonlinear truth model, and the truth model itself is cross-validated against external references (SPICE/Orekit test vectors) — errors quantified, not assumed.
+Fidelity hierarchy: every linearized model used by guidance is validated in CI against the nonlinear truth model, and the truth model itself is cross-validated against external references (Orekit test vectors for translational motion and analytic oracles for attitude) — errors quantified, not assumed.
 
 ## GNC dataflow per tick
 
@@ -65,7 +65,7 @@ sensors(truth) → nav filter (EKF, core) → guidance (waypoint/optimal traj, c
 
 Each core block is a pure function of `(state, measurement/reference, params)`. Blocks are individually replaceable — swapping a glideslope for an SCP-generated trajectory changes one constructor argument in the scenario config.
 
-Implemented so far along this dataflow: the deterministic engine (`podium.sim.engine`, impulsive flight-block interface v0), the relative-nav EKF (`podium.nav.ekf`: Joseph-form update, white-noise-acceleration process model, commanded burns fed through prediction as known inputs; NEES/NIS consistency enforced by test), LQR/glideslope/pulsed-docking control, and the convex Layer-0 planners. Sensor truth models and the continuous-thrust interface are the open v0.3 items.
+Implemented so far along this dataflow: the deterministic engine (`podium.sim.engine`) with actuator MIB/cap/execution-error truth; the sensor truth models (`podium.nav.sensors`: relative GNSS, camera, lidar); the relative-nav EKF (`podium.nav.ekf`: Joseph-form update, white-noise-acceleration process model, commanded burns fed through prediction as known inputs; NEES/NIS consistency enforced by test); LQR/glideslope/pulsed-docking control and push-only thruster allocation; the convex Layer-0 planners (impulsive and LCvx finite-burn) and the SCP Layer-1 / 6-DOF attitude-coupled docking planners; and rigid-body attitude with the environmental-torque suite. The continuous-thrust engine interface and between-step event bisection remain open.
 
 ## Mission phases (typical LEO profile)
 

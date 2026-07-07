@@ -66,8 +66,9 @@ about — is unchanged; the tool is just wired in.
   dynamics + mode-switched LQR (approach / rendezvous-attempt / abort), with
   a 30° line-of-sight cone, a docking-velocity ceiling, and passive-abort
   keep-out verified by reachability tools (CORA, JuliaReach, SpaceEx). Podium
-  will ship this scenario as an executable example with model export, so
-  closed-loop verification is a regression test, not an afterthought.
+  ships this scenario (`podium.guidance.arch`, `tools/reach/`, `reach.yml`) as
+  an executable example with model export, so closed-loop verification is a
+  regression test, not an afterthought.
 - **Feron-style credible autocoding:** controllers carry their Lyapunov
   certificates as ellipsoidal contracts (`x'Px <= 1` preserved by the step
   function), machine-checkable in the generated code.
