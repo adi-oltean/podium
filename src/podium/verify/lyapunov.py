@@ -10,7 +10,7 @@ A_cl = A - B K, because
 so x' P x is non-increasing along every closed-loop trajectory. This
 module treats P as a CERTIFICATE and re-verifies that inequality in
 `fractions.Fraction` arithmetic with no floating point in the trusted
-path, reusing the exact all-principal-minors PSD check from
+path, reusing the exact LDL^T PSD check from
 podium.verify.barrier. The decrease term Q + K'RK carries a large
 margin (Q >= 0 by design), so rationalizing the float Riccati solution
 leaves the exact inequality comfortably satisfied — the certificate is
@@ -78,7 +78,7 @@ def verify_lyapunov(a_cl: Mat, p: Mat) -> LyapunovReport:
     """Exactly verify that P certifies the closed loop A_cl: P > 0
     (positive definite, so {x : x'Px <= c} is a bounded ellipsoid) and
     the Lyapunov decrease P - A_cl' P A_cl >= 0, by the exact
-    all-principal-minors test. P > 0 is checked as PSD plus nonsingular
+    LDL^T test. P > 0 is checked as PSD plus nonsingular
     (a PSD matrix with nonzero determinant has all-positive eigenvalues);
     without strictness P = 0 would spuriously certify. Inputs are
     Fraction matrices (rationalize float syntheses first)."""

@@ -17,6 +17,7 @@ import math
 import pathlib
 import shutil
 import subprocess
+import zlib
 
 import numpy as np
 import pytest
@@ -76,7 +77,7 @@ def aarch64_out(tmp_path_factory):
     # per-kernel recorded vectors + the Python reference for each
     ref = {}
     for name in names:
-        rng = np.random.default_rng(hash(name) % 2**32)
+        rng = np.random.default_rng(zlib.crc32(name.encode()))
         vecs = _vectors(name, N_VEC, rng)
         (d / f"{name}.in").write_text(
             "\n".join(" ".join(float(x).hex() for x in row)

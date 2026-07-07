@@ -7,7 +7,8 @@ association order preserved (bit-exactness depends on it); `math.*`
 calls from a whitelist (same libm as CPython on the host); `np.empty` /
 `np.zeros` only as return-array allocation; if/else and conditional
 expressions; calls to other emitted kernels (lowered through explicit
-temporaries). No loops, no recursion, no heap, no exceptions.
+temporaries); bounded compile-time `range(N)` loops. No recursion, no
+heap, no exceptions.
 
 Array-returning Python functions become void C functions with an `out`
 parameter. Contracts from @contract render as ACSL `requires` clauses

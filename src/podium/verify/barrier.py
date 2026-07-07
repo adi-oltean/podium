@@ -29,8 +29,8 @@ Architecture (the untrusted-synthesizer / trusted-checker split):
   UNTRUSTED. Rationalized with bounded denominators afterwards.
 * Verification: `verify_certificate` is the TRUSTED path — pure
   `fractions.Fraction` arithmetic, matrices rebuilt from the integer
-  invariant bases, PSD decided by the all-principal-minors criterion
-  (exact determinants). No floats anywhere in the checker.
+  invariant bases, PSD decided by an exact symmetric LDL^T
+  factorization. No floats anywhere in the checker.
 
 If the initial set is not passively safe (e.g. a hold centered on the
 V-bar axis, whose coast passes straight through the target), synthesis

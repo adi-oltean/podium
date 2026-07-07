@@ -7,6 +7,7 @@ import pathlib
 import re
 import shutil
 import subprocess
+import zlib
 
 import numpy as np
 import pytest
@@ -266,7 +267,7 @@ def test_tier1_bit_exact(compiled, name):
     """2000 seeded vectors per kernel: C output equals Python output bit
     for bit (hex-float round trip) — except documented sin/cos libm
     divergence, bounded to 1 ulp at <0.1% incidence."""
-    rng = np.random.default_rng(hash(name) % 2**32)
+    rng = np.random.default_rng(zlib.crc32(name.encode()))
     vecs = _vectors(name, 2000, rng)
     # hex floats: exact in both directions (C99 strtod parses %a form)
     lines = "\n".join(" ".join(float(x).hex() for x in row)

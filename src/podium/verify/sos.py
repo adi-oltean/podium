@@ -10,7 +10,7 @@ Gram matrix G with
 
 both checked EXACTLY: the polynomial identity is matched coefficient by
 coefficient over the rationals, and G's positive semidefiniteness is
-decided by the exact all-principal-minors test reused from
+decided by the exact LDL^T test reused from
 podium.verify.barrier. There is no floating point in the trusted path;
 a floating-point SOS solver may synthesize (G, z), but the certificate
 that ships is the rational Gram matrix, re-verified here.
