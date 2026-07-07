@@ -232,6 +232,64 @@ capture, the temporal-logic and docking-interface margins, and the barrier
 certificate, and emits the bundle alongside the generated flight C and a fresh
 Frama-C/EVA report.
 
+Figure~\ref{fig:recovery} and Table~\ref{tab:receipts} make these certificates
+concrete on the keep-out QCQP primitive. As the rational dual multiplier
+$\lambda$ is rounded toward its optimum $\lambda^\star$, the exactly certified
+lower bound $g(\lambda)$ approaches the global optimum $J^\star$ at the rate the
+S-procedure predicts: quadratically when the trust-region subproblem is
+nonsingular, and linearly in the hard case where $A(\lambda^\star) = P_0 -
+\lambda^\star P_1$ is rank-deficient. Every plotted value is an exact rational
+verified by the checker. The KKT check behaves analogously
+(Table~\ref{tab:receipts}b): it returns an exact rational suboptimality bound
+only when a valid dual point exists, and refuses otherwise. A tolerance-based
+test would accept the rank-deficient point---stationarity residual $10^{-10}$,
+yet $100$ from the optimum---as optimal; the exact checker reports no bound
+rather than a false certificate.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.72\linewidth]{recovery.pdf}
+\caption{Exact optimality-gap recovery for a nonconvex keep-out QCQP. As the
+rational dual multiplier $\lambda$ approaches its optimum $\lambda^\star$, the gap
+between the certified lower bound and the global optimum, $J^\star - g(\lambda)$,
+closes quadratically (slope~2) when $A(\lambda^\star)$ is nonsingular and linearly
+(slope~1) in the trust-region hard case. Both coordinates are exact rationals
+verified over $\Q$; the guides mark slopes~2 and~1.}
+\label{fig:recovery}
+\end{figure}
+
+\begin{table}[t]
+\centering
+\caption{Exact-rational certificate receipts, verified over $\Q$ by the trusted
+checker. (a) Optimality-gap recovery for the keep-out QCQP of
+Fig.~\ref{fig:recovery}. (b) The KKT check returns an exact suboptimality bound
+only when a valid dual point exists; exact residuals alone are not an optimality
+certificate.}
+\label{tab:receipts}
+\footnotesize
+\begin{tabular}{@{}llll@{}}
+\toprule
+\multicolumn{4}{@{}l}{\emph{(a) Optimality-gap bracket recovery}}\\
+\midrule
+Case & $\lambda$ & $|\lambda-\lambda^\star|$ & $J^\star - g(\lambda)$ \\
+\cmidrule(r){1-4}
+Nonsingular & $39/100$ & $1/100$ & $1/244$ \\
+$\lambda^\star{=}2/5,\ J^\star{=}4$ & $399/1000$ & $1/1000$ & $1/24040$ \\
+ & $3999/10000$ & $1/10000$ & $1/2400400$ \\
+Hard case & $101/100$ & $1/100$ & $803/90300$ \\
+$\lambda^\star{=}1,\ J^\star{=}{-}4/3$ & $1001/1000$ & $1/1000$ & $8003/9003000$ \\
+\midrule
+\multicolumn{4}{@{}l}{\emph{(b) KKT check: exact bound or refusal}}\\
+\midrule
+Instance & Stationarity & Complementarity & Reported bound \\
+\cmidrule(r){1-4}
+PD QP $\tfrac12 x^2$, $x{=}1$ & $1$ & $0$ & $1/2$ (certified) \\
+Rank-deficient LP, $x{=}0$ & $10^{-10}$ & $0$ & --- (refused) \\
+Indefinite $-\tfrac12 x^2$, $x{=}0$ & $0$ & $0$ & --- (refused) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \section{Illustrative example}
 
 Two artifacts illustrate the library at different depths. A one-command demo,
