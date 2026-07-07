@@ -390,7 +390,8 @@ tudatpy 6-DOF oracle, torque allocation) carry into v0.7.
       membership is sqrt-FREE — s0>=-tol and ||s1:||^2<=(s0+tol)^2 are
       exact Fraction comparisons. Receipts: an untrusted ECOS solve
       (native standard-form duals) of a min-norm-with-thrust-cone SOCP
-      certifies exactly; an LP-as-SOCP with a rational optimum verifies
+      is re-verified exactly against the conic KKT conditions; an
+      LP-as-SOCP with a rational optimum verifies
       to EXACTLY zero; and negating a cone dual / leaving the cone is
       rejected. QP and SOCP checks are both exact, issuing a suboptimality
       bound only when a valid (conic) dual point exists

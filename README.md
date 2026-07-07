@@ -55,7 +55,8 @@ src/podium/
   emit/        C99 emitter for the static subset (bounded loops, matmul,
                ACSL rendering), the CORE-MATH correctly-rounded option,
                the EVA driver generator, and the cFS app generator;
-               bit-exact golden vectors vs Python
+               golden-vector equivalence vs Python (bit-exact scalars/sqrt,
+               matmul up to reassociation)
 tools/         reach/ (JuliaReach CI gate), eva_gate.py (Frama-C/EVA),
                tier2_build_run.sh (aarch64/qemu), build_audit_bundle.py,
                deploy_viewer.py, UI Playwright suites

@@ -44,7 +44,10 @@ The eight CI lanes are `ci` (receipts + golden vectors), `reach`,
 audit bundle (`tools/build_audit_bundle.py`) that is byte-deterministic
 under a fixed seed and cannot publish unless the reference mission
 captures, all margins hold, the barrier certificate verifies, and EVA
-reports zero alarms.
+reports zero alarms. The bundle ships a `SHA256SUMS` manifest over its
+byte-deterministic files (`kernels.c`, `eva_driver.c`, `bundle.json`;
+`meta.json` is excluded as it carries variable version stamps), so an
+identical-source rebuild is independently checkable with `sha256sum -c`.
 
 ## From plan to shipped
 
@@ -192,11 +195,13 @@ the bitwise receipts.
    suboptimality when a valid dual point exists (for a strictly convex QP the
    bound accounts for the stationarity residual through curvature; a SOCP, whose
    objective is linear, requires exact conic-dual feasibility), including the
-   embedded ECOS solve of a Layer-0 problem. The checker runs in continuous
+   embedded ECOS solve (ECOS is an optional dependency; install via the `opt`
+   extra) of a Layer-0 problem. The checker runs in continuous
    integration as a verification test, not inside the flight loop.
 5. **Runtime level** *(shipped)* — golden-vector Python↔C equivalence in CI
    under the documented equality/tolerance policy (scalar arithmetic/sqrt and
-   CORE-MATH transcendentals bit-exact; matrix products within tolerance for
+   CORE-MATH sine/cosine bit-exact, other libm transcendentals within a
+   documented tolerance; matrix products within tolerance for
    reassociation), replayed cross-architecture on aarch64 under qemu; every
    tagged release ships a byte-deterministic, evidence-gated audit bundle.
 

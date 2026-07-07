@@ -36,7 +36,7 @@ The single most important boundary in the codebase:
 
 Everything inside the flight core obeys the static subset (see `verification.md`); everything outside may use the full scientific-Python stack. The sim engine calls flight-core functions through the exact interface they will have after C translation: `step(state_in, inputs, params) -> (state_out, outputs)` with fixed-shape arrays.
 
-Some algorithms straddle the line deliberately — e.g. LQR: the Riccati recursion (synthesis) is sandbox-side and produces a constant gain; only `apply_gain` (a saturated matrix-vector product) is flight-side. The same split applies to trajectory optimization: cvxpy prototyping sandbox-side, generated fixed-iteration solver flight-side.
+Some algorithms straddle the line deliberately — e.g. LQR: the Riccati recursion (synthesis) is sandbox-side and produces a constant gain; only `apply_gain` (a saturated matrix-vector product) is flight-side. The same split applies to trajectory optimization: cvxpy prototyping sandbox-side, with the online solves covered by the certificate layer rather than the verified-C path (embedded fixed-iteration solver codegen is a partial, offline prototype).
 
 ## Simulation engine
 
