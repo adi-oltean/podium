@@ -62,10 +62,10 @@ try:
                linewidths=1.0, zorder=5, label="impulse points")
     ax.scatter([x0[1]], [x0[0]], marker="o", s=60, facecolors="black",
                edgecolors="black", zorder=6, label="start (1 km)")
-    ax.scatter([dock[1]], [dock[0]], marker="*", s=200, facecolors="0.75",
-               edgecolors="black", linewidths=0.6, zorder=6,
+    ax.scatter([dock[1]], [dock[0]], marker="*", s=210, facecolors="white",
+               edgecolors="black", linewidths=0.9, zorder=6,
                label="hold point (10 m)")
-    ax.scatter([0], [0], marker="s", s=60, facecolors="0.5",
+    ax.scatter([0], [0], marker="s", s=60, facecolors="black",
                edgecolors="black", zorder=6, label="target")
     ax.set_xlabel("along-track y [m]")
     ax.set_ylabel("radial x [m]")
