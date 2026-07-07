@@ -4,10 +4,12 @@
 \usepackage{amsmath,amssymb}
 \newcommand{\Q}{\mathbb{Q}}
 \usepackage{graphicx}
+\usepackage{float}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,fit}
 \usepackage{booktabs}
 \usepackage{array}
+\usepackage[section]{placeins}
 \usepackage{microtype}
 \setlength{\emergencystretch}{3em}
 \usepackage[hidelinks]{hyperref}
@@ -77,7 +79,7 @@ for deployment.
 
 \section{Software description}
 
-\begin{figure}[t]
+\begin{figure}[tbp]
 \centering
 \begin{tikzpicture}[
   font=\small,
@@ -177,7 +179,7 @@ Podium runs verification as a set of automated checks re-executed on every
 relevant change, rather than as a manual milestone; Table~\ref{tab:lanes}
 summarizes them.
 
-\begin{table}[t]
+\begin{table}[tbp]
 \centering
 \caption{Automated verification checks, re-run in continuous integration on the
 relevant path changes (and on scheduled drift checks where noted). QP: quadratic
@@ -246,7 +248,7 @@ test would accept the rank-deficient point---stationarity residual $10^{-10}$,
 yet $100$ from the optimum---as optimal; the exact checker reports no bound
 rather than a false certificate.
 
-\begin{figure}[t]
+\begin{figure}[tbp]
 \centering
 \includegraphics[width=0.72\linewidth]{recovery.pdf}
 \caption{Exact optimality-gap recovery for a nonconvex keep-out QCQP. As the
@@ -258,7 +260,7 @@ verified over $\Q$; the guides mark slopes~2 and~1.}
 \label{fig:recovery}
 \end{figure}
 
-\begin{table}[t]
+\begin{table}[tbp]
 \centering
 \caption{Exact-rational certificate receipts, verified over $\Q$ by the trusted
 checker. (a) Optimality-gap recovery for the keep-out QCQP of
@@ -292,46 +294,46 @@ Indefinite $-\tfrac12 x^2$, $x{=}0$ & $0$ & $0$ & --- (refused) \\
 
 \section{Illustrative example}
 
-Two artifacts illustrate the library at different depths. A one-command demo,
-\texttt{examples/\allowbreak vbar\_approach.py}, plans a 1\,km approach along the
-target's velocity axis (a V-bar approach, in the local vertical/local horizontal
-frame) on the Clohessy--Wiltshire discretization and propagates it under the
-linear Clohessy--Wiltshire dynamics; Figure~\ref{fig:vbar} shows its trajectory.
-It is a readable entry point (Python 3.10+, dependencies in
-\texttt{pyproject.toml}, no other setup) and is not the verified pipeline.
-
 The reference mission (\texttt{podium.sim.mission}, exercised by
 \texttt{test\_mission.py} in continuous integration) composes the layers end to
-end: a penalized trust-region (PTR) sequential-convex planner produces the approach, the plan is
-propagated through the nonlinear relative-motion truth model, the closed-loop
-trajectory is checked against range-channel Signal Temporal Logic phase
-specifications, and the passive-drift abort safety (the safe free-drift
-trajectory after a thruster cutoff) is certified in exact rational arithmetic by
-the barrier---an invariant of the linear Clohessy--Wiltshire drift for a fixed
-safe formation, which bounds the linearized abort. Richer truth forces ($J_2$,
-differential drag) and corridor/keep-out specifications are supported but are not
-enabled in this reference configuration. The exact-rational KKT and conic KKT checkers, which re-verify an
-online QP or SOCP solve (for the conic case, an Embedded Conic Solver (ECOS) solve when that
-optional solver is installed) against its own optimality conditions, run in
-continuous integration as part of the verification suite (\texttt{test\_kkt.py})
-rather than inside the reference-mission loop. An interactive playback of the same burn plan
-under the nonlinear truth model is available as a self-contained static web page
-linked from the repository. The emitted flight kernels are additionally exercised in
-\texttt{examples/cfs\_nav\_app/}, a NASA Core Flight System (cFS) application,
-with build and run steps in its \texttt{README}.
+end and is the paper's worked example. A penalized trust-region (PTR)
+sequential-convex planner produces a closed-loop rendezvous approach from the
+barrier-certified start set to the docking target; the plan is propagated through
+the nonlinear relative-motion truth model, and the resulting closed-loop
+trajectory (Figure~\ref{fig:mission}) is checked against range-channel Signal
+Temporal Logic phase specifications. The passive-drift abort safety of the start
+set (the safe free-drift trajectory after a thruster cutoff) is certified in exact
+rational arithmetic by the barrier---an invariant of the linear Clohessy--Wiltshire
+drift for a fixed safe formation, which bounds the linearized abort. Richer truth
+forces ($J_2$, differential drag) and additional corridor/keep-out specifications
+are supported but are not enabled in this reference configuration. The
+exact-rational KKT and conic KKT checkers re-verify an online QP or SOCP solve
+against its own optimality conditions---for a second-order cone program, an
+embedded conic solver (ECOS) when it is installed. They run in continuous
+integration as part of the verification suite (\texttt{test\_kkt.py}) rather than
+inside the reference-mission loop.
 
-\begin{figure}[t]
+\begin{figure}[H]
 \centering
-\includegraphics[width=0.86\linewidth]{vbar.pdf}
-\caption{Trajectory of the \texttt{vbar\_approach.py} demo: a 1\,km V-bar
-glideslope approach to a 10\,m hold point in the local-vertical/local-horizontal
-(LVLH) frame, planned on the Clohessy--Wiltshire discretization and propagated
-under the linear Clohessy--Wiltshire dynamics. The verified pipeline (nonlinear
-truth model, temporal-logic checks, and the exact barrier) is the reference
-mission, exercised in continuous integration rather than by this demo; the
-exact-rational KKT checker runs as a separate checker test.}
-\label{fig:vbar}
+\includegraphics[width=0.82\linewidth]{mission.pdf}
+\caption{Reference mission: the closed-loop rendezvous approach from the
+barrier-certified start set ($\approx$2\,km) to the docking target under the
+nonlinear relative-motion truth model, in the local vertical/local horizontal
+(LVLH) frame. The transfer keeps clear of the keep-out zone and completes on the
+docking corridor; the passive-abort safety of the start set is certified in exact
+rational arithmetic by the barrier.}
+\label{fig:mission}
 \end{figure}
+
+For a simpler entry point, the one-command demo
+\texttt{examples/\allowbreak vbar\_approach.py} plans a shorter V-bar glideslope
+approach on the Clohessy--Wiltshire discretization and propagates it under linear
+Clohessy--Wiltshire dynamics (Python 3.10+, dependencies in
+\texttt{pyproject.toml}, no other setup); it is a readable on-ramp rather than the
+verified pipeline. An interactive web playback of that plan is linked from the
+repository, and the emitted flight kernels are additionally exercised in
+\texttt{examples/cfs\_nav\_app/}, a NASA Core Flight System (cFS) application, with
+build and run steps in its \texttt{README}.
 
 \section{Impact and comparison}
 
@@ -339,7 +341,7 @@ Each ingredient of Podium is well covered by open prior art; the contribution is
 their coupling. Table~\ref{tab:compare} makes this precise against the closest
 tools on each axis.
 
-\begin{table}[t]
+\begin{table}[tbp]
 \centering
 \caption{Feature coverage of representative open tools: each covers at most one or
 two of the three prongs Podium combines. \checkmark{} full, $\sim$ partial, blank
