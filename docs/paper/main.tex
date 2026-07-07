@@ -142,8 +142,9 @@ packages provide the verification layer and the C code generator described below
 The flight kernels are written as pure step functions in a restricted subset of
 Python: statically shaped arrays, bounded loops, no dynamic allocation, and
 machine-readable contracts on input ranges and invariants. The subset is chosen
-so that a sound static analyzer can reason about it and so that it translates
-line-for-line to C. The \texttt{emit} package generates C99 from the subset,
+so that a sound static analyzer can reason about it and so that its scalar and
+subscript statements translate line-for-line to C, with array expressions lowered
+to bounded row-major loops. The \texttt{emit} package generates C99 from the subset,
 annotated with ACSL (ANSI/ISO~C Specification Language) contracts, together with
 correctly rounded implementations of sine and cosine from CORE-MATH~\cite{coremath2022}. The Frama-C/EVA
 abstract-interpretation analyzer~\cite{framac2015} shows the emitted C free of runtime alarms (division by zero,
@@ -230,8 +231,12 @@ through the problem's curvature; a small residual alone is not a suboptimality
 bound, since with a rank-deficient objective (a linear program or minimum-fuel problem) an
 approximately stationary point can be arbitrarily suboptimal. For a second-order
 cone program, whose objective is linear, a rigorous bound instead requires exact
-conic-dual feasibility. In every case the checker itself introduces no rounding
-error. Second, the emitted flight-code C is tied to the Python reference by the golden
+conic-dual feasibility. The numerical solvers and the rational recovery that
+propose each certificate are untrusted; the trusted checker rationalizes the
+candidate and either verifies it exactly or refuses, so solver rounding can force
+a refusal or a weaker bound but never a false certificate. In every case the
+checker itself introduces no rounding error. Second, the emitted flight-code C is
+tied to the Python reference by the golden
 vectors (above) and carried to assembly by CompCert, so the validated algorithm
 and the compiled algorithm agree on the tested inputs. Every tagged
 release ships a byte-deterministic audit bundle: a build script gates the mission
