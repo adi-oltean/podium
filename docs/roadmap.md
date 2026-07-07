@@ -244,7 +244,7 @@ headline addition is the ROE module, #5.)
       invariants in time-scaled coordinates (integer dynamics matrix →
       fully rational problem), synthesized by an untrusted SDP
       (cvxpy/Clarabel S-procedure) and re-verified by a TRUSTED checker
-      in exact fractions arithmetic (all-principal-minors PSD test, Lie
+      in exact fractions arithmetic (exact-rational LDL PSD test, Lie
       derivative exactly zero — no floats in the trusted path). Certifies
       "passive abort drift keeps RN separation outside the keep-out
       radius for ALL time", along-track-independent (the machine-checked
@@ -368,14 +368,16 @@ tudatpy 6-DOF oracle, torque allocation) carry into v0.7.
       (qemu-aarch64), split from the CORE-MATH item
 - [x] Verified-KKT checker (#40, `verify/kkt.py`): the trusted half of
       the R4 pattern. The online convex solver is UNTRUSTED; verify_qp
-      re-verifies a claimed QP solution's optimality in EXACT
+      re-checks a claimed QP solution in EXACT
       `fractions.Fraction` arithmetic — stationarity, primal in/eq
       feasibility, dual feasibility, and the complementary-slackness
-      duality gap — so the certificate carries no floating-point
-      uncertainty. Receipts: QPs with KNOWN rational optima verify to
-      residuals that are Fraction(0) EXACTLY (true optima, zero slack,
-      not merely 'small'); an untrusted Clarabel solution of a Layer-0
-      min-energy rendezvous QP certifies within 1e-5; perturbing the
+      duality gap — and, when a valid dual point exists, reports an
+      exact-rational bound on the solution's suboptimality that carries no
+      floating-point uncertainty. Receipts: QPs with KNOWN rational optima
+      verify to residuals that are Fraction(0) EXACTLY (true optima, zero
+      slack, not merely 'small'); an untrusted Clarabel solution of a
+      Layer-0 min-energy rendezvous QP gets an exact-rational suboptimality
+      bound; perturbing the
       primal or flipping a dual sign makes the exact residuals blow up
       and the checker rejects. Embedded-solvergen wiring (feed a
       QOCOGEN/CVXPYgen KKT dump to the checker) still open
@@ -390,16 +392,18 @@ tudatpy 6-DOF oracle, torque allocation) carry into v0.7.
       (native standard-form duals) of a min-norm-with-thrust-cone SOCP
       certifies exactly; an LP-as-SOCP with a rational optimum verifies
       to EXACTLY zero; and negating a cone dual / leaving the cone is
-      rejected. QP + SOCP optimality certificates now both exact
+      rejected. QP and SOCP checks are both exact, issuing a suboptimality
+      bound only when a valid (conic) dual point exists
 - [x] Embedded-solver + verified-KKT loop closed (#42,
       `kkt.certify_ecos`): a real Layer-0 min-fuel rendezvous SOCP
       (per-step thrust cones ||u_k||<=t_k, min sum t_k, CW-STM reach)
       is compiled by cvxpy to ECOS standard form, solved by the
       EMBEDDED ECOS solver (the branchless flight-target C, via its
-      binding), and re-verified exactly by verify_socp. Receipt: it
-      certifies within tolerance (stationarity/conic/comp-slack tiny,
-      cones satisfied), the certified objective matches the solver's
-      cost, and a burn is active. The online-solver analogue of the
+      binding), and re-checked exactly by verify_socp. Receipt: it
+      re-checks the solve in exact arithmetic and reports exact residuals
+      (stationarity, conic, complementary slackness) — a rigorous
+      suboptimality bound requires exact conic-dual feasibility; the
+      re-checked objective matches the solver's cost, and a burn is active. The online-solver analogue of the
       offline barrier and golden-vector certificates — the flight
       solver's answer is trusted only after an exact re-check. This is
       the CVXPYgen/QOCOGEN item's substance without the Julia sidecar;
@@ -411,7 +415,7 @@ tudatpy 6-DOF oracle, torque allocation) carry into v0.7.
       A_cl = A - BK — {x'Px<=c} is invariant and contracting because
       P - A_cl'PA_cl = Q + K'RK >= 0 — re-verified in EXACT rationals
       (P >= 0 and the decrease >= 0, via the barrier module's
-      all-principal-minors PSD test). The decrease carries the full Q
+      exact-rational LDL PSD test). The decrease carries the full Q
       margin so exact verification is robust to rationalization.
       Receipts: the CW LQR P certifies exactly; x'Px is monotone and
       the sublevel set invariant along trajectories; a bogus P

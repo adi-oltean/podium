@@ -51,7 +51,7 @@ are fractured across ISC/NOSA/AGPL/"government-owned").
 | Dependency | License | Role |
 |---|---|---|
 | **Basilisk** (`pip install bsk`) | ISC | Optional high-fidelity dynamics backend: coupled 6-DOF, rich sensor/actuator models, Hill-frame modules, mature Monte Carlo. Kept a *backend*, never the core — our Python→C story must not depend on its C++ internals |
-| **MuJoCo/MJX** | Apache-2.0 | Contact/docking-capture mechanics when we get there. The field converged on it (Basilisk ≥2.8, SmallSatSim); we will not write contact code |
+| **MuJoCo/MJX** | Apache-2.0 | Optional contact/docking-capture backend, already wrapped by `podium.sim.contact`: Podium owns the RPOD-specific probe-drogue geometry, capture criteria, IDSS tie-in, and tests, while MuJoCo supplies the contact solve. The field converged on it (Basilisk ≥2.8, SmallSatSim) |
 | **ANISE** | MPL-2.0 | Ephemerides/frames/time (SPICE-compatible, flight-proven, pip wheels). spiceypy (MIT) as an alternate adapter behind the same abstraction |
 | **CVXPYgen / TinyMPC** | MIT | The Python→embedded-C path for optimization-based guidance |
 | **heyoka.py** | MPL-2.0 | Optional truth-propagation/variational backend (free STMs, event detection) |

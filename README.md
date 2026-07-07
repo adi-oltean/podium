@@ -14,7 +14,7 @@ Mature tools exist — Basilisk, NASA 42, Trick, Orekit, GMAT — and Podium doe
 
 1. **RPOD as the first-class problem.** Relative motion (CW/Tschauner-Hempel), approach corridors, keep-out zones, plume impingement, passive abort safety, and docking contact — not an afterthought bolted onto an orbit propagator.
 2. **A verification-ready algorithm core.** GNC algorithms written as pure, statically-shaped, bounded-loop step functions with machine-readable contracts — the style that abstract interpretation (Astrée-class tools) can actually prove things about, and that translates line-for-line to embedded C.
-3. **Convex trajectory optimization built in.** Direct LP/SOCP transcription on the exact CW/YA/ROE discretizations (DPP-compiled, Clarabel), lossless-convexification finite-burn planning shipped with validity audits rather than assumptions, a constraint library (approach cone, rotating-hyperplane KOZ, plume, Breger-How passive safety), successive convexification (PTR with continuous-time cuts) for the nonconvex docking layer, and 6-DOF attitude-coupled planning with a body-fixed thruster — plus an exact-rational KKT checker that re-verifies the online solver's optimality with no trust in its floating-point.
+3. **Convex trajectory optimization built in.** Direct LP/SOCP transcription on the exact CW/YA/ROE discretizations (DPP-compiled, Clarabel), lossless-convexification finite-burn planning shipped with validity audits rather than assumptions, a constraint library (approach cone, rotating-hyperplane KOZ, plume, Breger-How passive safety), successive convexification (PTR with continuous-time cuts) for the nonconvex docking layer, and 6-DOF attitude-coupled planning with a body-fixed thruster — plus an exact-rational KKT checker that bounds the online solver's suboptimality (when a valid dual point exists) with no trust in its floating-point.
 4. **A sandbox you can trust.** Deterministic fixed-step simulation (bit-identical replays, enforced by test), truth/flight separation, seeded noise and stochastic atmosphere, STL-robustness spec oracles, MuJoCo probe-drogue contact, and cross-validation against Orekit (translational) and exact analytic solutions (attitude).
 5. **Verification as a regression, not a ceremony.** Eight CI lanes re-prove safety on every relevant commit: reachability (JuliaReach), exact-rational barrier certificates, sound static analysis (Frama-C/EVA), golden vectors through CompCert and on aarch64, and Orekit cross-validation — with every tagged release shipping a byte-deterministic, evidence-gated audit bundle.
 
@@ -50,8 +50,8 @@ src/podium/
                (LVLH/inertial frame blending), ISS-sim autopilot page —
                all zero-build, self-contained
   verify/      Contracts (ranges/invariants → ACSL), exact-rational
-               barrier certificates AND KKT optimality certificates
-               (QP + SOCP), correctly-rounded transcendental oracle
+               barrier certificates AND KKT suboptimality-bound
+               checkers (QP + SOCP), correctly-rounded transcendental oracle
   emit/        C99 emitter for the static subset (bounded loops, matmul,
                ACSL rendering), the CORE-MATH correctly-rounded option,
                the EVA driver generator, and the cFS app generator;
