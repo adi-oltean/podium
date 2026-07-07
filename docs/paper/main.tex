@@ -151,7 +151,8 @@ CORE-MATH~\cite{coremath2022} backend for correctly rounded sine and cosine. The
 Frama-C/EVA abstract-interpretation analyzer~\cite{framac2015} shows the emitted C
 free of runtime alarms (division by zero, overflow, invalid access) on the
 contracted or assumed input ranges. The generated C is checked against the Python
-reference on a suite of golden vectors---bit-exact for the scalar arithmetic and
+reference on a suite of golden vectors---regenerated deterministically from a fixed
+per-kernel seed rather than stored as fixtures, bit-exact for the scalar arithmetic and
 square-root class, with documented tolerance classes for the libm transcendentals
 and for matrix products (which differ only by floating-point reassociation against
 NumPy's Basic Linear Algebra Subprograms)---and the same vectors are replayed
@@ -160,7 +161,7 @@ bit-for-bit on a second instruction-set architecture (ISA), AArch64. The golden
 vectors thus tie the Python reference, the emitted C, and the compiled assembly on
 the tested inputs; the reproducibility methodology, the equality classes, and the
 cross-ISA conditions (IEEE-754 binary64 with \texttt{-ffp-contract=off}) are
-documented in a companion note in the repository. This emitted, analyzed, and
+documented in a companion note on numerical reproducibility. This emitted, analyzed, and
 compiled path covers the flight kernels---the relative-motion state transitions,
 the navigation-filter update, and the quaternion routines---rather than the
 guidance planners or controllers, whose solver output the certificate layer
@@ -210,16 +211,16 @@ keep-out QCQP---a primitive of the docking geometry, not yet wired into the
 full-horizon planner---through the S-procedure~\cite{yakubovich1971,polik2007}
 and its trust-region special case~\cite{moresorensen1983}; the derivation, the
 hard (singular) case, and the multi-constraint extension are given in the companion
-note. The
+note on exact certificates. The
 barrier and optimality-gap certificates are tolerance-free, their acceptance
 being an exact positive semidefiniteness test together with exact feasibility;
 exact rational certificates of this kind build on a body of work in
 sum-of-squares and polynomial optimization and in verified semidefinite
 programming~\cite{parrilo2003,lasserre2001,kaltofen2012,peyrl2008,davis2022}. The
 same checker discharges further certificate families---control-Lyapunov and
-sum-of-squares certificates---whose constructions and soundness proofs are
-collected in the companion technical note.
-The KKT check re-verifies an approximate solver's output: it computes the
+sum-of-squares certificates---whose constructions and exact-check basis are
+collected in the companion note on exact certificates.
+The KKT check re-verifies an approximate solver's output offline: it computes the
 optimality residuals exactly and, when a valid Lagrangian dual point exists,
 reports an exact rational bound on the point's suboptimality. For a strictly
 convex quadratic program this bound accounts for the stationarity residual
@@ -243,7 +244,10 @@ release additionally attaches a fresh Frama-C/EVA report, so that an
 identical-source rebuild is independently verifiable.
 
 Figure~\ref{fig:recovery} and Table~\ref{tab:receipts} make these certificates
-concrete on the keep-out QCQP primitive. As the rational dual multiplier
+concrete on the keep-out QCQP primitive: a quadratic objective (Hessian $P_0$)
+minimized subject to one quadratic keep-out constraint (Hessian $P_1$), whose
+S-procedure lower bound $g(\lambda)$ is built from the Lagrangian matrix
+$A(\lambda) = P_0 - \lambda P_1$ and brackets the global optimum $J^\star$. As the rational dual multiplier
 $\lambda$ is rounded toward its optimum $\lambda^\star$, the exactly certified
 lower bound $g(\lambda)$ approaches the global optimum $J^\star$ at the rate the
 S-procedure predicts: quadratically when the trust-region subproblem is

@@ -11,7 +11,7 @@ points here for the detail.
 The emitted C is checked against the Python reference on a suite of *golden
 vectors*. These are **not stored fixtures**: each kernel draws its inputs
 deterministically from a fixed per-kernel seed
-(`numpy.random.default_rng(zlib.crc32(name))`), with orbit-specific samplers and
+(`numpy.random.default_rng(zlib.crc32(name.encode()))`), with orbit-specific samplers and
 explicit branch-forcing cases. Because the seed is fixed, the suite regenerates
 *identically* on every run, so it cannot suffer the stale-fixture drift that
 checked-in `.dat` files invite. (It does not, of course, catch a wrong source
