@@ -117,7 +117,7 @@ Figure~\ref{fig:arch} shows the two paths this description follows: the restrict
 Python-to-C flight-code path (top) and the exact-rational certificate layer
 (bottom). Podium is organized as subpackages under \texttt{src/podium}. The
 \texttt{core}
-package holds the verifiable flight kernels: the Clohessy--Wiltshire dynamics and
+package holds the verifiable static subset: the Clohessy--Wiltshire dynamics and
 state-transition matrix~\cite{clohessy1960}, the Yamanaka--Ankersen matrix for
 elliptic orbits~\cite{yamanaka2002}, relative orbital elements with Keplerian, $J_2$, and
 $J_2$-plus-drag state-transition matrices~\cite{koenig2017}, a quaternion kernel,
@@ -168,8 +168,9 @@ covered by the certificate layer below.
 
 \paragraph{Software metadata.}
 Language Python 3.10+; license
-MIT; NumPy required, with optional CVXPY and Clarabel for the solver-backed paths
-and optional verification tooling (Frama-C, CompCert, JuliaReach). Continuous integration (CI) runs
+MIT; NumPy required, with optional CVXPY, Clarabel, and ECOS for the
+solver-backed paths and optional verification tooling (Frama-C, CompCert,
+JuliaReach). Continuous integration (CI) runs
 on GitHub Actions. The examples and the per-release audit bundle are the primary
 distribution channel; the library is in active development (v0.x).
 
@@ -355,7 +356,7 @@ focus.}
 \toprule
 & (i) SCP & (ii) cert/CI & (iii) verified C & RPOD \\
 \midrule
-SCPToolbox.jl~\cite{scptoolbox2022}                 & \checkmark & & $\sim$ & $\sim$ \\
+SCPToolbox.jl~\cite{scptoolbox2022}                 & \checkmark & & & $\sim$ \\
 GuSTO.jl~\cite{gusto2019}                           & \checkmark & &        & $\sim$ \\
 ct-scvx~\cite{elango2025}                           & \checkmark & & $\sim$ & $\sim$ \\
 successive\_rendezvous~\cite{successive_rendezvous2020} & \checkmark & &    & \checkmark \\
@@ -363,7 +364,7 @@ RealCertify~\cite{magron2018}                       & & $\sim$ & & \\
 ValidSDP~\cite{validsdp}                            & & $\sim$ & & \\
 Verified SDP~\cite{jansson2009}                     & & $\sim$ & & \\
 Copilot~\cite{copilot2023}                          & & & \checkmark & \\
-Credible autocoding~\cite{feron2013,cohen2020}      & $\sim$ & & $\sim$ & \\
+Credible autocoding~\cite{feron2013,cohen2020}      & & & $\sim$ & \\
 {CVXPYgen}~\cite{cvxpygen2022}                      & & & $\sim$ & \\
 Basilisk~\cite{basilisk2020}                        & & & & \checkmark \\
 \textbf{Podium}                                     & \checkmark & \checkmark & \checkmark & \checkmark \\

@@ -21,7 +21,7 @@ patterns.
 | Modality | Where | What it proves |
 |---|---|---|
 | **Contracts** | `podium.verify.contracts` | Input ranges/invariants; runtime-checked in the sandbox, rendered as ACSL on the emitted C |
-| **STL spec oracles** | `podium.sim.spec` | Mission properties (corridor, keep-out, docking rate) via robust temporal-logic semantics |
+| **STL spec oracles** | `podium.sim.spec` | Temporal-logic properties via robust semantics (range-channel phase gates in the reference mission; corridor, keep-out, and docking-rate specs supported) |
 | **Closed-loop reachability** | `tools/reach/` (JuliaReach), `reach.yml` | Flowpipe non-intersection with unsafe sets — LOS cone, velocity ceiling, abort keep-out — on the ARCH hybrid models, re-proven every commit (12 PROVEN/run) |
 | **Exact barrier certificates** | `podium.verify.barrier`, `test_barrier.py` | Infinite-horizon abort safety: SDP-synthesized (untrusted) barrier re-verified in exact rationals |
 | **Exact KKT certificates** | `podium.verify.kkt`, `test_kkt.py` | Online QP/SOCP solves re-verified in exact rationals: an exact-rational suboptimality bound (QP) or exact conic-dual re-check (SOCP), incl. the embedded ECOS solve of a Layer-0 problem |

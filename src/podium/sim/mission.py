@@ -236,7 +236,7 @@ def fly(seed: int = 0, dispersed: bool = False) -> MissionResult:
         idss_rotation=idss_rot,
         spec_margins=margins,
         dv_total=tr.dv_total(),
-        nav_rms_pos=1.0,  # steady-state per test_ekf receipts (2 m meas)
+        nav_rms_pos=1.0,  # conservative placeholder; the mission flies docking-grade 5 cm measurements
         barrier_ok=barrier_ok,
         trace=tr,
         extras=extras,
