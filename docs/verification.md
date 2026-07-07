@@ -24,9 +24,9 @@ patterns.
 | **STL spec oracles** | `podium.sim.spec` | Mission properties (corridor, keep-out, docking rate) via robust temporal-logic semantics |
 | **Closed-loop reachability** | `tools/reach/` (JuliaReach), `reach.yml` | Flowpipe non-intersection with unsafe sets — LOS cone, velocity ceiling, abort keep-out — on the ARCH hybrid models, re-proven every commit (12 PROVEN/run) |
 | **Exact barrier certificates** | `podium.verify.barrier`, `test_barrier.py` | Infinite-horizon abort safety: SDP-synthesized (untrusted) barrier re-verified in exact rationals |
-| **Exact KKT certificates** | `podium.verify.kkt`, `test_kkt.py` | Online-solver optimality (QP + SOCP) re-verified in exact rationals, incl. the embedded ECOS solve of a Layer-0 problem |
+| **Exact KKT certificates** | `podium.verify.kkt`, `test_kkt.py` | Online QP/SOCP solves re-verified in exact rationals: an exact-rational suboptimality bound (QP) or exact conic-dual re-check (SOCP), incl. the embedded ECOS solve of a Layer-0 problem |
 | **Exact optimality-gap certificates** | `podium.verify.bracket`, `test_bracket.py`, [`docs/optimality-gap-certificates.md`](optimality-gap-certificates.md) | Exact-rational bounds bracketing the global optimum of a nonconvex QCQP; four theorems (soundness, nonsingular recovery, singular hard case, multi-constraint certified gap) |
-| **Golden vectors** | `podium.emit`, `test_cemit.py` | Python↔C equivalence: bit-exact for arithmetic/sqrt, correctly-rounded (CORE-MATH) for transcendentals |
+| **Golden vectors** | `podium.emit`, `test_cemit.py` | Python↔C equivalence: bit-exact for scalar arithmetic/sqrt (and CORE-MATH transcendentals); matrix products agree up to floating-point reassociation |
 | **Sound static analysis** | `tools/eva_gate.py`, `eva.yml` | Frama-C/EVA proves the emitted C alarm-free (no div0/overflow/invalid access) over the contracted input ranges |
 | **Verified-compiler + cross-arch** | `compcert.yml`, `tier2.yml` | Golden vectors replay through CompCert (machine-checked semantics preservation) and on aarch64 under qemu (bit-identical across ISAs) |
 | **Independent physics + dynamics oracles** | `validate.yml` (Orekit), `test_attitude_analytic.py`, `test_gravity_gradient.py` | Truth model vs Orekit; attitude integrator vs exact Jacobi-elliptic / gravity-gradient closed forms |
@@ -181,10 +181,14 @@ the bitwise receipts.
    over the contracted ranges (`eva.yml`, zero alarms), compiled by the
    formally-verified CompCert (`compcert.yml`), with contracts rendered as
    ACSL preconditions discharged in the analysis.
-4. **Online-solver level** *(shipped)* — the untrusted convex solver's QP/SOCP
-   solution is re-verified for optimality by an exact-rational KKT checker
-   (`podium.verify.kkt`), including the embedded ECOS solve of a Layer-0
-   problem; the flight solver's answer is trusted only after an exact re-check.
+4. **Online-solver level** *(shipped)* — an untrusted convex solver's QP/SOCP
+   solution is re-verified in exact rational arithmetic by the KKT checker
+   (`podium.verify.kkt`): it reports an exact-rational bound on the solution's
+   suboptimality when a valid dual point exists (for a strictly convex QP the
+   bound accounts for the stationarity residual through curvature; a SOCP, whose
+   objective is linear, requires exact conic-dual feasibility), including the
+   embedded ECOS solve of a Layer-0 problem. The checker runs in continuous
+   integration as a verification test, not inside the flight loop.
 5. **Runtime level** *(shipped)* — golden-vector Python↔C equivalence in CI
    (bit-exact on host; bit-identical cross-architecture on aarch64 under
    qemu); every tagged release ships a byte-deterministic, evidence-gated
