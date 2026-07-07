@@ -530,9 +530,7 @@ gap, all verified over $\Q$. When the bracket closes, the trajectory is certifie
 globally optimal; when it does not, the residual gap $u - t$ is still a certified
 bound on suboptimality, and Theorem~\ref{thm:multi} identifies cases in which the
 lower bound cannot be tight. We establish this on the keep-out QCQP, the
-nonconvex primitive that these methods convexify;
-extending the exact certificate from that primitive to full trajectory horizons
-is the principal open problem (Section~\ref{sec:limits}).
+nonconvex primitive that these methods convexify.
 
 \section{Reference implementation}
 \label{sec:impl}
@@ -617,13 +615,10 @@ The lower-bound soundness of Theorems~\ref{thm:sound} and~\ref{thm:multi} and th
 nonsingular recovery of Theorem~\ref{thm:recovery} are complete. An exact
 rational recovery in the singular case (Theorem~\ref{thm:hard}) and an exact
 higher-level moment certificate for the multi-constraint gap
-(Theorem~\ref{thm:multi}) remain open. The $LDL^\top$ PSD test is $O(n^3)$, so
-the barrier to trajectory-scale certificates is not the test but the growth of
-the rational entries under exact elimination. The matrices of a discretized
-trajectory problem are block-banded, and a fraction-free elimination that
-exploits that structure would bound the certificate bit-size in the horizon; a
-structure-exploiting exact certificate at trajectory scale is the natural next
-step.
+(Theorem~\ref{thm:multi}) remain open. The $LDL^\top$ PSD test is $O(n^3)$; on the
+per-primitive problems these checkers target the rational entries stay small, and
+they grow with problem size under exact elimination, which is why the certificates
+are applied per primitive rather than to arbitrary sizes.
 
 \section{Conclusion}
 
