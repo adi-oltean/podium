@@ -159,7 +159,11 @@ CompCert verified compiler~\cite{compcert2009}, which machine-checks semantics
 preservation from C to assembly on x86-64 for the supported C subset and calling
 convention; the emitted C additionally reproduces the golden vectors bit-for-bit
 on a second instruction-set architecture (ISA), AArch64, under an ordinary
-cross-compiler and emulator. The golden vectors thus tie the Python reference,
+cross-compiler and emulator; this cross-architecture bit-exactness is that of the
+scalar arithmetic/square-root class and relies on IEEE-754 binary64 with
+fused-multiply-add contraction disabled (\texttt{-ffp-contract=off}, SSE2 on
+x86-64), the libm and matrix-product classes remaining within the tolerances
+above. The golden vectors thus tie the Python reference,
 the emitted C, and the compiled assembly on the tested inputs. This emitted,
 analyzed, and compiled path covers the flight kernels---the relative-motion state
 transitions, the navigation-filter update, and the quaternion routines---rather
@@ -407,6 +411,33 @@ replacement. It is intended for researchers and engineers developing and
 validating RPOD guidance and control, and as a reproducible baseline: verification
 runs on every change and every release carries its evidence, so that results built
 on the library can be re-checked independently.
+
+\section{Limitations}
+
+The guarantees are deliberately scoped. The cross-architecture bit-exactness of
+the emitted C holds for the scalar arithmetic and square-root class, and relies
+on IEEE-754 binary64 with fused-multiply-add contraction disabled; correctly
+rounded sine and cosine are bit-exact in that mode, while the remaining libm
+transcendentals and matrix products fall in documented tolerance classes rather
+than being bit-identical. The abort-safety barrier is certified for the linear
+Clohessy--Wiltshire drift of a fixed formation: it bounds the linearized abort
+but does not itself quantify the gap to the nonlinear, $J_2$-and-drag,
+actuator- and sensor-perturbed trajectory, for which robustness margins or
+stochastic and hybrid safety proofs would be required. The exact-rational
+certificate checkers are exact but run offline in continuous integration on
+per-primitive problems; their rational entries can grow with problem size, so
+scaling to full trajectory horizons is open, and they are not intended for online
+safety monitoring. The verifiable subset is intentionally restricted---statically
+shaped arrays, bounded loops, and no dynamic allocation---which suits the
+fixed-shape flight-math kernels but excludes variable-horizon, adaptive, or
+event-triggered logic; such logic lives in the untrusted planner and controller
+layers, whose online solves are covered by the certificate layer rather than the
+emitted-C path. Finally, Podium produces verification \emph{evidence}---analyzable
+and compiled code, sound-analysis and compiler receipts, and exact
+certificates---rather than a completed qualification under a standard such as
+DO-178C or ECSS; mapping that evidence to a certification case, and benchmarking
+the generated kernels and solvers against production baselines, are outside the
+present scope.
 
 \section{Conclusions}
 
