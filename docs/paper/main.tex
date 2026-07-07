@@ -303,14 +303,18 @@ established open art, and none of these carries a certificate or verified-code
 layer. On certificates, RealCertify \cite{magron2018}, the Coq-checked ValidSDP
 \cite{validsdp}, and verified SDP \cite{jansson2009} produce exact-rational or
 rigorously bounded certificates for general polynomial and conic problems, and
-certifiable trajectory optimization \cite{strom2024} and exact SDP relaxations
+certifiable trajectory optimization \cite{strom2024}, certifiable perception
+\cite{yang2023perception}, and exact SDP relaxations
 for QCQPs \cite{kojima2026,cifuentes2022} produce certified bounds by numerical
 semidefinite programming; but none is online, RPOD-specific, tolerance-free over
 $\Q$, and re-run in continuous integration. On verified code, the Copilot
 toolchain \cite{copilot2023} couples a restricted high-level source with a C
 path, formal proof, and CI (for runtime monitors, not guidance); credible
-autocoding \cite{feron2013,cohen2020} autocodes convex-optimization solvers to
-contract-annotated C; verified spacecraft control programs \cite{mokhov2018} and
+autocoding \cite{feron2013,cohen2020} and verified model-predictive-control
+solvers \cite{davy2018} autocode convex-optimization solvers to
+contract-annotated C, and execution-time-certified embedded QP solvers
+\cite{eiqp2025} bound the online iteration count; verified spacecraft control
+programs \cite{mokhov2018} and
 verified optimization reductions in a proof assistant \cite{cvxlean2024} certify
 code or problem transformations formally; and CVXPYgen \cite{cvxpygen2022}
 generates C from Python convex problems; none couples exact-rational per-solve
