@@ -41,7 +41,7 @@ headline addition is the ROE module, #5.)
       plane view with burns, channel time-series grid, dv timeline —
       object-API figures (headless/thread-safe), matplotlib optional
 
-## v0.2 — "Relative motion complete + convex guidance" (Layer 0, current)
+## v0.2 — "Relative motion complete + convex guidance" (Layer 0 — COMPLETE)
 
 - [x] **ROE module (#5)**: quasi-nonsingular relative orbital elements,
       ROE↔elements and ROE↔LVLH maps, Koenig closed-form Keplerian and J2
@@ -169,7 +169,7 @@ headline addition is the ROE module, #5.)
       blending (needs target-ECI export), log-time map, attitude
       keyframes
 
-## v0.4 — "SCP docking" (Layer 1, current)
+## v0.4 — "SCP docking" (Layer 1 — COMPLETE)
 
 - [x] PTR/SCvx* SCP core (#21, `podium.guidance.scp`): penalized trust
       region over the exact-STM transcription; TRUE nonconvex keep-out

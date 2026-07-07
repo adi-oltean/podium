@@ -158,6 +158,8 @@ golden vectors, Frama-C/EVA, and CompCert).
 
 Podium's contribution relative to both landscapes is the *integration*: an
 open, RPOD-focused library that couples a sequential-convex planner, exact-rational
-tolerance-free certificates re-run in continuous integration, and a restricted
-Python-to-C flight-code path checked by golden vectors, Frama-C/EVA, and CompCert.
+certificates re-run in continuous integration (tolerance-free for the barrier,
+Lyapunov, sum-of-squares, and optimality-gap certificates, and an exact
+suboptimality bound for KKT), and a restricted Python-to-C flight-code path
+checked by golden vectors, Frama-C/EVA, and CompCert.
 See the tool paper (`docs/paper/`) for the full comparison and citations.

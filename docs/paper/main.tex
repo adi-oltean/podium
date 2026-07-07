@@ -37,9 +37,10 @@ Analysis (EVA) plug-in \cite{framac2015}, a sound static analyzer, and is
 compiled with the CompCert verified compiler \cite{compcert2009}, with the
 emitted C checked against the Python reference on golden vectors. Several guarantees are re-verified
 in exact rational arithmetic in the trusted checker: tolerance-free barrier
-certificates for abort safety, Karush--Kuhn--Tucker (KKT) certificates that give
-an exact rational bound on the suboptimality of an approximate online convex
-solve, and tolerance-free bounds on the global optimum of the
+certificates for abort safety, Karush--Kuhn--Tucker (KKT) certificates that, when
+a valid Lagrangian dual point exists, give an exact rational bound on the
+suboptimality of an approximate online convex solve, and tolerance-free bounds on
+the global optimum of the
 nonconvex docking subproblem. This paper describes the architecture, the
 verification approach, and a reproducible end-to-end example.
 \end{abstract}
@@ -67,9 +68,9 @@ optimization is now standard in guidance
 floating-point quadratic program (QP) or second-order cone program (SOCP) solver
 can return a
 nominally optimal solution that violates a constraint under rounding, so Podium
-re-verifies each online solve with an exact-rational Karush--Kuhn--Tucker (KKT)
-checker, computing an exact rational bound on the solution's suboptimality before
-the command is used. The gap between a Python prototype and
+re-checks such solver output with an exact-rational Karush--Kuhn--Tucker (KKT)
+checker that computes an exact rational bound on the solution's suboptimality. The
+gap between a Python prototype and
 analyzable flight-target C, ordinarily crossed by hand, is here crossed
 mechanically, so that validation evidence applies to the same code path intended
 for deployment.
@@ -110,7 +111,10 @@ reachability checks on every change.}
 
 \subsection{Architecture}
 
-Podium is organized as subpackages under \texttt{src/podium}. The \texttt{core}
+Figure~\ref{fig:arch} shows the two paths this description follows: the restricted
+Python-to-C flight-code path (top) and the exact-rational certificate layer
+(bottom). Podium is organized as subpackages under \texttt{src/podium}. The
+\texttt{core}
 package holds the verifiable algorithm core: the Clohessy--Wiltshire dynamics and
 state-transition matrix \cite{clohessy1960}, the Yamanaka--Ankersen matrix for
 elliptic orbits \cite{yamanaka2002}, relative orbital elements with Keplerian, $J_2$, and
@@ -171,9 +175,10 @@ summarizes them.
 
 \begin{table}[t]
 \centering
-\caption{Automated verification checks, each re-run in continuous integration.
-QP: quadratic program. SOCP: second-order cone program. QCQP: quadratically
-constrained quadratic program. ISA: instruction-set architecture.}
+\caption{Automated verification checks, re-run in continuous integration on the
+relevant path changes (and on scheduled drift checks where noted). QP: quadratic
+program. SOCP: second-order cone program. QCQP: quadratically constrained
+quadratic program. ISA: instruction-set architecture.}
 \label{tab:lanes}
 \begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.34\linewidth}>{\raggedright\arraybackslash}p{0.62\linewidth}@{}}
 \toprule
@@ -237,8 +242,9 @@ trajectory after a thruster cutoff) is certified in exact rational arithmetic by
 the barrier. The exact-rational KKT and conic-KKT checkers, which re-verify an
 online QP or SOCP solve against its own optimality conditions, run in continuous
 integration as part of the verification suite (\texttt{test\_kkt.py}) rather than
-inside the reference-mission loop. An interactive playback of the
-approach is hosted at \url{https://adi-oltean.github.io/podium/} as static HTML
+inside the reference-mission loop. An interactive playback of the same burn plan
+under the nonlinear truth model is hosted at
+\url{https://adi-oltean.github.io/podium/} as static HTML
 with no build step, and the emitted flight kernels are exercised in
 \texttt{examples/cfs\_nav\_app/}, a NASA Core Flight System (cFS) application,
 with build and run steps in its \texttt{README}.

@@ -13,7 +13,7 @@ make it possible.
 
 ## What is shipped (verification modalities in CI)
 
-Nine independent modalities, each with its module, CI lane, and
+Ten independent modalities, each with its module, CI lane, and
 receipts. "Exact" means `fractions.Fraction` arithmetic with no floats
 in the trusted checker; "bit-exact" means identical IEEE-754 bit
 patterns.

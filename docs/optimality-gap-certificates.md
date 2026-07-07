@@ -121,5 +121,6 @@ condition, each verified by an exact PSD test.
   irrational) and the leading-minor Sylvester test (which certifies strict
   definiteness only), and replaces an earlier all-principal-minors test that was
   exponential in `n`.
-- Full proofs are given in the accompanying paper; this document states the
+- Full proofs are given in the companion technical note
+  ([`docs/exact-arithmetic-certificates/note.pdf`](exact-arithmetic-certificates/note.pdf)); this document states the
   results and their code/test realization.

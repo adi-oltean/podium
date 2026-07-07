@@ -521,9 +521,9 @@ program by repeatedly convexifying about the current iterate and solving a conve
 subproblem \cite{elango2025,acikmese2011}. Such methods return a feasible
 trajectory that is locally optimal, without a bound on its distance from the
 global optimum. The bracket supplies that bound. A converged iterate $\bar x$ is
-a feasible point, hence a certified upper bound $u = f_0(\bar x)$
-(Theorem~\ref{thm:sound}); the S-procedure dual of Section~\ref{sec:bracket}
-supplies a certified lower bound $t$ for the same problem; and $[t, u]$ is a
+a feasible point, hence a certified upper bound $u = f_0(\bar x)$; the
+S-procedure dual of Section~\ref{sec:bracket} supplies a certified lower bound
+$t \le J^\star$ for the same problem (Theorem~\ref{thm:sound}); and $[t, u]$ is a
 bound on the global suboptimality of the trajectory, with $u - t$ its certified
 gap, all verified over $\Q$. When the bracket closes, the trajectory is certified
 globally optimal; when it does not, the residual gap $u - t$ is still a certified
