@@ -162,7 +162,7 @@ def _gu_matrix(case: AbortSafetyCase) -> Mat:
 
 
 def _det(m: Mat) -> Fraction:
-    """Exact determinant by fraction-free-ish Gaussian elimination."""
+    """Exact determinant by Gaussian elimination over the rationals."""
     n = len(m)
     a = [row[:] for row in m]
     det = Frac(1)
