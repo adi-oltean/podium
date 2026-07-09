@@ -14,7 +14,7 @@ Update 2026-07-03 (verified against repos/registries):
   `stochasticAtmDensity`, docked-two-craft constraint effector (2.9).
 - **No open implementation of relative-orbital-elements (ROE) dynamics**
   (Koenig/D'Amico STMs, e/i-vector passive safety) exists in any surveyed
-  tool — see the roadmap's ROE module (issue #5).
+  tool — see `podium.core.roe` (issue #5).
 - SCPToolbox.jl remains dormant; **OpenSCvx** (Python/JAX, CTCS built-in)
   is the active SCP core. **Brahe** (Rust/Python, MIT, JOSS) is a new
   pedagogy-first entrant. `dyn4space` does not exist; SaRA is
