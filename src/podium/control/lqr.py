@@ -1,6 +1,6 @@
 """Discrete LQR for CW translational control.
 
-Synthesis (offline, full Python) vs. application (flight-side, static subset)
+Synthesis (offline, full Python) vs. application (flight-side control law)
 are deliberately separated: the Riccati recursion runs in the sandbox and its
 result is a constant gain matrix baked into the flight configuration, so the
 onboard code is a single matrix-vector product with saturation.
@@ -126,7 +126,7 @@ def clqr(a: F64, b: F64, q: F64, r: F64) -> F64:
 
 
 def apply_gain(k: F64, x: F64, u_max: float) -> F64:
-    """Flight-side control law: u = clip(-K x). Static-subset compliant."""
+    """Flight-side control law: u = clip(-K x)."""
     u = -(k @ x)
     out = np.empty(3)
     for i in range(3):

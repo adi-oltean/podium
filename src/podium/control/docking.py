@@ -12,7 +12,8 @@ docking axis (positive away from port, decreasing during approach);
 lateral = the two perpendicular offsets to null. Angles in degrees here —
 the vehicle HUD convention — since these laws act on displayed telemetry.
 
-Static-subset compliant: pure functions, fixed bounds, contracted inputs.
+Flight-side control laws in the restricted style (pure functions, fixed bounds,
+contracted inputs); the emitted, verified kernel set is core + nav, not these.
 """
 
 from __future__ import annotations

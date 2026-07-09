@@ -1,4 +1,4 @@
-"""Quaternion-feedback attitude control (flight side, static subset).
+"""Quaternion-feedback attitude control (flight-side control law).
 
 The classical quaternion-feedback regulator: torque = -Kp * e - Kd * w
 with e the shortest-way small-angle error vector from the core kernel

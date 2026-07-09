@@ -31,6 +31,13 @@ patterns.
 | **Verified-compiler + cross-arch** | `compcert.yml`, `tier2.yml` | Golden vectors replay through CompCert (machine-checked semantics preservation) and on aarch64 under qemu (bit-identical across ISAs) |
 | **Independent physics + dynamics oracles** | `validate.yml` (Orekit), `test_attitude_analytic.py`, `test_gravity_gradient.py` | Truth model vs Orekit; attitude integrator vs exact Jacobi-elliptic / gravity-gradient closed forms |
 
+Two further exact-certificate families — control-Lyapunov and sum-of-squares —
+use the same exact-arithmetic checker and are exercised in the test suite; they
+fold under the certificate modalities above rather than counting as separate CI
+lanes. They do appear as distinct rows in the fault-coverage matrix below, whose
+detection lanes are a different, fault-class-oriented partition of the same
+machinery — not a second modality count.
+
 These modalities are **complementary, not redundant**: a fault-injection
 coverage matrix ([`docs/fault-coverage.md`](fault-coverage.md),
 `tools/fault_coverage.py`) shows six of seven injected fault classes are
