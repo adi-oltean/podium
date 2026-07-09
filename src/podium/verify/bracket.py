@@ -255,8 +255,7 @@ def dual_value(p0: Mat, q0: Vec, r0: F, p1: Mat, q1: Vec, r1: F,
         return None
     b = [q0[i] - lam * q1[i] for i in range(n)]
     w = _solve(a, b)
-    if w is None:
-        return None
+    assert w is not None     # a is verified positive-definite above, so nonsingular
     bw = sum((b[i] * w[i] for i in range(n)), F(0))     # b' A^{-1} b
     return (r0 - lam * r1) - bw / F(4)
 

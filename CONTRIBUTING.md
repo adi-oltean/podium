@@ -42,14 +42,20 @@ offending code out of the trusted path.
 pip install -e ".[dev]"
 ruff check src tests examples   # zero findings
 mypy                            # clean
-pytest                          # green, coverage may not drop
+pytest --cov=podium --cov-fail-under=100   # green, 100% coverage
 ```
 
-All must pass with **zero** warnings or errors — not "mostly." CI enforces `ruff`
-and the full `pytest` suite on every push; a PR does **not** merge over red CI, and CI
-is never bypassed with `--no-verify` on shared branches. New code carries tests;
-kernel math carries property-based (`hypothesis`) tests and, for emitted kernels,
-golden vectors.
+All must pass with **zero** warnings or errors — not "mostly." CI enforces `ruff`,
+the full `pytest` suite, and **100% coverage** on every push; a PR does **not** merge
+over red CI, and CI is never bypassed with `--no-verify` on shared branches. New code
+carries tests; kernel math carries property-based (`hypothesis`) tests and, for emitted
+kernels, golden vectors.
+
+**Coverage is 100%, and CI enforces it** (`--cov-fail-under=100`): a PR that leaves any
+line uncovered fails. Every new branch — error, refusal, and edge paths included —
+needs a test asserting its behavior. If a branch is genuinely unreachable (a
+provably-dead defensive guard), **delete it** — do not hide it with a `# pragma: no
+cover`. Test it or remove it.
 
 Multi-orbit propagations are marked `slow`; `pytest -m "not slow"` is the fast local
 lane (<5 s), but the full suite must pass before you push.

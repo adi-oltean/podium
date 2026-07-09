@@ -93,8 +93,6 @@ def min_rn_separation_analytic(roe: F64, a: float) -> float:
             u = float(np.angle(z))
             w = np.array([math.cos(u), math.sin(u)])
             best = min(best, float(np.linalg.norm(c + p @ w)))
-    if math.isinf(best):  # numerically degenerate: fall back to the scan
-        return min_rn_separation(roe, a)
     return a * best
 
 

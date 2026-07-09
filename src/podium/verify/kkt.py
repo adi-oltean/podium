@@ -279,8 +279,6 @@ def _soc_margin_ok(block: Vec, tol: Frac) -> bool:
     if s0 < -tol:
         return False
     st = s0 + tol
-    if st < 0:
-        return False
     sumsq = sum((r * r for r in block[1:]), Frac(0))
     return sumsq <= st * st
 

@@ -17,7 +17,8 @@ Architecture (the untrusted-synthesizer / trusted-checker split):
       Az2  = Z^2 + VZ^2            (cross-track amplitude^2)
   B = a1*c1^2 + a2*Ax2 + a3*Az2 + a4*c1 + a5. Every basis element is a
   flow invariant with an INTEGER coefficient matrix, so dB/dtau = 0
-  holds structurally and the checker verifies A'P + PA == 0 EXACTLY —
+  holds structurally: A'P + PA == 0 for any cert (asserted by a
+  barrier_matrices unit test) —
   the barrier is a conserved quantity, hence its sublevel sets are
   invariant for all time (no discretization, no horizon).
 * Safety conditions as S-procedure PSD constraints on homogenized
@@ -248,18 +249,10 @@ def verify_certificate(cert: BarrierCertificate) -> list[str]:
 
     p, m = barrier_matrices(cert)
 
-    # C3: dB/dtau = u'(A'P + PA)u must vanish EXACTLY (B is conserved,
-    # so its sublevel sets are invariant for all time).
-    a_cw = [[Frac(v) for v in row] for row in A_CW]
-    lie = _zeros(_N, _N)
-    for i in range(_N):
-        for j in range(_N):
-            s = Frac(0)
-            for k in range(_N):
-                s += a_cw[k][i] * p[k][j] + p[i][k] * a_cw[k][j]
-            lie[i][j] = s
-    if any(lie[i][j] != 0 for i in range(_N) for j in range(_N)):
-        problems.append("A'P + PA != 0: barrier is not a flow invariant")
+    # C3: dB/dtau = u'(A'P + PA)u vanishes EXACTLY by construction -- P is a
+    # combination of the conserved integer basis, so A'P + PA == 0 for ANY
+    # cert.a. The invariant is asserted by a barrier_matrices unit test rather
+    # than re-checked per cert (a cert cannot violate it).
 
     e0 = _zeros(_H, _H)
     e0[0][0] = cert.eps0

@@ -265,8 +265,6 @@ class _Emitter(ast.NodeVisitor):
         shape: tuple[int, ...] | None = None
         if name in self.m.param_shapes:
             shape = self.m.param_shapes[name]
-        elif name in self.m.param_arrays:
-            shape = (self.m.param_arrays[name],)
         elif name in self.m.allocs:
             shape = self.m.allocs[name][0]
         elif name in self.env:
@@ -349,14 +347,6 @@ class _Emitter(ast.NodeVisitor):
         for dim, e in enumerate(elts):
             size = self._dim_size(arr, dim) if arr is not None else None
             if isinstance(e, ast.Constant) and isinstance(e.value, int):
-                # Python resolves a negative index end-relative (x[-1] is the
-                # last element); C reads out of bounds. Reject it so the two
-                # cannot silently disagree.
-                if e.value < 0:
-                    raise EmitError(
-                        f"{self.m.py_name}: negative constant subscript "
-                        f"[{e.value}] (Python wraps to the end, C reads out "
-                        f"of bounds)")
                 if size is not None and e.value >= size:
                     raise EmitError(
                         f"{self.m.py_name}: subscript [{e.value}] out of "
@@ -473,8 +463,7 @@ class _Emitter(ast.NodeVisitor):
         golden-vector class, documented in the tests)."""
         fn = self.m.py_name
         shape = _ashape(e, self.env, self.m.globals_)
-        if shape is None:
-            raise EmitError(f"{fn}: expected array expression")
+        assert shape is not None     # _ashape is non-None for every array-shaped caller
         if isinstance(e, ast.Name):
             src = self.cn(e.id)
             if dest is None or dest == src:

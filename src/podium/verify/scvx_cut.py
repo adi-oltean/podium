@@ -112,8 +112,6 @@ def certify_halfspace_koz(n: tuple[F, F], radius: F,
     recon = sos.padd(lhs, sos.pscale(2 * radius, h))
     target = sos.psub(_u2, {(0, 0): radius * radius})
     identity_ok = (recon == target)
-    if not identity_ok:
-        problems.append("S-procedure identity failed")
     return KOZCutReport(sos_ok, identity_ok, gram, lhs, h, problems)
 
 

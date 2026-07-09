@@ -79,8 +79,6 @@ def propagate_true_anomaly(n: float, e: float, theta0: float, dt: float) -> floa
         mean1 += _TWO_PI
     ecc1 = kepler_eccentric(mean1, e)
     theta1 = true_from_eccentric(ecc1, e)
-    if theta1 < 0.0:
-        theta1 += _TWO_PI
     return theta1
 
 
