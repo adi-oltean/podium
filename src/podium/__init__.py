@@ -13,9 +13,10 @@ control     Feedback controllers and actuator allocation (LQR, MPC hooks,
             quaternion attitude control, thruster mapping).
 nav         Relative navigation filters and sensor models.
 sim         Deterministic fixed-step simulation engine, events, Monte Carlo.
-viz         Visualization of trajectories, approach corridors, and sim state.
-verify      Contracts, input-range assumptions, and export harness for the
-            external abstract-interpretation validation tool.
+emit        C99 code generator for the static subset: ACSL contracts, the EVA
+            driver, and the cFS app, checked by golden vectors and CompCert.
+verify      Exact-rational certificate checkers (barrier, KKT, optimality-gap,
+            Lyapunov, SOS) and input-range contracts.
 """
 
 __version__ = "0.8.0.dev0"

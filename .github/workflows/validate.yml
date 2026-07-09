@@ -28,7 +28,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -e . orekit-jpype pytest
+      - run: pip install -e ".[validate]" pytest
       - name: Cache orekit-data
         id: okdata
         uses: actions/cache@v4
