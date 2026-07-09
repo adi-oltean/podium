@@ -7,8 +7,8 @@ GitHub issue: https://github.com/adi-oltean/podium/issues/32
 `tests/test_orekit_validation.py` (skips cleanly without JVM/data;
 slow-marked) + `.github/workflows/validate.yml` (weekly + dynamics
 paths + dispatch; setup-java temurin 21, cached orekit-data.zip).
-Local environment: portable Temurin JRE + orekit-data.zip under
-../podium-dev/tmp (same pattern as the local Julia), orekit-jpype in
+Local environment: a JRE + orekit-data.zip under `./.orekit-cache`
+(or set `JAVA_HOME` / `OREKIT_DATA_ZIP`), orekit-jpype in
 the validate extra. numpy note: orekit-jpype pins numpy<2.3 as
 metadata; dev venv keeps numpy 2.5 (works fine at runtime, and the
 main CI lane never installs orekit-jpype).

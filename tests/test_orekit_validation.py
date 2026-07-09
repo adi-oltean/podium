@@ -10,10 +10,10 @@ astrodynamics stack. Three receipts, three failure classes:
    must agree to 10%: validates drag magnitude, direction, and the
    co-rotating-atmosphere convention (both stacks co-rotate).
 
-Environment: needs orekit-jpype (validate extra), a JVM (JAVA_HOME or
-the portable Temurin under ../podium-dev/tmp), and orekit-data.zip
-(OREKIT_DATA_ZIP or ../podium-dev/tmp/orekit-data.zip). Skips cleanly
-when absent, so the main CI lane is unaffected; validate.yml runs it.
+Environment: needs orekit-jpype (validate extra), a JVM (JAVA_HOME, or a
+JRE under ./.orekit-cache), and orekit-data.zip (OREKIT_DATA_ZIP, or
+./.orekit-cache/orekit-data.zip). Skips cleanly when absent, so the main
+CI lane is unaffected; validate.yml runs it.
 """
 
 import math
@@ -28,8 +28,8 @@ from podium.dynamics import nonlinear as nl
 
 orekit_jpype = pytest.importorskip("orekit_jpype")
 
-_JDK_FALLBACK = pathlib.Path("../podium-dev/tmp/jdk-21.0.11+10-jre")
-_DATA_FALLBACK = pathlib.Path("../podium-dev/tmp/orekit-data.zip")
+_JDK_FALLBACK = pathlib.Path(".orekit-cache/jdk-21.0.11+10-jre")
+_DATA_FALLBACK = pathlib.Path(".orekit-cache/orekit-data.zip")
 
 A0 = 6_778_137.0  # ~400 km
 TOF = 2.0 * 2.0 * math.pi * math.sqrt(A0**3 / const.MU_EARTH)  # 2 orbits
