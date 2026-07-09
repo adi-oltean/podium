@@ -52,6 +52,11 @@ def _check_qcqp(p0: Mat, q0: Vec, p1: Mat, q1: Vec) -> int:
             or any(len(row) != n for row in p0)
             or any(len(row) != n for row in p1)):
         raise ValueError("QCQP data dimensions are inconsistent")
+    if (any(not isinstance(x, F) for row in p0 for x in row)
+            or any(not isinstance(x, F) for row in p1 for x in row)
+            or any(not isinstance(x, F) for x in q0)
+            or any(not isinstance(x, F) for x in q1)):
+        raise ValueError("QCQP data must be exact Fractions")
     return n
 
 

@@ -18,4 +18,4 @@ verify      Contracts, input-range assumptions, and export harness for the
             external abstract-interpretation validation tool.
 """
 
-__version__ = "0.7.0"
+__version__ = "0.8.0.dev0"

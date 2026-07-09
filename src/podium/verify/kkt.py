@@ -465,7 +465,7 @@ def certify_ecos(problem: object,
     imported lazily so podium.verify stays dependency-free.
     """
     import cvxpy as cp  # noqa: PLC0415
-    import ecos  # type: ignore[import-untyped]  # noqa: PLC0415
+    import ecos  # noqa: PLC0415
     from scipy import sparse  # type: ignore[import-untyped]  # noqa: PLC0415
 
     data, _chain, _inv = problem.get_problem_data(cp.ECOS)  # type: ignore[attr-defined]

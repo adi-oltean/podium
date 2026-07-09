@@ -109,6 +109,9 @@ def is_sos(p: Poly, basis: list[Mono],
     """Certify p is SOS via (basis, Gram): exact identity p = z^T G z
     AND G >= 0 (exact PSD). Returns (certified, problems)."""
     problems: list[str] = []
+    if (any(not isinstance(c, Fraction) for c in p.values())
+            or any(not isinstance(x, Fraction) for row in gram for x in row)):
+        return False, ["SOS certificate requires exact rational inputs"]
     n = len(basis)
     if any(len(row) != n for row in gram) or len(gram) != n:
         problems.append("Gram must be square, matching the basis")
@@ -144,6 +147,8 @@ def validate_gram(target: Poly, basis: list[Mono],
     pair can produce (the basis is too small for an SOS form).
     """
     n = len(basis)
+    if len(gram_float) != n or any(len(row) != n for row in gram_float):
+        return None
     g = [[Frac(0)] * n for _ in range(n)]
     for i in range(n):
         for j in range(n):
@@ -174,4 +179,5 @@ def validate_gram(target: Poly, basis: list[Mono],
         g[i][j] += delta
         if i != j:
             g[j][i] += delta
-    return g
+    ok, _ = is_sos(target, basis, g)
+    return g if ok else None

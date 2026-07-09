@@ -196,6 +196,8 @@ def is_psd(m: Mat) -> bool:
     since z' M z = sum_i D_ii (l_i' z)^2. This replaces the earlier
     all-principal-minors test, which was exponential in n."""
     n = len(m)
+    if any(not isinstance(x, Fraction) for row in m for x in row):
+        return False  # trusted PSD test requires exact rational entries
     for i in range(n):
         for j in range(n):
             if m[i][j] != m[j][i]:
@@ -233,6 +235,14 @@ def verify_certificate(cert: BarrierCertificate) -> list[str]:
             problems.append(f"{name} must be a positive Fraction")
     if not all(isinstance(x, Fraction) for x in cert.a):
         problems.append("barrier coefficients must be Fractions")
+    case = cert.case
+    if (len(case.center) != _N or len(case.radii) != _N
+            or not all(isinstance(x, Fraction) for x in case.center)
+            or not all(isinstance(r, Fraction) and r > 0 for r in case.radii)):
+        problems.append("abort case center/radii must be length-_N Fractions "
+                        "with strictly positive radii")
+    if not (isinstance(case.koz_radius, Fraction) and case.koz_radius > 0):
+        problems.append("abort case koz_radius must be a positive Fraction")
     if problems:
         return problems
 

@@ -16,7 +16,7 @@ authors:
   - family-names: Oltean
     given-names: Adi
     affiliation: "Starcloud, Inc."
-version: 0.7.0
+version: 0.8.0.dev0
 date-released: "2026-07-06"
 license: MIT
 repository-code: "https://github.com/adi-oltean/podium"

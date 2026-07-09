@@ -18,6 +18,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: pip install -e ".[dev]"
       - run: ruff check src tests examples
+      - run: mypy
       - run: pytest --cov=podium --cov-report=term
   # Placeholder for the validation gate: when the C emitter lands, this job
   # will translate podium.core and run the external abstract-interpretation

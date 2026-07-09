@@ -88,6 +88,10 @@ def verify_lyapunov(a_cl: Mat, p: Mat) -> LyapunovReport:
             or any(len(row) != n for row in a_cl)):
         problems.append("P and A_cl must be square and same size")
         return LyapunovReport(False, False, problems)
+    if (any(not isinstance(x, Fraction) for row in p for x in row)
+            or any(not isinstance(x, Fraction) for row in a_cl for x in row)):
+        problems.append("Lyapunov verification requires exact rational inputs")
+        return LyapunovReport(False, False, problems)
     # symmetry of P (a Lyapunov matrix is symmetric)
     for i in range(n):
         for j in range(i):

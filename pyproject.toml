@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "podium-gnc"
-version = "0.7.0"
+version = "0.8.0.dev0"
 description = "Podium: physics-precise RPOD (rendezvous, proximity operations & docking) GNC library, simulation sandbox, and visualization for LEO/MEO"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -40,8 +40,8 @@ validate = ["spiceypy>=6.0", "orekit-jpype>=13.0"]
 dev = [
     "pytest>=8.0",
     "pytest-cov",
-    "mypy>=1.8",
-    "ruff>=0.4",
+    "mypy>=1.8,<2.2",
+    "ruff>=0.4,<0.16",
     "hypothesis>=6.90",
     # Layer-0 guidance + plot tests (tests skip gracefully if absent,
     # but CI runs them)
@@ -83,7 +83,7 @@ ignore = ["PLR0913", "PLR2004"]
                                    "PLC0206"]
 # cvxpy is imported lazily inside synthesize(): the trusted checker must
 # stay importable (and float-free) without the optional SDP stack.
-"src/podium/verify/barrier.py" = ["PLC0415"]
+"src/podium/verify/barrier.py" = ["PLC0415", "PLR0912", "PLR0915"]
 # The exact KKT checker is one branch per optimality/feasibility case; the
 # case analysis is the specification, so splitting it would obscure it.
 "src/podium/verify/kkt.py" = ["PLR0912", "PLR0915"]
@@ -164,6 +164,16 @@ disable_error_code = ["attr-defined", "import-untyped", "type-arg"]
 [[tool.mypy.overrides]]
 module = "podium.sim.mission"
 disable_error_code = ["type-arg", "assignment", "operator", "union-attr"]
+
+# Optional third-party packages imported lazily behind feature flags; no stubs.
+[[tool.mypy.overrides]]
+module = ["ecos.*", "cvxpygen.*"]
+ignore_missing_imports = true
+
+# numpy stubs type np.linalg results as floating[Any]; our arrays are float64.
+[[tool.mypy.overrides]]
+module = ["podium.dynamics.attitude", "podium.control.lqr"]
+disable_error_code = ["assignment", "return-value"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
