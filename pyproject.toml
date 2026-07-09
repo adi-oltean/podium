@@ -84,6 +84,9 @@ ignore = ["PLR0913", "PLR2004"]
 # cvxpy is imported lazily inside synthesize(): the trusted checker must
 # stay importable (and float-free) without the optional SDP stack.
 "src/podium/verify/barrier.py" = ["PLC0415"]
+# The exact KKT checker is one branch per optimality/feasibility case; the
+# case analysis is the specification, so splitting it would obscure it.
+"src/podium/verify/kkt.py" = ["PLR0912", "PLR0915"]
 # mujoco is imported lazily so the module documents itself without the
 # optional contact stack installed.
 "src/podium/sim/contact.py" = ["PLC0415"]
