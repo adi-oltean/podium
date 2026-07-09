@@ -93,9 +93,6 @@ ignore = ["PLR0913", "PLR2004"]
 # An AST visitor is one dispatch table per node class; splitting it
 # obscures the subset definition.
 "src/podium/emit/cemit.py" = ["PLR0911", "PLR0912", "PLR0915"]
-# cvxpy/cvxpygen imported lazily: generation is a local/offline step and
-# cvxpygen's import pulls a Julia sidecar.
-"src/podium/emit/solvergen.py" = ["PLC0415"]
 # mpmath imported lazily so the core stays dependency-free.
 "src/podium/emit/croracle.py" = ["PLC0415"]
 # scipy.optimize imported lazily so the core stays dependency-free.
@@ -158,18 +155,13 @@ disable_error_code = ["type-arg", "arg-type", "attr-defined",
                       "assignment", "operator", "unused-ignore"]
 
 [[tool.mypy.overrides]]
-module = "podium.emit.solvergen"
-disallow_untyped_defs = false
-disable_error_code = ["attr-defined", "import-untyped", "type-arg"]
-
-[[tool.mypy.overrides]]
 module = "podium.sim.mission"
 disable_error_code = ["type-arg", "assignment", "operator", "union-attr",
                       "arg-type"]
 
-# Optional third-party packages imported lazily behind feature flags; no stubs.
+# Optional ecos imported lazily behind a feature flag; no stubs.
 [[tool.mypy.overrides]]
-module = ["ecos.*", "cvxpygen.*"]
+module = ["ecos.*"]
 ignore_missing_imports = true
 
 # numpy stubs type np.linalg results as floating[Any] and vary the ndarray

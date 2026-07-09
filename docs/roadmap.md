@@ -288,14 +288,10 @@ headline addition is the ROE module, #5.)
       fixed en route: ACSL decimal literals are exact reals, so
       boundary doubles left preconditions 'unknown' until the emitter
       switched to hex float literals
-- [x] CVXPYgen embedded solver generation (#26,
-      `podium.emit.solvergen`): fixed-grid Layer-0 rendezvous with live
-      boundary parameters generated to a self-contained C tree (ECOS
-      backend), compiled with plain gcc (build recipe encoded: gnu99,
-      -fcommon, demo-source exclusions, SuiteSparse includes) and run
-      with zero Python — the binary reproduces the Clarabel optimum to
-      1e-5. cvxpygen deliberately NOT a dev dependency (its import pulls
-      a Julia sidecar via pdaqp; generation is a local/offline step).
+- [x] CVXPYgen embedded solver generation (#26): prototyped, then removed
+      as an untested offline path (it required a Julia sidecar and could not
+      be covered in CI). The online convex solve is covered by the exact-KKT
+      certificate layer instead.
       QOCOGEN alternate + verified-KKT checker are the v0.6 items
 - [ ] cFS/F´ integration example (generated GNC app on a software bus)
 
@@ -379,7 +375,7 @@ tudatpy 6-DOF oracle, torque allocation) carry into v0.7.
       Layer-0 min-energy rendezvous QP gets an exact-rational suboptimality
       bound; perturbing the
       primal or flipping a dual sign makes the exact residuals blow up
-      and the checker rejects. Embedded-solvergen wiring (feed a
+      and the checker rejects. Embedded-solver wiring (feed a
       QOCOGEN/CVXPYgen KKT dump to the checker) still open
 - [x] Verified-KKT checker for SOCP (#41): extends #40 to
       second-order-cone programs — the conic Layer-0 form (keep-out /

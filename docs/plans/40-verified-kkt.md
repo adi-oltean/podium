@@ -47,7 +47,7 @@ exact point — the same discipline as the barrier certificates (#20).
 ## Deferred
 
 Feeding an embedded CVXPYgen/QOCOGEN solver's KKT dump directly to the
-checker (solvergen.py emits ECOS today); SOCP cone complementarity
+checker; SOCP cone complementarity
 (second-order-cone membership in exact arithmetic) for the conic
 Layer-0 problems; an interval-arithmetic variant for problems without
 a clean rational optimum.
