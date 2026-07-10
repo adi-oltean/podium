@@ -177,6 +177,55 @@ def test_multi_constraint_bracket():
         p0, q0, r0, cons, [F(0), F(0)]) is None      # origin is inside both
 
 
+def test_cdt_strict_gap():
+    """Celis-Dennis-Tapia (two-ball) instance with a genuine Shor/SDP
+    duality gap: the S-procedure does NOT close, so the best certifiable
+    lower bound sits STRICTLY below J*, yet both bracket endpoints are
+    exact over Q.
+
+    Minimize the indefinite saddle f0(x) = 2 x1 x2 over the intersection
+    of the two balls ||x-(1,0)|| <= 2 and ||x+(1,0)|| <= 2. The Shor SDP
+    value is d* = -3 exactly (confirmed numerically; the sup is the
+    trust-region hard case at lam=(1/2,1/2), where A = P0 + (lam1+lam2) I
+    = [[1,1],[1,1]] is singular). The true global optimum is
+    J* = -1.4760... (a single ball active, involving sqrt(33)), so
+    d* = -3 < J*: a certified duality gap. The upper point is the exact
+    rational circle point (73/109, -120/109) on the second ball.
+    """
+    # objective 2 x1 x2
+    p0 = [[F(0), F(1)], [F(1), F(0)]]
+    q0 = [F(0), F(0)]
+    r0 = F(0)
+    # balls ||x - c|| <= 2 as f(x) = -x'x + 2 c'x + (4 - ||c||^2) >= 0
+    neg_i = [[F(-1), F(0)], [F(0), F(-1)]]
+    cons = [(neg_i, [F(2), F(0)], F(3)),      # c1 = (1, 0)
+            (neg_i, [F(-2), F(0)], F(3))]     # c2 = (-1, 0)
+
+    # certified lower bound: lam = (1/2, 1/2) certifies t = -3 = d* ...
+    lams = [F(1, 2), F(1, 2)]
+    t = F(-3)
+    assert bracket.certify_lower_bound_multi(p0, q0, r0, cons, lams, t)
+    # ... and -3 is the ceiling: nothing strictly above it is certifiable
+    # (the S-procedure is stuck at d* = -3, well below J* ~ -1.476)
+    assert not bracket.certify_lower_bound_multi(p0, q0, r0, cons, lams,
+                                                 F(-29, 10))   # > -3
+    assert not bracket.certify_lower_bound_multi(p0, q0, r0, cons, lams,
+                                                 F(-3, 2))     # ~ J*, unreachable
+
+    # certified upper bound at the exact rational point on ball 2's boundary
+    xbar = [F(73, 109), F(-120, 109)]
+    u = bracket.certify_upper_bound_multi(p0, q0, r0, cons, xbar)
+    assert u == F(-17520, 11881)                 # exact f0(xbar), a Fraction
+    # xbar sits exactly ON ball 2 (f2 = 0) and strictly inside ball 1
+    assert bracket._quad(*cons[1], xbar) == F(0)
+    assert bracket._quad(*cons[0], xbar) > 0
+
+    # the certified bracket [t, u] encloses J* with both ends exact over Q,
+    # and is strictly open -- the S-procedure gap is real, not numerical
+    assert t < u
+    assert u - t == F(18123, 11881)
+
+
 def test_int_data_stays_exact_rational():
     """The trusted path divides by 2 and 4; these must stay EXACT even
     when a caller passes int (not Fraction) data. In Python `int / 2` is a

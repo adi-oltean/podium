@@ -72,7 +72,8 @@ the rounding denominator in the nonsingular case and first-order in the
 trust-region hard case, with soundness retained in both, and it vanishes when the
 optimal multiplier is rational (Theorems~\ref{thm:recovery} and~\ref{thm:hard}).
 For several constraints the S-procedure need not be tight, and the bracket then
-certifies a duality gap with both endpoints exact (Theorem~\ref{thm:multi}). Each
+encloses $J^\star$ between exact rational bounds, certifying a strictly positive
+suboptimality gap on a Celis--Dennis--Tapia instance (Theorem~\ref{thm:multi}). Each
 result is accompanied by a verifying test in the reference implementation.
 \end{abstract}
 
@@ -202,11 +203,12 @@ yield a valid Lagrangian dual point, not merely when they are small.
 For linearized relative motion with a spherical keep-out zone, an SDP produces a
 barrier function whose sublevel set is invariant under the passive, thrust-free
 drift. The checker verifies over $\Q$ an S-procedure condition, in which a
-nonnegative multiplier certifies that one quadratic is nonnegative on the zero
-set of another, together with an exactly vanishing Lie derivative, the rate of
-change of the barrier along the drift. Together these establish forward
-invariance of the safe set, so that the abort set never intersects the keep-out
-zone \cite{prajna2004,ames2017}.
+nonnegative multiplier certifies that one quadratic is nonnegative on the region
+where another is nonnegative. The barrier is expressed on a basis of quantities
+conserved by the passive drift, so its Lie derivative --- the rate of change of
+the barrier along the drift --- vanishes by construction. Together these
+establish forward invariance of the safe set, so that the abort set never
+intersects the keep-out zone \cite{prajna2004,ames2017}.
 
 \paragraph{KKT certificates for the online solves.}
 The guidance layer solves a quadratic program (QP) and a second-order cone
@@ -379,7 +381,8 @@ $J^\star = \max_{\lambda \ge 0} g(\lambda) = g(\lambda^\star)$
 \cite{yakubovich1971}.
 
 \begin{theorem}[Nonsingular recovery]\label{thm:recovery}
-Suppose $A(\lambda^\star) \succ 0$. Then $g$ is smooth and concave near
+Suppose $A(\lambda^\star) \succ 0$ and $\lambda^\star > 0$ is an interior
+maximizer of the dual. Then $g$ is smooth and concave near
 $\lambda^\star$ with $g'(\lambda^\star) = 0$, so
 $J^\star - g(\lambda) = O((\lambda - \lambda^\star)^2)$. Rounding $\lambda^\star$
 to a rational $\lambda$ with denominator at most $D$, so that
@@ -466,7 +469,8 @@ of $t$ over rational $\lambda \ge 0$ and $t$ with $M(\lambda, t) \succeq 0$. The
 $d^\star \le J^\star$ always, and for $m \ge 2$ this inequality may be strict.
 When it is, any certified lower bound $t \le d^\star$ and any exactly feasible
 $\bar x$ give an interval $[t, f_0(\bar x)]$ that contains $J^\star$, with both
-endpoints exact rationals and $f_0(\bar x) - t > 0$ a certified duality gap.
+endpoints exact rationals; $f_0(\bar x) - t$ is then a certified upper bound on
+the suboptimality of $\bar x$, and hence on the duality gap $J^\star - d^\star$.
 \end{theorem}
 
 \begin{proof}
@@ -492,8 +496,9 @@ Finally, let $t$ be a certified lower bound, so $\lambda \ge 0$ and
 $M(\lambda, t) \succeq 0$ pass the exact PSD test, and let $\bar x$ be exactly
 feasible, so $f_k(\bar x) \ge 0$ for every $k$, each checked over $\Q$. Then
 $t \le d^\star \le J^\star \le f_0(\bar x)$, so $J^\star \in [t, f_0(\bar x)]$
-with both endpoints exact rationals, and $f_0(\bar x) - t \ge 0$ is a certified
-bound on the duality gap; when it is positive it certifies a nonzero gap exactly.
+with both endpoints exact rationals, and
+$f_0(\bar x) - t \ge J^\star - d^\star \ge 0$ is a certified upper bound on both
+the suboptimality of $\bar x$ and the duality gap.
 \end{proof}
 
 \begin{remark}
@@ -505,13 +510,15 @@ $J^\star$ under a compactness (Archimedean) condition, each verified by an exact
 PSD test.
 \end{remark}
 
-The implementation exhibits the strict case on a two-constraint instance of
-Celis--Dennis--Tapia type,\footnote{The
+The implementation exhibits the strict case on the two-ball Celis--Dennis--Tapia
+instance $\min 2x_1x_2$ subject to $\lVert x-(1,0)\rVert \le 2$ and
+$\lVert x+(1,0)\rVert \le 2$,\footnote{The
 Celis--Dennis--Tapia problem minimizes a quadratic over the intersection of two
 quadratic constraints; it is the standard example in which the Shor relaxation
-can be inexact.} for which the largest certifiable lower bound lies strictly below
-the optimum; the bracket then encloses a nonconvex optimum with no closed form,
-with both endpoints verified over $\Q$.
+can be inexact.} a trust-region hard case in which the largest certifiable lower
+bound $d^\star = -3$ lies strictly below the optimum $J^\star \approx -1.476$; the
+bracket $[-3,\,-17520/11881]$ then encloses this nonconvex optimum, which has no
+closed form, with both endpoints verified over $\Q$.
 
 \subsection{Relation to successive convexification}
 \label{sec:scvx}
@@ -550,9 +557,9 @@ Instance & Case & $\lambda^\star$ & certified $[t,\,u]$ & $J^\star$ \\
 $\min\lVert x\rVert^2$, $\lVert x-(3,0)\rVert\ge5$ & nonsingular, closed & $2/5$ & $[4,\,4]$ & $4$ \\
 \quad same, non-optimal upper point & open bracket & $2/5$ & $[4,\,169/25]$ & $4$ \\
 recovery from $\tilde\lambda\approx0.4003$ & quadratic rate & $2/5$ & $t=4$ & $4$ \\
-$\min -x_1^2{+}2x_2^2{+}2x_2$, $\lVert x\rVert\le1$ & singular & $1$ & $[-4/3,\,-4/3]$ & $-4/3$ \\
-two active keep-outs & several constraints & $(\tfrac12,\tfrac12)$ & $[5,\,5]$ & $5$ \\
-Celis--Dennis--Tapia sweep (7 of 40) & duality gap & \text{--} & $u-t\le1.72$ & \text{--} \\
+$\min -x_1^2{+}2x_2^2{+}2x_2$, $\lVert x\rVert\le1$ & singular & $1$ & $t=-4/3$ & $-4/3$ \\
+two active keep-outs & several constraints & $(\tfrac12,\tfrac12)$ & $[5,\,9]$ & $5$ \\
+Celis--Dennis--Tapia $\min 2x_1x_2$ & duality gap & $(\tfrac12,\tfrac12)$ & $[-3,\,-\tfrac{17520}{11881}]$ & ${\approx}\,{-}1.476$ \\
 \bottomrule
 \end{tabular}
 \end{table}

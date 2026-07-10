@@ -144,7 +144,8 @@ packages provide the verification layer and the C code generator described below
 
 The flight kernels are written as pure step functions in a restricted subset of
 Python: statically shaped arrays, bounded loops, no dynamic allocation, and
-machine-readable contracts on input ranges and invariants. The subset is chosen
+machine-readable contracts on input ranges, with any ranges the static analysis
+assumes rather than the kernel declares recorded as explicit gaps. The subset is chosen
 so that a sound static analyzer can reason about it and so that its scalar and
 subscript statements translate line-for-line to C, with array expressions lowered
 to bounded row-major loops. The \texttt{emit} package generates C99 from the subset,
@@ -164,8 +165,8 @@ vectors thus tie the Python reference, the emitted C, and the compiled assembly 
 the tested inputs; the reproducibility methodology, the equality classes, and the
 cross-ISA conditions (IEEE-754 binary64 with \texttt{-ffp-contract=off}) are
 documented in a companion note on numerical reproducibility. This emitted, analyzed, and
-compiled path covers the flight kernels---the relative-motion state transitions,
-the navigation-filter update, and the quaternion routines---rather than the
+compiled path covers the flight kernels---the CW and Keplerian relative-orbital-element
+state transitions, the navigation-filter update, and the quaternion routines---rather than the
 guidance planners or controllers, whose solver output the certificate layer
 re-checks below.
 
@@ -322,8 +323,11 @@ drift for a fixed safe formation, which bounds the linearized abort. Richer trut
 forces ($J_2$, differential drag) and additional corridor/keep-out specifications
 are supported but are not enabled in this reference configuration. The
 exact-rational KKT and conic KKT checkers re-verify an online QP or SOCP solve
-against its own optimality conditions---for a second-order cone program, an
-embedded conic solver (ECOS) when it is installed. They run in continuous
+against its own optimality conditions, rationalizing the candidate and returning
+an exact rational suboptimality bound when its stationarity and (for a
+second-order cone program) conic-dual feasibility hold exactly, and the exact
+residuals otherwise; the SOCP path uses an embedded conic solver (ECOS) when it
+is installed. They run in continuous
 integration as part of the verification suite (\texttt{test\_kkt.py}) rather than
 inside the reference-mission loop.
 
