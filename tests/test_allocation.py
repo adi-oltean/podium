@@ -134,3 +134,12 @@ def test_config_validation():
     with pytest.raises(ValueError, match="both be"):
         al.ThrusterConfig(positions=np.zeros((4, 3)),
                           directions=np.zeros((3, 3)))
+
+
+def test_zero_direction_rejected():
+    """A [0, 0, 0] thrust direction cannot be normalized — it would inject a
+    NaN column into the effectiveness matrix — so it is rejected up front."""
+    with pytest.raises(ValueError, match="nonzero"):
+        al.ThrusterConfig(positions=np.zeros((2, 3)),
+                          directions=np.array([[1.0, 0.0, 0.0],
+                                               [0.0, 0.0, 0.0]]))

@@ -29,6 +29,11 @@ def camera_h(x: F64) -> F64:
     relative LVLH state (position part used)."""
     s = -x[0:3]
     rho = float(np.linalg.norm(s))
+    if rho <= 0.0:
+        raise ValueError(
+            "camera_h: degenerate geometry, relative range is zero "
+            "(target coincident with chaser)"
+        )
     az = math.atan2(float(s[1]), float(s[0]))
     el = math.asin(float(s[2]) / rho)
     return np.array([az, el, rho])
@@ -43,6 +48,11 @@ def camera_jacobian(x: F64) -> F64:
     rho = math.sqrt(rho2)
     rxy2 = sx * sx + sy * sy
     rxy = math.sqrt(rxy2)
+    if rho <= 0.0 or rxy <= 0.0:
+        raise ValueError(
+            "camera_jacobian: degenerate geometry, relative range is zero or "
+            "the line of sight lies on the cross-track axis (bearing undefined)"
+        )
     h = np.zeros((3, 6))
     # d(az)/ds then chain ds/dr = -I
     h[0, 0] = -(-sy / rxy2)

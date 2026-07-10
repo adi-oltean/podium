@@ -280,6 +280,20 @@ class _Emitter(ast.NodeVisitor):
         self.idx_n += 1
         return f"_i{self.idx_n}"
 
+    def _int_typed(self, e: ast.expr) -> bool:
+        """True if ``e`` emits as an int-typed C expression. Loop counters
+        (declared ``int``) are the subset's only integers; ``/`` between two
+        such operands is C integer division, which truncates and traps on a
+        zero divisor rather than matching Python's float division."""
+        if isinstance(e, ast.Name):
+            return e.id in self.loop_vars
+        if isinstance(e, ast.UnaryOp) and isinstance(e.op, ast.USub):
+            return self._int_typed(e.operand)
+        if isinstance(e, ast.BinOp) and isinstance(
+                e.op, (ast.Add, ast.Sub, ast.Mult)):
+            return self._int_typed(e.left) and self._int_typed(e.right)
+        return False
+
     # -- expressions ----------------------------------------------------
     def expr(self, e: ast.expr) -> str:
         if isinstance(e, ast.Constant):
@@ -299,6 +313,12 @@ class _Emitter(ast.NodeVisitor):
         if isinstance(e, ast.UnaryOp) and isinstance(e.op, ast.USub):
             return f"(-{self.expr(e.operand)})"
         if isinstance(e, ast.BinOp):
+            if isinstance(e.op, ast.Div) and self._int_typed(e.left) \
+                    and self._int_typed(e.right):
+                raise EmitError(
+                    f"{self.m.py_name}: integer division of loop variables "
+                    f"(C truncates toward zero and traps on a zero divisor; "
+                    f"Python does true float division)")
             ops = {ast.Add: "+", ast.Sub: "-", ast.Mult: "*", ast.Div: "/"}
             for t, sym in ops.items():
                 if isinstance(e.op, t):
@@ -662,6 +682,20 @@ class _Emitter(ast.NodeVisitor):
                 # array expression (matmul / transpose / elementwise)
                 shp = _ashape(st.value, self.env, self.m.globals_)
                 if shp is not None:
+                    # The expression is lowered element-by-element into the
+                    # destination buffer, so if that buffer is ALSO read on
+                    # the RHS (e.g. t = a @ t, m = m + m.T) the in-flight
+                    # writes corrupt later reads. The kernel-call path guards
+                    # this as "array local reassigned"; the only safe alias is
+                    # a bare `out = out`, which lower_array short-circuits.
+                    if not (isinstance(st.value, ast.Name)
+                            and st.value.id == tgt.id):
+                        for sub in ast.walk(st.value):
+                            if isinstance(sub, ast.Name) and sub.id == tgt.id:
+                                raise EmitError(
+                                    f"{fn}: array expression assigns to "
+                                    f"{tgt.id!r} while reading it "
+                                    f"(self-aliasing miscompiles)")
                     if tgt.id in self.outs_map or tgt.id in self.env:
                         dest = self.cn(tgt.id)
                         if tgt.id in self.outs_map \
@@ -723,6 +757,14 @@ class _Emitter(ast.NodeVisitor):
                 raise EmitError(f"{fn}: for-else unsupported")
             return
         if isinstance(st, ast.If):
+            # only these condition forms render with the outer parentheses C
+            # requires; a bare name/subscript/call would emit `if flag {`.
+            if not isinstance(st.test, (ast.Compare, ast.BinOp,
+                                        ast.UnaryOp, ast.IfExp)):
+                raise EmitError(
+                    f"{fn}: unsupported if-condition "
+                    f"{type(st.test).__name__} (only comparison/arithmetic "
+                    f"conditions emit valid parenthesized C)")
             self.lines.append(f"{indent}if {self.expr(st.test)} {{")
             for s in st.body:
                 self.stmt(s, indent + "    ")
@@ -749,9 +791,26 @@ def _acsl(meta: _FuncMeta) -> str:
         lo, hi = float(iv.lo).hex(), float(iv.hi).hex()
         if name in meta.param_arrays:
             n = meta.param_arrays[name]
+            if n == 0:
+                # size resolved only from loop-var subscripts: the ACSL bound
+                # would be a vacuous `0 <= i < 0` and the signature a
+                # non-ISO-C99 `const double v[0]` — neither is sound.
+                raise EmitError(
+                    f"{meta.py_name}: @contract on {name!r} whose array size "
+                    f"resolves to 0 (sized by a loop bound, not a constant "
+                    f"subscript); declare its length with @shapes")
             req.append(f"requires \\forall integer i; 0 <= i < {n} ==> "
                        f"{lo} <= {name}[i] <= {hi};")
         else:
+            shp = meta.param_shapes.get(name)
+            if shp is not None and len(shp) > 1:
+                # a scalar range on a 2-D param would emit
+                # `requires lo <= m <= hi;` for `const double m[.][.]`,
+                # malformed ACSL that aborts Frama-C.
+                raise EmitError(
+                    f"{meta.py_name}: scalar-range @contract on multi-"
+                    f"dimensional array parameter {name!r} (would emit "
+                    f"malformed ACSL); contract its elements individually")
             req.append(f"requires {lo} <= {name} <= {hi};")
         spec.append(f"[in, {iv.to_annotation()}] {name};")
     acsl = "/*@\n  " + "\n  ".join(req) + "\n*/\n"

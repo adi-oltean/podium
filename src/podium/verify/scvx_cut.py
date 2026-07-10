@@ -147,6 +147,14 @@ def certify_cut(q: Poly, cuts: list[tuple[F, Poly]],
     multiplier c_i >= 0 -- a Positivstellensatz witness that q >= 0 on
     the intersection of the cut half-/sub-spaces. All exact rational."""
     problems: list[str] = []
+    if len(gram) != len(basis) or any(len(row) != len(basis) for row in gram):
+        raise ValueError("Gram matrix shape must match the basis")
+    if (any(not isinstance(c, F) for c in q.values())
+            or any(not isinstance(v, F) for row in gram for v in row)
+            or any(not isinstance(c, F) for c, _cut in cuts)
+            or any(not isinstance(v, F)
+                   for _c, cut in cuts for v in cut.values())):
+        raise ValueError("cut certificate data must be exact Fractions")
     recon = dict(sos.gram_poly(basis, gram))
     for c, cut in cuts:
         if c < 0:

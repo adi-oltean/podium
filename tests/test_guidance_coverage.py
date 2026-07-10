@@ -85,6 +85,31 @@ def test_passive_safety_requires_circular_orbit():
         planner.solve(X0, XF, n=N, e=0.01)
 
 
+def test_rendezvous_infeasible_returns_status_not_crash():
+    """A dv budget far too small for a 1 km transfer is infeasible; the
+    planner must report the status (not AssertionError, not None burns)."""
+    times = np.linspace(0.0, 2000.0, 9)
+    plan = RendezvousPlanner(times, dv_max=1e-9).solve(X0, XF, n=N)
+    assert "infeasible" in plan.status
+    assert math.isinf(plan.objective)
+    assert plan.dvs.shape == (len(times), 3)
+    assert np.all(plan.dvs == 0.0)
+
+
+def test_rendezvous_solver_error_returns_infeasible_plan(monkeypatch):
+    """A raised SolverError must be swallowed and surface as an empty plan
+    carrying the status, mirroring FiniteBurnPlanner.solve."""
+    planner = RendezvousPlanner(np.linspace(0.0, 2000.0, 6))
+
+    def boom(self, *a, **k):
+        raise cp.error.SolverError("forced failure")
+
+    monkeypatch.setattr(cp.Problem, "solve", boom)
+    plan = planner.solve(X0, XF, n=N)
+    assert math.isinf(plan.objective)
+    assert np.all(plan.dvs == 0.0)
+
+
 # ======================================================================
 # convex.py — FiniteBurnPlan / FiniteBurnPlanner / find_min_time
 # ======================================================================
@@ -154,6 +179,22 @@ def test_roe_planner_l1_objective_solves():
     )
     assert plan.status in ("optimal", "optimal_inaccurate")
     assert np.allclose(plan.roes[-1] + 0.0, plan.roes[-1])  # finite
+
+
+def test_roe_planner_solver_error_returns_infeasible_plan(monkeypatch):
+    """A raised SolverError must surface as an empty ROE plan carrying the
+    status, mirroring FiniteBurnPlanner.solve (no burns, infinite objective)."""
+    roef = np.array([0.0, 0.0, 4e-5, 0.0, 4e-5, 0.0])
+    planner = RoePlanner(_roe_times())
+
+    def boom(self, *a, **k):
+        raise cp.error.SolverError("forced failure")
+
+    monkeypatch.setattr(cp.Problem, "solve", boom)
+    plan = planner.solve(np.zeros(6), roef, a=A, n=N, u0=0.3)
+    assert math.isinf(plan.objective)
+    assert plan.dvs.shape == (len(planner.times), 3)
+    assert np.all(plan.dvs == 0.0)
 
 
 def test_roe_planner_j2_dynamics_solves():

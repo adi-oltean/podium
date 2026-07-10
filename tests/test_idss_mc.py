@@ -109,6 +109,19 @@ def test_idss_attitude_box_at_contact_time():
     assert m["angular_rate"] > 0.5 * BOX.angular_rate_max
 
 
+def test_zero_approach_axis_rejected():
+    """A zero approach axis cannot be normalized into a direction; the
+    checker must raise rather than return NaN margins."""
+    with pytest.raises(ValueError, match="nonzero"):
+        idss.check_translation(np.zeros(6), DOCK, np.zeros(3))
+
+
+def test_zero_runs_rejected():
+    """n_runs=0 would index an empty results list; require at least one run."""
+    with pytest.raises(ValueError, match=">= 1"):
+        monte_carlo.run_campaign(0, master_seed=0, make_case=_docking_case)
+
+
 def test_box_defaults_match_idss_rev_g():
     assert BOX.closing_min == 0.05
     assert BOX.closing_max == 0.10

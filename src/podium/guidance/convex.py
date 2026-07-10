@@ -344,17 +344,29 @@ class RendezvousPlanner:
         self._x0.value = np.asarray(x0, dtype=np.float64)
         self._xf.value = np.asarray(xf, dtype=np.float64)
         self._set_reference(self._reference_states(x0, xf))
-        self._problem.solve(solver=cp.CLARABEL)
+        try:
+            self._problem.solve(solver=cp.CLARABEL)
+        except cp.error.SolverError:
+            pass
         passes = (
             refine_passes
             if (self.koz or self.plume or self.passive_safety)
             else 0
         )
         for _ in range(passes):
-            assert self._x.value is not None
-            self._set_reference(self._x.value.T.copy())
-            self._problem.solve(solver=cp.CLARABEL)
-        assert self._v.value is not None and self._x.value is not None
+            if self._x.value is not None:
+                self._set_reference(self._x.value.T.copy())
+                self._problem.solve(solver=cp.CLARABEL)
+        if self._v.value is None or self._x.value is None:
+            # infeasible/failed: return an empty plan carrying the status
+            # (mirrors FiniteBurnPlanner.solve) instead of asserting on None
+            return Plan(
+                times=self.times.copy(),
+                dvs=np.zeros((self.k + 1, 3)),
+                states=np.zeros((self.k + 1, 6)),
+                objective=math.inf,
+                status=str(self._problem.status),
+            )
         states = self._x.value.T.copy()
         ps_margins: dict[int, float] = {}
         if self.passive_safety is not None:
@@ -705,8 +717,20 @@ class RoePlanner:
         self._r0.value = self._SCALE * np.asarray(roe0, dtype=np.float64)
         if self.safe_set is None:
             self._rf.value = self._SCALE * np.asarray(roef, dtype=np.float64)
-        self._problem.solve(solver=cp.CLARABEL)
-        assert self._v.value is not None and self._r.value is not None
+        try:
+            self._problem.solve(solver=cp.CLARABEL)
+        except cp.error.SolverError:
+            pass
+        if self._v.value is None or self._r.value is None:
+            # infeasible/failed: return an empty plan carrying the status
+            # (mirrors FiniteBurnPlanner.solve) instead of asserting on None
+            return RoePlan(
+                times=self.times.copy(),
+                dvs=np.zeros((self.k + 1, 3)),
+                roes=np.zeros((self.k + 1, 6)),
+                objective=math.inf,
+                status=str(self._problem.status),
+            )
         return RoePlan(
             times=self.times.copy(),
             dvs=self._v.value.T.copy(),

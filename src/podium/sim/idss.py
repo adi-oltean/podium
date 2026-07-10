@@ -42,7 +42,10 @@ def check_translation(
 ) -> dict[str, float]:
     """Margins of the translational contact conditions (>0 = inside)."""
     axis = np.asarray(approach_axis, dtype=np.float64)
-    axis = axis / np.linalg.norm(axis)
+    axis_norm = float(np.linalg.norm(axis))
+    if axis_norm == 0.0:
+        raise ValueError("approach_axis must be nonzero")
+    axis = axis / axis_norm
     rel_pos = x_rel[0:3] - np.asarray(dock_point, dtype=np.float64)
     closing = -float(x_rel[3:6] @ axis)  # positive = moving into the port
     lat_pos = rel_pos - (rel_pos @ axis) * axis

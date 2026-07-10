@@ -33,6 +33,8 @@ def run_campaign(
     n_runs: int, master_seed: int, make_case: MakeCase
 ) -> np.ndarray:
     """Run the campaign; returns a structured array (run, seed, metrics...)."""
+    if n_runs < 1:
+        raise ValueError("n_runs must be >= 1")
     master = np.random.default_rng(master_seed)
     rows: list[dict[str, float]] = []
     for i in range(n_runs):

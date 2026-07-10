@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 
 from podium.emit import cemit, evagen
-from podium.verify import shapes
+from podium.verify import Interval, contract, shapes
 
 
 # -- shared cross-kernel callees -------------------------------------------
@@ -268,6 +268,24 @@ def test_rejects_offset_subscript_without_known_size():
         cemit.emit_module([f])
 
 
+def test_rejects_loopvar_integer_division():
+    """`/` between int-typed loop counters is C integer division (it
+    truncates and traps on zero), never Python's float division. A float
+    divisor keeps the operand int-typed check on the True/False sides
+    (x[i] / 2.0 is fine); (i + j) / (-i) — both int-typed — is rejected."""
+    @shapes(x=(3,))
+    def f(x):  # noqa: ANN001
+        s = 0.0
+        for i in range(3):
+            for j in range(3):
+                s = s + x[i] / 2.0       # float divisor: emits fine
+                s = s + (i + j) / (-i)   # loop-var / loop-var: rejected
+        return s
+
+    with pytest.raises(cemit.EmitError):
+        cemit.emit_module([f])
+
+
 # -- correctly-rounded mode ------------------------------------------------
 def test_correctly_rounded_emits_coremath():
     def f(x):  # noqa: ANN001
@@ -305,6 +323,31 @@ def test_rejects_array_local_reassigned():
 
     with pytest.raises(cemit.EmitError):
         cemit.emit_module([_vec, user])
+
+
+def test_rejects_array_expression_self_alias():
+    """`t = a @ t` lowers to a loop that writes the destination buffer
+    while still reading it — the array-EXPRESSION analogue of the
+    'array local reassigned' call-path guard. Must be rejected."""
+    @shapes(a=(3, 3), t=(3,))
+    def f(a, t):  # noqa: ANN001
+        t = a @ t
+        return t
+
+    with pytest.raises(cemit.EmitError):
+        cemit.emit_module([f])
+
+
+def test_rejects_elementwise_transpose_self_alias():
+    """`m = m + m.T` reads m[j][i] after m[i][j] has been overwritten
+    (the transpose aliases the destination) — a self-aliasing miscompile."""
+    @shapes(m=(2, 2))
+    def f(m):  # noqa: ANN001
+        m = m + m.T
+        return m
+
+    with pytest.raises(cemit.EmitError):
+        cemit.emit_module([f])
 
 
 # -- array-expression emit branches ----------------------------------------
@@ -518,6 +561,49 @@ def test_rejects_for_else():
         else:  # noqa: PLW0120 — for-else is the construct under test
             s = s + 2.0
         return s
+
+    with pytest.raises(cemit.EmitError):
+        cemit.emit_module([f])
+
+
+def test_rejects_bare_name_if_condition():
+    """Only comparison/arithmetic conditions render with the outer parens
+    C requires; a bare name emits an uncompilable `if flag {`, so it is
+    rejected rather than silently miscompiled."""
+    @shapes(x=(3,))
+    def f(flag, x):  # noqa: ANN001
+        if flag:
+            return x[0]
+        return x[1]
+
+    with pytest.raises(cemit.EmitError):
+        cemit.emit_module([f])
+
+
+# -- ACSL contract rendering rejections ------------------------------------
+def test_rejects_contract_on_loop_sized_array():
+    """A @contract on a 1-D array whose length comes only from loop-var
+    subscripts resolves to size 0 — the ACSL clause would be a vacuous
+    `0 <= i < 0` and the C param a non-ISO `const double v[0]`."""
+    @contract(v=Interval(-1.0, 1.0))
+    def f(v):  # noqa: ANN001
+        s = 0.0
+        for i in range(3):
+            s = s + v[i]
+        return s
+
+    with pytest.raises(cemit.EmitError):
+        cemit.emit_module([f])
+
+
+def test_rejects_scalar_contract_on_2d_array_param():
+    """A scalar-range @contract on a 2-D array parameter would fall through
+    to `requires lo <= m <= hi;` on a `const double m[2][2]` — malformed
+    ACSL that aborts Frama-C. Rejected."""
+    @contract(m=Interval(-1.0, 1.0))
+    @shapes(m=(2, 2))
+    def f(m):  # noqa: ANN001
+        return m[0, 0]
 
     with pytest.raises(cemit.EmitError):
         cemit.emit_module([f])

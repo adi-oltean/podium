@@ -124,6 +124,9 @@ def certify_upper_bound(p0: Mat, q0: Vec, r0: F, p1: Mat, q1: Vec, r1: F,
     upper bound; a solver/KKT step is only for choosing a good x."""
     if _check_qcqp(p0, q0, p1, q1) != len(x):
         raise ValueError("x has the wrong dimension")
+    if (not isinstance(r0, F) or not isinstance(r1, F)
+            or any(not isinstance(xi, F) for xi in x)):
+        raise ValueError("QCQP data must be exact Fractions")
     if _quad(p1, q1, r1, x) < 0:            # exactly infeasible
         return None
     return _quad(p0, q0, r0, x)
@@ -160,13 +163,26 @@ Con = tuple[Mat, Vec, F]        # (P_k, q_k, r_k) for f_k(x) >= 0
 def _check_multi(p0: Mat, q0: Vec, cons: list[Con]) -> int:
     """Validate an m-constraint QCQP's shapes; raise ValueError on
     malformed data instead of silently ignoring extra rows or raising an
-    opaque IndexError."""
+    opaque IndexError. Inputs must be exact Fractions: unlike the lower
+    bound (guarded by is_psd, which rejects floats), the upper-bound leg
+    decides feasibility with an exact `_quad(...) < 0` test, so a float
+    datum could wrong-accept a point infeasible by a rounding eps and
+    return an upper bound below J*, collapsing the bracket beneath the
+    true optimum -- exactly what the single-constraint _check_qcqp forbids."""
     n = len(q0)
     if len(p0) != n or any(len(row) != n for row in p0):
         raise ValueError("objective dimensions are inconsistent")
     for pk, qk, _rk in cons:
         if len(pk) != n or any(len(row) != n for row in pk) or len(qk) != n:
             raise ValueError("constraint dimensions are inconsistent")
+    ok = (all(isinstance(x, F) for row in p0 for x in row)
+          and all(isinstance(x, F) for x in q0))
+    for pk, qk, rk in cons:
+        ok = ok and isinstance(rk, F) \
+            and all(isinstance(v, F) for row in pk for v in row) \
+            and all(isinstance(v, F) for v in qk)
+    if not ok:
+        raise ValueError("QCQP data must be exact Fractions")
     return n
 
 
@@ -217,6 +233,8 @@ def certify_upper_bound_multi(p0: Mat, q0: Vec, r0: F, cons: list[Con],
     feasible for ALL constraints (f_k(x) >= 0), else None."""
     if _check_multi(p0, q0, cons) != len(x):
         raise ValueError("x has the wrong dimension")
+    if not isinstance(r0, F) or any(not isinstance(xi, F) for xi in x):
+        raise ValueError("QCQP data must be exact Fractions")
     for pk, qk, rk in cons:
         if _quad(pk, qk, rk, x) < 0:
             return None

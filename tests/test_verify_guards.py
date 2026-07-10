@@ -9,7 +9,7 @@ from fractions import Fraction as F
 
 import pytest
 
-from podium.verify import barrier, bracket, kkt, lyapunov, sos
+from podium.verify import barrier, bracket, kkt, lyapunov, scvx_cut, sos
 
 # --- float-input guards (the trusted path is float-free) --------------------
 
@@ -88,3 +88,67 @@ def test_check_qcqp_refuses_dim_mismatch():
 def test_verify_lyapunov_refuses_shape_mismatch():
     rep = lyapunov.verify_lyapunov([[F(1), F(0)], [F(0), F(1)]], [[F(1)]])
     assert not rep.certified()
+
+
+# --- multi-constraint bracket: the upper-bound leg decides feasibility with
+#     an exact _quad(...) < 0 test, so (unlike the is_psd-guarded lower leg) a
+#     float datum could wrong-accept an eps-infeasible point and return an
+#     upper bound BELOW J*, collapsing the bracket beneath the true optimum.
+
+def _multi() -> dict:
+    # min ||x||^2 s.t. ||x - (2,0)|| >= 3   (a single keep-out, as a list)
+    con = ([[F(1), F(0)], [F(0), F(1)]], [F(-4), F(0)], F(-5))
+    return dict(p0=[[F(1), F(0)], [F(0), F(1)]], q0=[F(0), F(0)], r0=F(0),
+                cons=[con], x=[F(0), F(3)])
+
+
+def test_certify_upper_bound_multi_baseline():
+    d = _multi()
+    assert bracket.certify_upper_bound_multi(**d) == F(9)
+
+
+def test_certify_upper_bound_multi_refuses_float_data():
+    d = _multi()
+    d["cons"] = [([[1.0, F(0)], [F(0), F(1)]], [F(-4), F(0)], F(-5))]
+    with pytest.raises(ValueError):
+        bracket.certify_upper_bound_multi(**d)
+
+
+def test_certify_upper_bound_multi_refuses_float_x():
+    d = _multi()
+    d["x"] = [0.0, F(3)]            # exact data, but a float candidate point
+    with pytest.raises(ValueError):
+        bracket.certify_upper_bound_multi(**d)
+
+
+def test_certify_upper_bound_refuses_float_x():
+    # single-constraint upper leg: r0/r1/x also feed _quad and must be exact
+    with pytest.raises(ValueError):
+        bracket.certify_upper_bound(
+            [[F(1), F(0)], [F(0), F(1)]], [F(0), F(0)], F(0),
+            [[F(1), F(0)], [F(0), F(1)]], [F(-4), F(0)], F(-5),
+            [0.0, F(3)])
+
+
+# --- scvx_cut.certify_cut: exact-rational Positivstellensatz witness --------
+
+def _cut() -> tuple:
+    q, cut, mult, basis, gram = scvx_cut.superquadric_diagonal_certificate(F(1))
+    return q, [(mult, cut)], basis, gram
+
+
+def test_certify_cut_baseline():
+    q, cuts, basis, gram = _cut()
+    assert scvx_cut.certify_cut(q, cuts, basis, gram).certified
+
+
+def test_certify_cut_refuses_shape_mismatch():
+    q, cuts, basis, gram = _cut()
+    with pytest.raises(ValueError):
+        scvx_cut.certify_cut(q, cuts, basis, gram[:-1])
+
+
+def test_certify_cut_refuses_float_data():
+    q, cuts, basis, gram = _cut()
+    with pytest.raises(ValueError):
+        scvx_cut.certify_cut(q, [(1.0, cuts[0][1])], basis, gram)

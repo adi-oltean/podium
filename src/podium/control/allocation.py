@@ -43,9 +43,11 @@ class ThrusterConfig:
         d = np.asarray(self.directions, dtype=np.float64)
         if p.shape != d.shape or p.ndim != 2 or p.shape[1] != 3:
             raise ValueError("positions/directions must both be (N, 3)")
+        norms = np.linalg.norm(d, axis=1, keepdims=True)
+        if np.any(norms == 0.0):
+            raise ValueError("thruster directions must be nonzero")
         object.__setattr__(self, "positions", p)
-        object.__setattr__(self, "directions",
-                           d / np.linalg.norm(d, axis=1, keepdims=True))
+        object.__setattr__(self, "directions", d / norms)
 
     @property
     def n(self) -> int:

@@ -5,6 +5,7 @@ actuator effects, determinism."""
 import math
 
 import numpy as np
+import pytest
 
 from podium import constants as const
 from podium.control import lqr
@@ -26,6 +27,29 @@ def test_camera_jacobian_matches_fd():
         dp[k] = h
         fd[:, k] = (sensors.camera_h(x + dp) - sensors.camera_h(x - dp)) / (2 * h)
     assert np.allclose(jac, fd, rtol=1e-6, atol=1e-10)
+
+
+def test_camera_h_rejects_zero_range():
+    """Coincident target/chaser (zero range) is non-physical: camera_h must
+    raise rather than emit a silent NaN elevation into the EKF."""
+    with pytest.raises(ValueError, match="range"):
+        sensors.camera_h(np.zeros(6))
+    # normal geometry still returns finite [az, el, range]
+    z = sensors.camera_h(np.array([10.0, -20.0, 5.0, 0.0, 0.0, 0.0]))
+    assert np.all(np.isfinite(z))
+
+
+def test_camera_jacobian_rejects_degenerate_geometry():
+    """Zero range and a line of sight along the cross-track axis both make
+    a denominator vanish; the Jacobian must raise, not return NaN."""
+    with pytest.raises(ValueError, match="range"):
+        sensors.camera_jacobian(np.zeros(6))
+    # sx = sy = 0 (LOS on the +/- cross-track axis): azimuth undefined
+    with pytest.raises(ValueError, match="cross-track"):
+        sensors.camera_jacobian(np.array([0.0, 0.0, 50.0, 0.0, 0.0, 0.0]))
+    # normal geometry still yields a finite Jacobian
+    jac = sensors.camera_jacobian(np.array([10.0, -20.0, 5.0, 0.0, 0.0, 0.0]))
+    assert np.all(np.isfinite(jac))
 
 
 def test_sensor_budgets_match_statistics():
