@@ -19,4 +19,4 @@ verify      Exact-rational certificate checkers (barrier, KKT, optimality-gap,
             Lyapunov, SOS) and input-range contracts.
 """
 
-__version__ = "0.8.0.dev0"
+__version__ = "0.8.1"
