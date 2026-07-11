@@ -153,13 +153,15 @@ annotated with ACSL (ANSI/ISO~C Specification Language) contracts, with an optio
 CORE-MATH~\cite{coremath2022} backend for correctly rounded sine and cosine. The
 Frama-C/EVA abstract-interpretation analyzer~\cite{framac2015} shows the emitted C
 free of runtime alarms (division by zero, overflow, invalid access) on the
-contracted or assumed input ranges. The generated C is checked against the Python
+contracted or assumed input ranges---the abstract-interpretation discipline
+applied at scale to aerospace flight software by the Astr{\'e}e
+analyzer~\cite{bertrane2015aerospace}. The generated C is checked against the Python
 reference on a suite of golden vectors---regenerated deterministically from a fixed
 per-kernel seed rather than stored as fixtures, bit-exact for the scalar arithmetic and
 square-root class, with documented tolerance classes for the libm transcendentals
 and for matrix products (which differ only by floating-point reassociation against
 NumPy's Basic Linear Algebra Subprograms)---and the same vectors are replayed
-through the CompCert verified compiler~\cite{compcert2009} on x86-64 and reproduced
+through the CompCert verified compiler~\cite{compcert2009,boldo2015fpcompile} on x86-64 and reproduced
 bit-for-bit on a second instruction-set architecture (ISA), AArch64. The golden
 vectors thus tie the Python reference, the emitted C, and the compiled assembly on
 the tested inputs; the reproducibility methodology, the equality classes, and the
@@ -195,7 +197,7 @@ quadratic program. ISA: instruction-set architecture.}
 \toprule
 Check & Guarantee \\
 \midrule
-Closed-loop reachability (JuliaReach~\cite{juliareach2019}) & Flowpipes avoid unsafe sets on the benchmark models~\cite{archcomp2023} \\
+Closed-loop reachability (JuliaReach~\cite{juliareach2019}) & Flowpipes avoid unsafe sets on the benchmark models~\cite{archcomp2023,chan2017rendezvous} \\
 Exact-rational barrier certificates & Infinite-horizon abort safety, verified over $\Q$ \\
 Exact-rational KKT certificates & Online QP solves yield an exact rational suboptimality bound; SOCP solves re-verified against conic KKT; both over $\Q$ \\
 Exact optimality-gap certificates & Bounds on a nonconvex keep-out QCQP optimum, verified over $\Q$ \\
@@ -219,7 +221,7 @@ barrier and optimality-gap certificates are tolerance-free, their acceptance
 being an exact positive semidefiniteness test together with exact feasibility;
 exact rational certificates of this kind build on a body of work in
 sum-of-squares and polynomial optimization and in verified semidefinite
-programming~\cite{parrilo2003,lasserre2001,kaltofen2012,peyrl2008,davis2022}. The
+programming~\cite{parrilo2003,lasserre2001,kaltofen2012,peyrl2008,davis2022,lin2013exactsos}. The
 same checker discharges further certificate families---control-Lyapunov and
 sum-of-squares certificates---whose constructions and exact-check basis are
 collected in the companion note on exact certificates.
@@ -377,6 +379,7 @@ Verified SDP~\cite{jansson2009}                     & & $\sim$ & & \\
 Copilot~\cite{copilot2023}                          & & & \checkmark & \\
 Credible autocoding~\cite{feron2013,cohen2020}      & & & $\sim$ & \\
 {CVXPYgen}~\cite{cvxpygen2022}                      & & & $\sim$ & \\
+{QOCOGEN}~\cite{chari2026qoco}                      & & & $\sim$ & \\
 Basilisk~\cite{basilisk2020}                        & & & & \checkmark \\
 \textbf{Podium}                                     & \checkmark & \checkmark & \checkmark & \checkmark \\
 \bottomrule
@@ -403,7 +406,9 @@ contract-annotated C, and execution-time-certified embedded QP solvers~\cite{eiq
 programs~\cite{mokhov2018} and
 verified optimization reductions in a proof assistant~\cite{cvxlean2024} certify
 code or problem transformations formally; and CVXPYgen~\cite{cvxpygen2022}
-generates C from Python convex problems; none couples exact-rational per-solve
+generates C from Python convex problems, and QOCOGEN~\cite{chari2026qoco} emits a
+custom C solver for the second-order-cone programs Podium's exact conic-KKT checker
+re-verifies; none couples exact-rational per-solve
 certificates with an RPOD library. The simulators Basilisk~\cite{basilisk2020} and NASA's 42~\cite{nasa42} and the flight-dynamics systems
 Orekit~\cite{orekit2010} and GMAT~\cite{gmat2020} support proximity-operations
 modeling but no planner, certificate, or verified-code layer.
@@ -439,7 +444,7 @@ remaining libm transcendentals and matrix products fall in documented tolerance
 classes.
 
 The abort-safety barrier is certified exactly for the linear Clohessy--Wiltshire
-drift of a fixed formation---the standard e/i-vector passive-safety analysis, here
+drift of a fixed formation---the standard e/i-vector passive-safety analysis~\cite{damico2006eivector}, here
 machine-checked over $\Q$---and bounds the linearized abort; the residual gap to
 the nonlinear, $J_2$-and-drag, actuator- and sensor-perturbed trajectory is not
 certified by the barrier but is exercised by the nonlinear closed-loop simulation
