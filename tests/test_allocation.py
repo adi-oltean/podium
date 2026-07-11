@@ -130,6 +130,24 @@ def test_sixdof_plan_wrenches_allocate():
         assert a.residual < 1e-7
 
 
+def test_bounded_lsq_is_no_worse_than_clipped_nnls():
+    """The infeasible fallback is a TRUE box-bounded least-squares fit
+    (0 <= u <= u_max), not an unbounded NNLS clipped to u_max -- so it stays
+    within bounds and its residual is never worse than the clip-after-NNLS it
+    replaced."""
+    from scipy.optimize import nnls  # noqa: PLC0415
+
+    cfg = standard_cluster()
+    b = cfg.effectiveness()
+    w = np.array([20.0, 3.0, -2.0, 0.5, 0.0, 0.0])   # beyond authority at u_max=1
+    a = allocate(cfg, w, u_max=1.0)
+    assert not a.feasible
+    assert np.all(a.u >= -1e-12) and np.all(a.u <= 1.0 + 1e-9)
+    u_nnls, _ = nnls(b, w)
+    r_clip = float(np.linalg.norm(b @ np.minimum(u_nnls, 1.0) - w))
+    assert a.residual <= r_clip + 1e-9
+
+
 def test_config_validation():
     with pytest.raises(ValueError, match="both be"):
         al.ThrusterConfig(positions=np.zeros((4, 3)),

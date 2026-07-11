@@ -35,6 +35,21 @@ def make_scenario(**kw):
     return Scenario(**base)
 
 
+def test_run_rejects_nonpositive_dt():
+    with pytest.raises(ValueError, match="dt_gnc must be positive"):
+        run(make_scenario(dt_gnc=0.0), no_control)
+
+
+def test_run_rejects_bad_substeps():
+    with pytest.raises(ValueError, match="truth_substeps"):
+        run(make_scenario(truth_substeps=0), no_control)
+
+
+def test_run_rejects_nonpositive_duration():
+    with pytest.raises(ValueError, match="duration must be positive"):
+        run(make_scenario(duration=0.0), no_control)
+
+
 def test_bit_identical_replay():
     tr1 = run(make_scenario(seed=7, meas_pos_std=1.0, meas_vel_std=0.01), no_control)
     tr2 = run(make_scenario(seed=7, meas_pos_std=1.0, meas_vel_std=0.01), no_control)

@@ -158,13 +158,32 @@ class Trace:
         return json.dumps(data, separators=(",", ":"))
 
 
+def _validate_scenario(sc: Scenario) -> None:
+    """Reject degenerate run parameters up front (fail fast, not mid-loop)."""
+    if sc.dt_gnc <= 0.0:
+        raise ValueError("dt_gnc must be positive")
+    if sc.truth_substeps < 1:
+        raise ValueError("truth_substeps must be >= 1")
+    if sc.duration <= 0.0:
+        raise ValueError("duration must be positive")
+
+
 def run(
     scenario: Scenario,
     controller: Controller,
     specs: tuple[spec_mod.Spec, ...] = (),
 ) -> Trace:
-    """Run the closed loop; returns the recorded Trace with spec margins."""
+    """Run the closed loop; returns the recorded Trace with spec margins.
+
+    Requires ``dt_gnc > 0``, ``truth_substeps >= 1``, and ``duration > 0``.
+    The horizon is discretized to ``n_ticks = round(duration / dt_gnc)`` GNC
+    ticks, so the simulated span is ``n_ticks * dt_gnc``; a duration that is
+    not an integer multiple of ``dt_gnc`` is rounded to the nearest tick (a
+    documented rule, not a silent snap). Pass a grid-aligned duration for an
+    exact span.
+    """
     sc = scenario
+    _validate_scenario(sc)
     n_ticks = int(round(sc.duration / sc.dt_gnc))
     rng = np.random.default_rng(sc.seed)
     f = nl._deriv(sc.cfg, sc.bc_target, sc.bc_chaser)

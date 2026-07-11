@@ -78,7 +78,7 @@ def allocate(cfg: ThrusterConfig, wrench: F64, u_max: float = np.inf,
     or bounds), falls back to a bounded non-negative least-squares fit
     and returns feasible=False with the achievable wrench + residual.
     """
-    from scipy.optimize import linprog, nnls  # type: ignore[import-untyped]
+    from scipy.optimize import linprog, lsq_linear  # type: ignore[import-untyped]
 
     b = cfg.effectiveness()
     w = np.asarray(wrench, dtype=np.float64)
@@ -93,10 +93,12 @@ def allocate(cfg: ThrusterConfig, wrench: F64, u_max: float = np.inf,
         return Allocation(u=u, realized=realized, residual=r,
                           feasible=r <= tol, propellant=float(u.sum()))
 
-    # infeasible: closest achievable wrench with u >= 0 (report honestly)
-    u, _ = nnls(b, w)
-    if np.isfinite(u_max):
-        u = np.minimum(u, u_max)
+    # infeasible: closest achievable wrench subject to 0 <= u <= u_max, a
+    # TRUE box-bounded least-squares fit -- not an unbounded NNLS clipped to
+    # u_max, which need not be the closest feasible point. When u_max is inf
+    # this reduces to non-negative least squares.
+    sol = lsq_linear(b, w, bounds=(0.0, u_max))
+    u = np.clip(sol.x, 0.0, u_max if np.isfinite(u_max) else None)
     realized = b @ u
     r = float(np.linalg.norm(realized - w))
     return Allocation(u=u, realized=realized, residual=r, feasible=False,
