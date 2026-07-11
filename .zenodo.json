@@ -19,5 +19,9 @@
     "barrier certificates",
     "CompCert",
     "Frama-C"
+  ],
+  "related_identifiers": [
+    { "identifier": "10.5281/zenodo.21225267", "relation": "isDocumentedBy", "resource_type": "publication-preprint" },
+    { "identifier": "10.5281/zenodo.21247380", "relation": "isSupplementedBy", "resource_type": "publication-technicalnote" }
   ]
 }
