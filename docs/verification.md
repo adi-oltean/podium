@@ -13,7 +13,7 @@ make it possible.
 
 ## What is shipped (verification modalities in CI)
 
-Ten independent modalities, each with its module, CI lane, and
+Eleven independent modalities, each with its module, CI lane, and
 receipts. "Exact" means `fractions.Fraction` arithmetic with no floats
 in the trusted checker; "bit-exact" means identical IEEE-754 bit
 patterns.
@@ -23,6 +23,7 @@ patterns.
 | **Contracts** | `podium.verify.contracts` | Input ranges/invariants; runtime-checked in the sandbox, rendered as ACSL on the emitted C |
 | **STL spec oracles** | `podium.sim.spec` | Temporal-logic properties via robust semantics (range-channel phase gates in the reference mission; corridor, keep-out, and docking-rate specs supported) |
 | **Closed-loop reachability** | `tools/reach/` (JuliaReach), `reach.yml` | Flowpipe non-intersection with unsafe sets — LOS cone, velocity ceiling, abort keep-out — on the ARCH hybrid models, re-proven every commit (12 PROVEN/run) |
+| **Model checking (TLA+/TLC)** | `tla/`, `tools/tla_extract.py`, `tools/tla_trace_check.py`, `tla.yml` | Exhaustive check of the discrete mode/phase/protocol machines: abort dominance and deadline invariants, mode-entry liveness under stated fairness, corridor-gate safety conditional on a stated estimator-error bound, and the flight app's message-atomicity/ordering contract; `@tla` source annotations are cross-checked against the specs in CI, and concrete `simulate()`/`fly()` runs replay through the specs as literal behaviors (trace validation) ([add-tla-specs.md](add-tla-specs.md)) |
 | **Exact barrier certificates** | `podium.verify.barrier`, `test_barrier.py` | Infinite-horizon abort safety: SDP-synthesized (untrusted) barrier re-verified in exact rationals |
 | **Exact KKT certificates** | `podium.verify.kkt`, `test_kkt.py` | Online QP/SOCP solves re-verified in exact rationals: an exact-rational suboptimality bound (QP) or exact conic-dual re-check (SOCP), incl. the embedded ECOS solve of a Layer-0 problem |
 | **Exact optimality-gap certificates** | `podium.verify.bracket`, `test_bracket.py`, [`docs/optimality-gap-certificates.md`](optimality-gap-certificates.md) | Exact-rational bounds bracketing the global optimum of a nonconvex QCQP; four theorems (soundness, nonsingular recovery, singular hard case, multi-constraint certified gap) |
@@ -45,9 +46,10 @@ caught by exactly one lane, and that certificate faults (corrupted
 proofs) are invisible to every physics and trajectory check — only the
 exact-arithmetic checker for that certificate rejects them.
 
-The eight CI lanes are `ci` (receipts + golden vectors), `reach`,
-`eva`, `compcert`, `tier2`, `validate`, plus the evidence-gated
-`release` and the `pages` viewer deploy. Every tagged release ships an
+The nine CI lanes are `ci` (receipts + golden vectors), `reach`,
+`eva`, `compcert`, `tier2`, `validate`, `tla` (TLC model checking +
+annotation extraction), plus the evidence-gated `release` and the
+`pages` viewer deploy. Every tagged release ships an
 audit bundle (`tools/build_audit_bundle.py`) that is byte-deterministic
 under a fixed seed and cannot publish unless the reference mission
 captures, all margins hold, the barrier certificate verifies, and EVA
@@ -217,3 +219,12 @@ policies at the full initial set remains hard; certificate-based verification
 (neural Lyapunov-barrier proofs) has succeeded on CW-scale benchmarks, so any
 learned component here would be wrapped in a run-time-assurance monitor whose
 backup law and switching surface are the verified classical artifacts.
+
+A separate assessment of where temporal-logic model checking (TLA+)
+complements this stack — the discrete mode/phase logic, whose liveness
+obligations were previously checked only on simulated traces — is in
+[tla-potential.md](tla-potential.md). The execution plan derived from
+it, [add-tla-specs.md](add-tla-specs.md), is implemented: the `tla`
+lane model-checks `tla/ArchRendezvous.tla`, `tla/Mission.tla`, and
+`tla/NavApp.tla` with TLC and gates on the `@tla` annotation
+extraction (`tools/tla_extract.py`).

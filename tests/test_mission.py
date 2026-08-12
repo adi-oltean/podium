@@ -35,16 +35,25 @@ def test_reference_mission_docks_and_captures(ref):
     # it — recorded as polish, not hidden by a loose bound
     assert ref.dv_total < 15.0
     assert ref.barrier_ok  # abort-safety certificate verified exactly
+    assert "tla_events" not in ref.extras  # trace recording is opt-in
 
 
 @pytest.mark.slow
 def test_audit_bundle_deterministic(ref):
     b1 = mission.audit_bundle(ref, 7)
-    res2 = mission.fly(seed=7)
+    # recording on: covers the tla_events paths AND proves recording
+    # does not perturb the audit bundle bytes
+    res2 = mission.fly(seed=7, record_tla_events=True)
     b2 = mission.audit_bundle(res2, 7)
     assert b1 == b2  # byte-for-byte
     assert '"captured": true' in b1
     assert '"verified_exact_rational": true' in b1
+    events = res2.extras["tla_events"]
+    assert events[0]["e"] == "meta"
+    kinds = {e["e"] for e in events}
+    assert {"meta", "nav", "replan", "burn", "phase", "gate"} <= kinds
+    assert sum(1 for e in events if e["e"] == "replan") == 3
+    assert sum(1 for e in events if e["e"] == "phase") == 1
 
 
 @pytest.mark.slow

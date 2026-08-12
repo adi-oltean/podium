@@ -26,7 +26,13 @@ point was abort-safe forever" fact.
 
 `audit_bundle` is deterministic byte-for-byte under a fixed seed
 (no wall-clock inside; versions pinned by the caller if desired).
+
+The discrete decisions of fly() — phase transition, corridor gate,
+replan queue, burn cursor — are model-checked by TLC over the
+annotation-bound spec below (truth/estimate split, stated estimator
+bound); tools/tla_extract.py cross-checks the @tla markers in CI.
 """
+# @tla{module: Mission, spec: tla/Mission.tla}
 
 from __future__ import annotations
 
@@ -89,7 +95,8 @@ def _initial_state(rng: np.random.Generator) -> F64:
     return np.concatenate([x[0:3], N_REF * x[3:6]])
 
 
-def fly(seed: int = 0, dispersed: bool = False) -> MissionResult:
+def fly(seed: int = 0, dispersed: bool = False, *,
+        record_tla_events: bool = False) -> MissionResult:
     from podium.guidance.scp import PtrDockingPlanner
     from podium.sim import contact
 
@@ -124,8 +131,19 @@ def fly(seed: int = 0, dispersed: bool = False) -> MissionResult:
     # ESTIMATE-keyed corridor gate never saw the true offset — measured.
     nav = ekf.RelNavEkf(N_REF, dt=dt, q_accel=2e-6, r_pos=0.05, x0=x0.copy())
 
+    # @tla{var: phase}
+    # @tla{var: burnIdx, note: state["burn_idx"]; resets with each replan}
     state: dict = {"plan": None, "plan_t0": 0.0, "burn_idx": 0, "phase": "A"}
+    # @tla{var: replans, note: pending replan queue, modeled as a counter}
     replan_times = [0.0, t_phase_a / 3.0, 2.0 * t_phase_a / 3.0]
+
+    # Optional discrete-event record for TLA+ trace validation. Ordinary
+    # fly() calls preserve the pre-trace extras contract and avoid building
+    # event dictionaries; tools/tla_trace_check.py opts in explicitly.
+    tla_events: list[dict] | None = None
+    if record_tla_events:
+        tla_events = [
+            {"e": "meta", "t_phase_a": t_phase_a, "duration": duration}]
 
     def replan(t_now: float, est: F64) -> None:
         times = np.linspace(0.0, t_phase_a - t_now, 9)
@@ -134,34 +152,58 @@ def fly(seed: int = 0, dispersed: bool = False) -> MissionResult:
         state["plan"] = res
         state["plan_t0"] = t_now
         state["burn_idx"] = 0
+        if tla_events is not None:
+            tla_events.append({"e": "replan", "t": t_now})
 
+    # @tla{var: t, note: mission clock, engine-owned}
+    # @tla{var: pc, note: no code state; the tick sub-schedule is the sequential body}
     def controller(t: float, meas: F64) -> F64:
+        # @tla{action: Estimate, var: estOff, note: lateral part of the EKF estimate}
         est = nav.step(meas[0:3])
+        if tla_events is not None:
+            tla_events.append({
+                "e": "nav", "t": t, "y": float(est[1]),
+                "lat": math.hypot(float(est[0]), float(est[2])),
+            })
         dv = np.zeros(3)
         if state["phase"] == "A":
+            # @tla{action: Replan, note: consume the queue head, reset the cursor}
             if replan_times and t >= replan_times[0] - 1e-9:
                 replan_times.pop(0)
                 replan(t, est)
             plan = state["plan"]
             if plan is not None:
                 k = state["burn_idx"]
+                # @tla{action: ExecuteBurn}
                 while (k < len(plan.times)
                        and t >= state["plan_t0"] + plan.times[k] - 1e-9):
                     dv = dv + plan.dvs[k]
                     k += 1
+                if tla_events is not None and k != state["burn_idx"]:
+                    tla_events.append({"e": "burn", "t": t, "k": k})
                 state["burn_idx"] = k
+            # @tla{action: AdvancePhase, note: one-way time trigger}
             if t >= t_phase_a - 1e-9:
                 state["phase"] = "BC"
+                if tla_events is not None:
+                    tla_events.append({"e": "phase", "t": t})
         else:
             # terminal rate-command feedback on the estimate, with the
             # corridor GATE: inside 40 m, closing holds until the
             # lateral error is inside the contact box (standard
             # practice — do not advance misaligned)
             y = float(est[1])
+            # @tla{var: near, note: the 40 m gate region, keyed on the estimate}
+            # @tla{var: closing, note: v_close > 0}
             lat = math.hypot(float(est[0]), float(est[2]))
             v_close = min(0.5, max(0.075, abs(y) / 90.0))
+            # @tla{action: GateEvaluate}
+            # @tla{invariant: CorridorHoldSound}
             if abs(y) < 40.0 and lat > 0.06:
                 v_close = 0.0
+            if tla_events is not None:
+                tla_events.append({"e": "gate", "t": t,
+                                   "closing": v_close > 0.0})
             vy_des = v_close if y < 0 else 0.0
             vx_des = max(-0.035, min(0.035, -float(est[0]) / 15.0))
             vz_des = max(-0.035, min(0.035, -float(est[2]) / 15.0))
@@ -181,6 +223,7 @@ def fly(seed: int = 0, dispersed: bool = False) -> MissionResult:
     # needed — here we report the innovation-free proxy: measurement
     # noise level was 2 m, EKF steady state ~1 m per test_ekf)
     ch = tr.channels()
+    # @tla{var: truthOff, note: truth lives in the engine; surfaces in the trace}
     ys = tr.x_rel[:, 1]
     hits = np.flatnonzero(ys >= -0.05)
     captured = False
@@ -188,6 +231,8 @@ def fly(seed: int = 0, dispersed: bool = False) -> MissionResult:
     idss_tr: dict[str, float] = {}
     idss_rot: dict[str, float] = {}
     extras: dict = {}
+    if tla_events is not None:
+        extras["tla_events"] = tla_events
     if len(hits) > 0:
         k = int(hits[0])
         contact_t = float(tr.times[k])

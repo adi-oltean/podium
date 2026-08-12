@@ -23,7 +23,12 @@ This module is sandbox-side. `export_model()` writes the hybrid
 automaton as JSON; `tools/reach/arch_rendezvous.jl` consumes it and
 re-proves the properties with ReachabilityAnalysis.jl — Podium exports
 the model, the reachability tool verifies it, CI gates on the result.
+
+The discrete skeleton (modes, urgent guards, abort dominance) is also
+model-checked by TLC over the annotation-bound spec below; the @tla
+markers are cross-checked against it by tools/tla_extract.py in CI.
 """
+# @tla{module: ArchRendezvous, spec: tla/ArchRendezvous.tla}
 
 from __future__ import annotations
 
@@ -73,7 +78,7 @@ A_ABORT = np.array([
 ])
 _B_CLOCK = np.array([0.0, 0.0, 0.0, 0.0, 1.0])  # dt/dt = 1
 
-MODE_NAMES = ("approaching", "attempt", "aborting")
+MODE_NAMES = ("approaching", "attempt", "aborting")  # @tla{const: Modes}
 _MATS = (A_APPROACH, A_ATTEMPT, A_ABORT)
 
 # initial set (mode 1): center +/- radius, velocities and clock exact
@@ -88,14 +93,28 @@ TARGET_HALF_WIDTH = 0.2  # abort keep-out box [m]
 HORIZON = 300.0  # minutes
 
 
+# The attempt octagon, defined ONCE and consumed three ways: simulate()'s
+# guard (_in_attempt_box), export_model()'s halfspace list, and — abstracted
+# to a nondeterministic environment event — the inBox variable of the TLA+
+# spec. Rows are (indices, coefficients, bound): sum(c * s[i]) <= bound.
+ATTEMPT_BOX: tuple[tuple[tuple[int, ...], tuple[float, ...], float], ...] = (
+    ((0,), (-1.0,), 100.0),
+    ((0,), (1.0,), 100.0),
+    ((1,), (-1.0,), 100.0),
+    ((1,), (1.0,), 100.0),
+    ((0, 1), (-1.0, -1.0), 141.1),
+    ((0, 1), (1.0, 1.0), 141.1),
+    ((0, 1), (1.0, -1.0), 141.1),
+    ((0, 1), (-1.0, 1.0), 141.1),
+)
+
+
+# @tla{var: inBox, note: guard proxy; continuous semantics owned by the reachability lane}
 def _in_attempt_box(s: F64) -> bool:
     """Guard/invariant region of the rendezvous-attempt mode (octagonal)."""
-    x, y = float(s[0]), float(s[1])
-    return (
-        -100.0 <= x <= 100.0
-        and -100.0 <= y <= 100.0
-        and abs(x + y) <= 141.1
-        and abs(x - y) <= 141.1
+    return all(
+        sum(c * float(s[i]) for i, c in zip(idx, coef)) <= b
+        for idx, coef, b in ATTEMPT_BOX
     )
 
 
@@ -181,12 +200,15 @@ def simulate(
     states = np.zeros((steps + 1, 5))
     modes = np.zeros(steps + 1, dtype=np.int64)
     s = np.asarray(x0, dtype=np.float64).copy()
-    mode = 1
+    mode = 1  # @tla{var: mode}
     for k in range(steps + 1):
-        t = k * dt
+        t = k * dt  # @tla{var: clock}
         # transitions (urgent, abort dominates)
+        # @tla{action: Abort}
+        # @tla{invariant: AbortByDeadline}
         if abort_time >= 0.0 and mode != 3 and t >= abort_time:
             mode = 3
+        # @tla{action: EnterAttempt}
         elif mode == 1 and _in_attempt_box(s):
             mode = 2
         times[k] = t
@@ -262,12 +284,7 @@ def export_model(
             a[i] = c
         return {"a": a, "b": b}
 
-    attempt_box = [
-        hs([0], [-1.0], 100.0), hs([0], [1.0], 100.0),
-        hs([1], [-1.0], 100.0), hs([1], [1.0], 100.0),
-        hs([0, 1], [-1.0, -1.0], 141.1), hs([0, 1], [1.0, 1.0], 141.1),
-        hs([0, 1], [1.0, -1.0], 141.1), hs([0, 1], [-1.0, 1.0], 141.1),
-    ]
+    attempt_box = [hs(list(idx), list(coef), b) for idx, coef, b in ATTEMPT_BOX]
     aborting = abort_time >= 0.0
     inv1 = [hs([0], [1.0], -100.0)]
     inv2 = list(attempt_box)
@@ -277,16 +294,18 @@ def export_model(
 
     a1, a2, a3 = _matrices(gains)
     modes = [
-        {"name": "approaching", "A": a1.tolist(),
+        {"name": MODE_NAMES[0], "A": a1.tolist(),
          "b": _B_CLOCK.tolist(), "invariant": inv1},
-        {"name": "attempt", "A": a2.tolist(),
+        {"name": MODE_NAMES[1], "A": a2.tolist(),
          "b": _B_CLOCK.tolist(), "invariant": inv2},
     ]
+    # @tla{action: EnterAttempt, note: exported form of the simulate() guard}
     transitions = [{"from": 1, "to": 2, "guard": attempt_box}]
     if aborting:
-        modes.append({"name": "aborting", "A": a3.tolist(),
+        modes.append({"name": MODE_NAMES[2], "A": a3.tolist(),
                       "b": _B_CLOCK.tolist(), "invariant": []})
         abort_guard = [hs([4], [-1.0], -abort_time)]
+        # @tla{action: Abort, note: exported form of the simulate() guard}
         transitions.append({"from": 1, "to": 3, "guard": abort_guard})
         transitions.append({"from": 2, "to": 3, "guard": abort_guard})
 
