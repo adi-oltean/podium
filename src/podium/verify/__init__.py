@@ -23,10 +23,11 @@ from podium.verify import (  # noqa: F401
     bracket,
     kkt,
     lyapunov,
+    riccati,
     scvx_cut,
     sos,
 )
 from podium.verify.contracts import Interval, contract, prove, shapes
 
 __all__ = ["Interval", "barrier", "bracket", "contract", "kkt", "lyapunov",
-           "prove", "scvx_cut", "shapes", "sos"]
+           "prove", "riccati", "scvx_cut", "shapes", "sos"]
