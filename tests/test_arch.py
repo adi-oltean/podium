@@ -53,6 +53,31 @@ def test_export_schema_and_roundtrip():
     assert len(arch.export_model(-1.0)["modes"]) == 2
 
 
+def test_guard_single_sourcing_value_identical():
+    """A2 receipt (docs/add-tla-specs.md): single-sourcing the attempt
+    octagon through ATTEMPT_BOX must leave the exported JSON value-identical
+    to the pre-refactor literal halfspaces, and the simulate() guard must
+    agree with the exported octagon pointwise."""
+    expected = [
+        {"a": [-1.0, 0.0, 0.0, 0.0, 0.0], "b": 100.0},
+        {"a": [1.0, 0.0, 0.0, 0.0, 0.0], "b": 100.0},
+        {"a": [0.0, -1.0, 0.0, 0.0, 0.0], "b": 100.0},
+        {"a": [0.0, 1.0, 0.0, 0.0, 0.0], "b": 100.0},
+        {"a": [-1.0, -1.0, 0.0, 0.0, 0.0], "b": 141.1},
+        {"a": [1.0, 1.0, 0.0, 0.0, 0.0], "b": 141.1},
+        {"a": [1.0, -1.0, 0.0, 0.0, 0.0], "b": 141.1},
+        {"a": [-1.0, 1.0, 0.0, 0.0, 0.0], "b": 141.1},
+    ]
+    model = arch.export_model(abort_time=120.0)
+    assert model["transitions"][0]["guard"] == expected
+    assert model["modes"][1]["invariant"][:8] == expected
+    rng = np.random.default_rng(0)
+    for p in rng.uniform(-160.0, 160.0, size=(500, 2)):
+        s = np.array([p[0], p[1], 0.0, 0.0, 0.0])
+        by_halfspaces = all(float(np.dot(h["a"], s)) <= h["b"] for h in expected)
+        assert arch._in_attempt_box(s) == by_halfspaces
+
+
 def test_simulation_specs_srna01():
     """No-abort scenario: every corner of the initial set must reach the
     attempt mode and satisfy LOS + velocity throughout — a necessary

@@ -25,6 +25,7 @@ docs/_build/
 # Editors / OS
 .vscode/
 .idea/
+.project
 *.swp
 .DS_Store
 
@@ -35,3 +36,8 @@ out/
 
 # Scratch scripts and generated messages (see CLAUDE.md)
 tmp/
+
+# TLC model-checker artifacts (local runs)
+states/
+tla/*_TTrace_*
+tla2tools.jar

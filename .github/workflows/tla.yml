@@ -1,0 +1,106 @@
+name: tla
+
+# Model-checking lane (docs/add-tla-specs.md): TLC exhaustively checks the
+# discrete mode/phase/protocol specs in tla/, and tools/tla_extract.py
+# gates on the @tla source-annotation traceability (E1-E4 are errors;
+# intentional environment/scheduler actions have an explicit E3 allowlist).
+#
+# The -deadlock flag DISABLES TLC's deadlock reporting; it is required
+# because the models terminate by stuttering at their horizon.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tla/**"
+      - "src/podium/guidance/arch.py"
+      - "src/podium/sim/mission.py"
+      - "src/podium/emit/cfsapp.py"
+      - "examples/cfs_nav_app/**"
+      - "tools/tla_extract.py"
+      - "tools/tla_trace_check.py"
+      - ".github/workflows/tla.yml"
+  pull_request:
+    paths:
+      - "tla/**"
+      - "src/podium/guidance/arch.py"
+      - "src/podium/sim/mission.py"
+      - "src/podium/emit/cfsapp.py"
+      - "examples/cfs_nav_app/**"
+      - "tools/tla_extract.py"
+      - "tools/tla_trace_check.py"
+      - ".github/workflows/tla.yml"
+  workflow_dispatch:
+
+jobs:
+  tlc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17" }
+      - name: Fetch TLC (pinned release)
+        run: |
+          curl -fsSL -o tla2tools.jar \
+            https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.jar
+          echo "ab323b79802aedc3203b3f9af37c6aca3ed43f4e0225b36f2aa77b26de46c05f  tla2tools.jar" | sha256sum -c
+      - name: Model-check
+        run: |
+          set -e
+          tlc() {
+            java -cp tla2tools.jar tlc2.TLC -workers auto -deadlock \
+              -config "tla/$1.cfg" "tla/$2.tla" | tee "tlc-$1.log"
+          }
+          tlc ArchRendezvousSRA  ArchRendezvous
+          tlc ArchRendezvousSRNA ArchRendezvous
+          tlc ArchRendezvousExit ArchRendezvous
+          tlc Mission            Mission
+          tlc NavApp             NavApp
+          tlc NavAppBackpressure NavApp
+      - name: E-NAV falsification receipt (reader must violate NoPartialPublish)
+        run: |
+          if java -cp tla2tools.jar tlc2.TLC -workers auto -deadlock \
+               -config tla/NavAppReader.cfg tla/NavApp.tla > tlc-NavAppReader.log 2>&1; then
+            echo "E-NAV unexpectedly verified — the atomicity obligation lost its witness"
+            exit 1
+          fi
+          grep -q "Invariant NoPartialPublish is violated" tlc-NavAppReader.log
+          echo "E-NAV counterexample produced, as required (docs/add-tla-specs.md WP4)"
+      - name: State-space sizes (growth is a review signal)
+        run: |
+          {
+            echo "### TLC state spaces"
+            echo ""
+            echo "| model | states generated | distinct |"
+            echo "|---|---|---|"
+            for log in tlc-*.log; do
+              read -r gen distinct < <(grep -oE \
+                "[0-9,]+ states generated, [0-9,]+ distinct" "$log" | tail -1 \
+                | sed 's/ states generated,//;s/ distinct//' ) || true
+              echo "| ${log#tlc-} | ${gen:-?} | ${distinct:-?} |"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Annotation extraction gate
+        run: python3 tools/tla_extract.py --strict
+
+  # Trace validation (tools/tla_trace_check.py): concrete simulate() and
+  # fly() runs must replay as literal behaviors of the specs; --receipt
+  # additionally requires a tampered witness to be REJECTED.
+  trace:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17" }
+      - name: Fetch TLC (pinned release)
+        run: |
+          curl -fsSL -o tla2tools.jar \
+            https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.jar
+          echo "ab323b79802aedc3203b3f9af37c6aca3ed43f4e0225b36f2aa77b26de46c05f  tla2tools.jar" | sha256sum -c
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -e ".[opt,contact]"
+      - name: simulate() traces vs ArchRendezvous (10 runs + tamper receipts)
+        run: python3 tools/tla_trace_check.py arch --receipt
+      - name: fly() trace vs Mission (seed 7 + tamper receipt)
+        run: python3 tools/tla_trace_check.py mission --receipt

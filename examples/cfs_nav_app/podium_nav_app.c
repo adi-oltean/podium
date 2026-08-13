@@ -2,7 +2,13 @@
  *
  * A cFS application. The measurement handler is the ONLY arithmetic and
  * it is entirely emitted, EVA-proven, CompCert-checked C: the flight
- * numerics of this app carry the full podium verification stack. */
+ * numerics of this app carry the full podium verification stack.
+ *
+ * The message protocol (single task, single pipe, blocking receive) is
+ * model-checked by TLC against the annotation-bound spec below; the
+ * @tla markers are emitted by the generator, so regeneration cannot
+ * drift from the declaration (tools/tla_extract.py gates in CI). */
+/* @tla{module: NavApp, spec: tla/NavApp.tla} */
 #include "podium_nav_app.h"
 
 /* emitted kernels (podium_kernels.c) */
@@ -16,6 +22,8 @@ void podium_ekf_predict(const double x[6], const double p[6][6],
                         const double phi[6][6], const double q[6][6],
                         double out0[6], double out1[6][6]);
 
+/* @tla{var: pc, note: filter-state consistency; g is mid-chain between the copy-backs} */
+/* @tla{var: dirtyRead, note: no code counterpart; a hypothetical un-piped reader of g (E-NAV)} */
 static PODIUM_NAV_App_t g;
 
 static void copy6(const double s[6], double d[6]) {
@@ -28,18 +36,24 @@ static void copy66(const double s[6][6], double d[6][6]) {
 
 /* one measurement cycle: update on the emitted Joseph kernel, then
  * propagate one step — the flight GNC step, in verified C. */
+/* @tla{var: current, note: the measurement message being processed} */
 static void PODIUM_NAV_OnMeas(const PODIUM_NAV_MeasMsg_t *m) {
     double x1[6], P1[6][6];
+    /* @tla{atomic-begin: OnMeas, note: single task, single pipe, blocking receive} */
+    /* @tla{action: Update} */
     podium_ekf_update_sequential(g.x, g.P, m->pos, g.r_var, x1, P1);
     copy6(x1, g.x);
     copy66(P1, g.P);
+    /* @tla{action: Predict} */
     podium_ekf_predict(g.x, g.P, g.phi, g.Q, x1, P1);
     copy6(x1, g.x);
     copy66(P1, g.P);
+    /* @tla{atomic-end: OnMeas} */
     g.cycles++;
 
     PODIUM_NAV_StateMsg_t out;
     CFE_MSG_Init(&out.hdr, PODIUM_NAV_STATE_MID, sizeof out);
+    /* @tla{var: processed, note: the sequence of published STATE messages} */
     copy6(g.x, out.state);
     CFE_SB_TransmitMsg(&out.hdr, true);
 }
@@ -61,7 +75,9 @@ static void PODIUM_NAV_Init(void) {
     g.r_var = 0.01;
     g.cycles = 0;
 
+    /* @tla{var: queue, note: the SB pipe, depth 16; modeled as a FIFO of capacity QCap} */
     CFE_SB_CreatePipe(&g.pipe, 16, "PODIUM_NAV_PIPE");
+    /* @tla{var: sent, note: the environment measurement source, in MID order} */
     CFE_SB_Subscribe(PODIUM_NAV_MEAS_MID, g.pipe);
     CFE_EVS_SendEvent(1, CFE_EVS_INFORMATION,
                       "PODIUM_NAV initialized (verified-kernel EKF)");
@@ -78,6 +94,7 @@ void PODIUM_NAV_AppMain(void) {
         if (st != CFE_SUCCESS || buf == 0) break;
         CFE_SB_MsgId_t mid;
         CFE_MSG_GetMsgId(&mid, &buf->msg);
+        /* @tla{action: Recv} */
         if (mid == PODIUM_NAV_MEAS_MID)
             PODIUM_NAV_OnMeas((const PODIUM_NAV_MeasMsg_t *)buf);
     }

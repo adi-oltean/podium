@@ -6,7 +6,7 @@
 
 Podium is an open-source framework for *developing, testing, and formally validating* guidance, navigation & control algorithms for spacecraft rendezvous and docking. It is Python-first for iteration speed, but the algorithm core is written in a deliberately restricted style (the *static subset*) so that flight algorithms translate mechanically to C, are proven runtime-error-free by an integrated sound static analyzer (Frama-C/EVA), and compile through a formally-verified compiler (CompCert).
 
-> Status: v0.1–v0.7 complete, v0.8 in progress. The verified-flight-code path runs end to end and is checked by **eight CI lanes**. Highlights: the CW / **Yamanaka-Ankersen** / **relative-orbital-elements** kernels (Koenig Keplerian/J2/J2+drag STMs, e/i-vector passive safety — no other shipped open implementation exists); the nonlinear truth model (J2 + differential drag + seeded stochastic atmosphere) **cross-validated against Orekit**; **convex Layer-0 guidance** (DPP-compiled impulsive planning on CW/YA/ROE, LCvx finite-burn with losslessness audit, constraint library) and **SCP Layer-1** docking (PTR with continuous-time cuts, 6-DOF attitude-coupled planning with a body-fixed thruster); a Joseph-form **relative-nav EKF**; rigid-body **attitude** with the full **environmental-torque suite** (gravity gradient, aerodynamic, SRP, magnetic — analytically validated); a **C99 emitter** (20 flight kernels, ACSL-annotated) whose output is **bit-exact vs Python** for scalar kernels (correctly-rounded via CORE-MATH; matmul agrees up to reassociation), bit-identical on aarch64, checked through **CompCert** and **proven alarm-free by Frama-C/EVA**; **exact-rational certificates** for abort-safety barriers and online-solver KKT re-verification (QP suboptimality bounds; SOCP conic-KKT re-check); a **reference mission** shipped per-tag as an evidence-gated audit bundle; and the **ARCH-COMP rendezvous benchmark as a CI reachability gate** re-proving closed-loop safety on every relevant commit. See [`docs/verification.md`](docs/verification.md).
+> Status: v0.1–v0.7 complete, v0.8 in progress. The verified-flight-code path runs end to end and is checked by **nine CI lanes**. Highlights: the CW / **Yamanaka-Ankersen** / **relative-orbital-elements** kernels (Koenig Keplerian/J2/J2+drag STMs, e/i-vector passive safety — no other shipped open implementation exists); the nonlinear truth model (J2 + differential drag + seeded stochastic atmosphere) **cross-validated against Orekit**; **convex Layer-0 guidance** (DPP-compiled impulsive planning on CW/YA/ROE, LCvx finite-burn with losslessness audit, constraint library) and **SCP Layer-1** docking (PTR with continuous-time cuts, 6-DOF attitude-coupled planning with a body-fixed thruster); a Joseph-form **relative-nav EKF**; rigid-body **attitude** with the full **environmental-torque suite** (gravity gradient, aerodynamic, SRP, magnetic — analytically validated); a **C99 emitter** (20 flight kernels, ACSL-annotated) whose output is **bit-exact vs Python** for scalar kernels (correctly-rounded via CORE-MATH; matmul agrees up to reassociation), bit-identical on aarch64, checked through **CompCert** and **proven alarm-free by Frama-C/EVA**; **exact-rational certificates** for abort-safety barriers and online-solver KKT re-verification (QP suboptimality bounds; SOCP conic-KKT re-check); a **reference mission** shipped per-tag as an evidence-gated audit bundle; the **ARCH-COMP rendezvous benchmark as a CI reachability gate** re-proving closed-loop safety on every relevant commit; and **TLA+/TLC model checking** of the discrete mode/phase/protocol logic, annotation-bound to the sources and trace-validated against real simulation runs. See [`docs/verification.md`](docs/verification.md).
 
 ## Why another space simulator?
 
@@ -16,7 +16,7 @@ Mature tools exist — Basilisk, NASA 42, Trick, Orekit, GMAT — and Podium doe
 2. **A verification-ready algorithm core.** GNC algorithms written as pure, statically-shaped, bounded-loop step functions with machine-readable contracts — the style that abstract interpretation (Astrée-class tools) can actually prove things about, and that translates line-for-line to embedded C.
 3. **Convex trajectory optimization built in.** Direct LP/SOCP transcription on the exact CW/YA/ROE discretizations (DPP-compiled, Clarabel), lossless-convexification finite-burn planning shipped with validity audits rather than assumptions, a constraint library (approach cone, rotating-hyperplane KOZ, plume, Breger-How passive safety), successive convexification (PTR with continuous-time cuts) for the nonconvex docking layer, and 6-DOF attitude-coupled planning with a body-fixed thruster — plus an exact-rational KKT checker that bounds the online solver's suboptimality (when a valid dual point exists) with no trust in its floating-point.
 4. **A sandbox you can trust.** Deterministic fixed-step simulation (bit-identical replays, enforced by test), truth/flight separation, seeded noise and stochastic atmosphere, STL-robustness spec oracles, MuJoCo probe-drogue contact, and cross-validation against Orekit (translational) and exact analytic solutions (attitude).
-5. **Verification as a regression, not a ceremony.** Eight CI lanes re-prove safety on every relevant commit: reachability (JuliaReach), exact-rational barrier certificates, sound static analysis (Frama-C/EVA), golden vectors through CompCert and on aarch64, and Orekit cross-validation — with every tagged release shipping a byte-deterministic, evidence-gated audit bundle.
+5. **Verification as a regression, not a ceremony.** Nine CI lanes re-prove safety on every relevant commit: reachability (JuliaReach), exact-rational barrier certificates, sound static analysis (Frama-C/EVA), golden vectors through CompCert and on aarch64, TLA+/TLC model checking of the discrete mode/phase/protocol logic, and Orekit cross-validation — with every tagged release shipping a byte-deterministic, evidence-gated audit bundle.
 
 ## Layout
 
@@ -54,8 +54,13 @@ src/podium/
                the EVA driver generator, and the cFS app generator;
                golden-vector equivalence vs Python (bit-exact scalars/sqrt,
                matmul up to reassociation)
+tla/           TLA+ specifications of the discrete mode/phase/protocol
+               logic (ArchRendezvous, Mission, NavApp), model-checked by
+               TLC in CI and annotation-bound to the sources
 tools/         reach/ (JuliaReach CI gate), eva_gate.py (Frama-C/EVA),
                tier2_build_run.sh (aarch64/qemu), build_audit_bundle.py,
+               run_tla.sh + tla_extract.py + tla_trace_check.py (TLC lane,
+               annotation gate, trace validation),
                deploy_viewer.py, UI Playwright suites
 tests/         pytest receipts (truth-model validations, closed-loop
                flights, statistical consistency, exact-arithmetic audits)
@@ -105,7 +110,9 @@ dv1, dv2 = cw.two_impulse(x0, np.zeros(6), n, 1500.0)
 | [`docs/paper/podium-paper.pdf`](docs/paper/podium-paper.pdf) | The tool paper describing the library (DOI [10.5281/zenodo.21225267](https://doi.org/10.5281/zenodo.21225267)) |
 | [`docs/exact-arithmetic-certificates/note.pdf`](docs/exact-arithmetic-certificates/note.pdf) | Technical note: constructions, proofs, and prior art for the exact-rational certificates (DOI [10.5281/zenodo.21247380](https://doi.org/10.5281/zenodo.21247380)) |
 | [`docs/optimality-gap-certificates.md`](docs/optimality-gap-certificates.md) | Index of the optimality-gap results mapped to code and tests |
-| [`docs/verification.md`](docs/verification.md) | The ten shipped verification modalities, static-subset rules, contract→ACSL mapping, layered assurance |
+| [`docs/verification.md`](docs/verification.md) | The eleven shipped verification modalities, static-subset rules, contract→ACSL mapping, layered assurance |
+| [`docs/tla-potential.md`](docs/tla-potential.md) | Gap analysis: where TLA+ model checking complements the continuous verification lanes |
+| [`docs/add-tla-specs.md`](docs/add-tla-specs.md) | The TLA+ lane: specs, normative annotation convention, trace validation, acceptance receipts |
 | [`docs/numerical-reproducibility.md`](docs/numerical-reproducibility.md) | Golden-vector methodology, equality classes, and cross-ISA bit-exactness conditions |
 | [`docs/visualization.md`](docs/visualization.md) | Rendering architecture (patterns adopted from fermi) |
 | [`docs/plans/`](docs/plans/) | One design/receipt plan per numbered issue |
