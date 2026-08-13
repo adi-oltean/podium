@@ -144,6 +144,21 @@ def test_shape_validation():
         riccati.block_tridiag_psd([[[F(1)]], [[F(1)]]], [[[F(1), F(0)]]])
 
 
+def test_rejects_asymmetric_diagonal_block():
+    # Asymmetric diagonal block: the band sweep's zero-pivot logic and border
+    # carry assume symmetry, and barrier.is_psd refuses such input -- the band
+    # checkers must refuse rather than silently diverge from the dense verdict.
+    asym = [[[F(1), F(5)], [F(0), F(1)]]]
+    with pytest.raises(ValueError, match="symmetric"):
+        riccati.block_tridiag_psd(asym, [])
+    with pytest.raises(ValueError, match="symmetric"):
+        riccati.border_band_psd(asym, [], [F(0), F(0)], F(0))
+    # the symmetric counterpart is accepted (verdict matches the dense checker)
+    sym = [[[F(1), F(5)], [F(5), F(1)]]]
+    assert riccati.block_tridiag_psd(sym, []) == is_psd(riccati.assemble(sym, []))
+    assert riccati.border_band_psd(sym, [], [F(0), F(0)], F(0)) is False
+
+
 def test_single_block():
     assert riccati.block_tridiag_psd([[[F(4)]]], []) is True
     assert riccati.riccati_storage([[[F(4)]]], []) == [[[F(4)]]]

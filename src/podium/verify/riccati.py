@@ -44,7 +44,9 @@ def _require_fractions(blocks: list[Mat], what: str) -> None:
 
 def _validate(diag: list[Mat], off: list[Mat]) -> int:
     """Shape checks: N square d x d diagonal blocks, N-1 d x d off blocks (the
-    (k, k+1) super-diagonal). Returns d. Raises ValueError on malformed input."""
+    (k, k+1) super-diagonal), and each diagonal block symmetric (the band sweep's
+    zero-pivot logic assumes it; off blocks are mirrored by `assemble` so they
+    need no check). Returns d. Raises ValueError on malformed input."""
     if not diag:
         raise ValueError("need at least one diagonal block")
     d = len(diag[0])
@@ -60,6 +62,11 @@ def _validate(diag: list[Mat], off: list[Mat]) -> int:
             raise ValueError("off-diagonal blocks must match the block size")
     _require_fractions(diag, "block-tridiagonal PSD certificate")
     _require_fractions(off, "block-tridiagonal PSD certificate")
+    for b in diag:
+        for i in range(d):
+            for j in range(i + 1, d):
+                if b[i][j] != b[j][i]:
+                    raise ValueError("diagonal blocks must be symmetric")
     return d
 
 
