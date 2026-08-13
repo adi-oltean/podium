@@ -115,6 +115,53 @@ def block_tridiag_psd(diag: list[Mat], off: list[Mat]) -> bool:
     return _band_ldlt_psd([row[:] for row in m], 2 * d - 1)
 
 
+def border_band_psd(diag: list[Mat], off: list[Mat], lin: Vec, corner: F) -> bool:
+    """Exact PSD certificate for the bordered matrix
+
+        M = [[ H,        lin/2 ],
+             [ lin^T/2,  corner ]]
+
+    with ``H`` the block-tridiagonal matrix given by its blocks -- the full
+    S-procedure LMI ``M(lam, t)`` of `podium.verify.bracket` when ``H`` is the
+    Lagrangian Hessian, ``lin = q0 - sum_k lam_k q_k`` and ``corner =
+    r0 - sum_k lam_k r_k - t``. One band ``LDL^T`` sweep carries the border
+    column: each pivot updates its band window plus its border entry, a zero
+    pivot demands a zero row *including the border entry* (this is exactly the
+    ``lin in range(H)`` condition of the generalized Schur complement, detected
+    as a consistent zero-pivot row), and the terminal corner pivot is the
+    arrival cost ``corner - lin^T H^+ lin / 4``. Same verdict as the dense
+    `barrier.is_psd` on the assembled ``M``, in ``O(N d^3)`` exact rational
+    operations. Refuses non-Fraction entries."""
+    d = _validate(diag, off)
+    n = len(diag) * d
+    if len(lin) != n:
+        raise ValueError("border vector length must match the matrix dimension")
+    if any(not isinstance(v, F) for v in lin) or not isinstance(corner, F):
+        raise TypeError(
+            "bordered PSD certificate requires exact Fraction entries")
+    w = 2 * d - 1
+    a = assemble(diag, off)
+    col = [v / F(2) for v in lin]
+    c = corner
+    for k in range(n):
+        if a[k][k] < 0:
+            return False
+        hi = min(n, k + w + 1)
+        if a[k][k] == 0:
+            if any(a[k][j] != 0 for j in range(k + 1, hi)) or col[k] != 0:
+                return False
+            continue
+        piv = a[k][k]
+        for i in range(k + 1, hi):
+            if a[i][k] != 0:
+                f = a[i][k] / piv
+                for j in range(k, hi):
+                    a[i][j] -= f * a[k][j]
+                col[i] -= f * col[k]
+        c -= col[k] * col[k] / piv
+    return c >= 0
+
+
 def _inv(a: Mat) -> Mat:
     """Exact inverse via Gauss-Jordan (small d). Raises ValueError if singular."""
     n = len(a)

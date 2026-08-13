@@ -147,3 +147,58 @@ def test_shape_validation():
 def test_single_block():
     assert riccati.block_tridiag_psd([[[F(4)]]], []) is True
     assert riccati.riccati_storage([[[F(4)]]], []) == [[[F(4)]]]
+
+
+# ---- bordered sweep: the full S-procedure LMI M(lam, t) ---------------------
+
+def _assemble_bordered(diag, off, lin, corner):
+    m = riccati.assemble(diag, off)
+    n = len(m)
+    full = [m[i][:] + [lin[i] / F(2)] for i in range(n)]
+    full.append([lin[j] / F(2) for j in range(n)] + [corner])
+    return full
+
+
+def test_border_matches_dense_M_over_random_instances():
+    rng = random.Random(20260811)
+    seen_true = seen_false = 0
+    for _ in range(200):
+        N = rng.randint(1, 5)
+        d = rng.randint(1, 3)
+        shift = rng.choice([F(0), F(2), F(6), F(-1), F(12)])
+        diag, off = _rand_chain(rng, N, d, shift)
+        n = N * d
+        lin = [F(rng.randint(-3, 3)) for _ in range(n)]
+        corner = F(rng.randint(-2, 12))
+        expect = is_psd(_assemble_bordered(diag, off, lin, corner))
+        assert riccati.border_band_psd(diag, off, lin, corner) == expect
+        seen_true += expect
+        seen_false += not expect
+    assert seen_true > 0 and seen_false > 0
+
+
+def test_border_singular_H_range_condition():
+    # H singular, lin outside range(H) -> refused regardless of corner
+    assert riccati.border_band_psd([[[F(0)]]], [], [F(1)], F(5)) is False
+    # lin in range (zero) -> verdict is the corner sign
+    assert riccati.border_band_psd([[[F(0)]]], [], [F(0)], F(0)) is True
+    assert riccati.border_band_psd([[[F(0)]]], [], [F(0)], F(-1)) is False
+    # block case: kernel direction with a consistent (zero) border entry
+    diag = [[[F(0), F(0)], [F(0), F(2)]]]
+    assert riccati.border_band_psd(diag, [], [F(0), F(2)], F(1)) is True
+    assert riccati.border_band_psd(diag, [], [F(1), F(2)], F(1)) is False
+
+
+def test_border_corner_is_arrival_cost():
+    # H = [[2]], lin = [2]: M = [[2, 1], [1, c]] is PSD iff c >= 1/2
+    assert riccati.border_band_psd([[[F(2)]]], [], [F(2)], F(1, 2)) is True
+    assert riccati.border_band_psd([[[F(2)]]], [], [F(2)], F(499, 1000)) is False
+
+
+def test_border_validation_and_no_floats():
+    with pytest.raises(ValueError, match="border vector"):
+        riccati.border_band_psd([[[F(1)]]], [], [F(1), F(1)], F(0))
+    with pytest.raises(TypeError, match="Fraction"):
+        riccati.border_band_psd([[[F(1)]]], [], [1.0], F(0))
+    with pytest.raises(TypeError, match="Fraction"):
+        riccati.border_band_psd([[[F(1)]]], [], [F(1)], 0.5)
