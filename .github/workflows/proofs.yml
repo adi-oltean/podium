@@ -1,0 +1,39 @@
+name: proofs
+
+# Type-checks the Lean corpus in proofs/ against the Mathlib revision pinned in
+# proofs/ci/, and asserts the axiom audit: every theorem may depend only on the
+# three standard axioms, and never on sorryAx. A proof that stops compiling, or
+# starts leaning on an admitted statement, fails the build.
+
+on:
+  push:
+    branches: [main]
+    paths: ['proofs/**', '.github/workflows/proofs.yml']
+  pull_request:
+    paths: ['proofs/**', '.github/workflows/proofs.yml']
+
+jobs:
+  lean:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install elan (Lean toolchain manager)
+        run: |
+          curl -sSf https://elan.lean-lang.org/elan-init.sh -o elan-init.sh
+          bash elan-init.sh -y --no-modify-path
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      # Mathlib's build tree is large and its pins change rarely, so cache it on
+      # the pin files themselves: same pins, same cache.
+      - name: Cache the pinned Mathlib build
+        uses: actions/cache@v4
+        with:
+          path: proofs/.leanwork/.lake
+          key: leanwork-${{ hashFiles('proofs/ci/lake-manifest.json', 'proofs/ci/lakefile.toml', 'proofs/ci/lean-toolchain') }}
+
+      - name: Build the pinned Mathlib project
+        run: bash proofs/setup.sh
+
+      - name: Type-check the corpus and audit axioms
+        run: bash proofs/check-all.sh
