@@ -15,7 +15,7 @@ increasing order, the pivot blocks are the accumulated arrival-cost / informatio
 
 `block_tridiag_psd` is the sound verdict (provably equal to `barrier.is_psd` on the
 assembled matrix -- see tests) and exploits the band; `riccati_storage` returns the
-storage-function pivot blocks for the benign positive-definite regime.
+arrival-cost / information-form pivot blocks for the benign positive-definite regime.
 
 Same "check the answer, not the run", no-float-in-the-trusted-path discipline as
 barrier / bracket / kkt: every entry must be an exact `Fraction`.
@@ -122,6 +122,43 @@ def block_tridiag_psd(diag: list[Mat], off: list[Mat]) -> bool:
     return _band_ldlt_psd([row[:] for row in m], 2 * d - 1)
 
 
+def _border_sweep(diag: list[Mat], off: list[Mat], lin: Vec,
+                  corner: F) -> F | None:
+    """The one band ``LDL^T`` sweep behind `border_band_psd` and
+    `border_terminal_pivot`. Returns the terminal corner pivot, or ``None`` when the
+    sweep refuses before reaching it -- a negative band pivot, or a zero pivot whose
+    row is not zero (border entry included). Validation and the no-float refusal are
+    performed here, so both callers raise identically."""
+    d = _validate(diag, off)
+    n = len(diag) * d
+    if len(lin) != n:
+        raise ValueError("border vector length must match the matrix dimension")
+    if any(not isinstance(v, F) for v in lin) or not isinstance(corner, F):
+        raise TypeError(
+            "bordered PSD certificate requires exact Fraction entries")
+    w = 2 * d - 1
+    a = assemble(diag, off)
+    col = [v / F(2) for v in lin]
+    c = corner
+    for k in range(n):
+        if a[k][k] < 0:
+            return None
+        hi = min(n, k + w + 1)
+        if a[k][k] == 0:
+            if any(a[k][j] != 0 for j in range(k + 1, hi)) or col[k] != 0:
+                return None
+            continue
+        piv = a[k][k]
+        for i in range(k + 1, hi):
+            if a[i][k] != 0:
+                f = a[i][k] / piv
+                for j in range(k, hi):
+                    a[i][j] -= f * a[k][j]
+                col[i] -= f * col[k]
+        c -= col[k] * col[k] / piv
+    return c
+
+
 def border_band_psd(diag: list[Mat], off: list[Mat], lin: Vec, corner: F) -> bool:
     """Exact PSD certificate for the bordered matrix
 
@@ -139,34 +176,24 @@ def border_band_psd(diag: list[Mat], off: list[Mat], lin: Vec, corner: F) -> boo
     arrival cost ``corner - lin^T H^+ lin / 4``. Same verdict as the dense
     `barrier.is_psd` on the assembled ``M``, in ``O(N d^3)`` exact rational
     operations. Refuses non-Fraction entries."""
-    d = _validate(diag, off)
-    n = len(diag) * d
-    if len(lin) != n:
-        raise ValueError("border vector length must match the matrix dimension")
-    if any(not isinstance(v, F) for v in lin) or not isinstance(corner, F):
-        raise TypeError(
-            "bordered PSD certificate requires exact Fraction entries")
-    w = 2 * d - 1
-    a = assemble(diag, off)
-    col = [v / F(2) for v in lin]
-    c = corner
-    for k in range(n):
-        if a[k][k] < 0:
-            return False
-        hi = min(n, k + w + 1)
-        if a[k][k] == 0:
-            if any(a[k][j] != 0 for j in range(k + 1, hi)) or col[k] != 0:
-                return False
-            continue
-        piv = a[k][k]
-        for i in range(k + 1, hi):
-            if a[i][k] != 0:
-                f = a[i][k] / piv
-                for j in range(k, hi):
-                    a[i][j] -= f * a[k][j]
-                col[i] -= f * col[k]
-        c -= col[k] * col[k] / piv
-    return c >= 0
+    c = _border_sweep(diag, off, lin, corner)
+    return c is not None and c >= 0
+
+
+def border_terminal_pivot(diag: list[Mat], off: list[Mat], lin: Vec,
+                          corner: F) -> F | None:
+    """The terminal corner pivot of `border_band_psd`'s sweep, exposed as a value
+    rather than a sign: ``corner - lin^T H^+ lin / 4``, the arrival cost of the
+    bordered matrix. With ``lin = q0 - sum_k lam_k q_k`` and ``corner =
+    r0 - sum_k lam_k r_k - t`` this is exactly ``g(lam) - t`` for the Lagrangian dual
+    value ``g(lam)`` (so running it at ``t = 0`` reads off ``g(lam)`` itself).
+
+    Returns ``None`` in precisely the cases `border_band_psd` refuses before the
+    corner is reached: a negative band pivot (``H`` not PSD) or an inconsistent zero
+    pivot (``lin`` outside ``range(H)``). Hence ``border_band_psd(...)`` is exactly
+    ``(p := border_terminal_pivot(...)) is not None and p >= 0``; this is a read-only
+    accessor for the same sweep, not a second verdict."""
+    return _border_sweep(diag, off, lin, corner)
 
 
 def _inv(a: Mat) -> Mat:

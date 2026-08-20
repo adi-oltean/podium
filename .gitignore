@@ -35,3 +35,6 @@ out/
 
 # Scratch scripts and generated messages (see CLAUDE.md)
 tmp/
+
+# Zenodo release tooling secrets (see CLAUDE.md -- never commit the token)
+.env
