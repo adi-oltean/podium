@@ -1,0 +1,1317 @@
+% ---------------------------------------------------------------------------
+% riccati-cert-simple/main.tex -- the SIMPLIFIED paper (the publication target).
+% Stage 4 skeleton + prose. Seat 1 wrote: preamble, Abstract, \S1, \S2 (incl.
+% \S2.1). Sections 3--9 are placeholders for the later seats.
+%
+% LABEL SCHEME (binding for all seats). Section labels REUSE the full paper's
+% names, because the Stage-3 plan-map's claim texts embed them (\S\ref{sec:rpod}
+% and so on); the simplified-only additions follow the same prefixes:
+%   sections:    sec:intro  sec:setup  sec:sizes (=\S2.1)  sec:riccati
+%                sec:theorem  sec:regime  sec:rpod  sec:related  sec:limits
+%                sec:conclusion (new; the full paper's sec:limits covers both)
+%   equations:   eq:qcqp  eq:keepout  eq:riccati
+%   theorem envs: def:height  def:protocol  def:constructed  thm:main
+%                lem:band  lem:dd  ex:gap  rem:value  rem:effective
+%                rem:curvature (new)  rem:bordered (new)  rem:contact (new)
+%   tables:      tab:heights  tab:results
+% New numbered objects introduced by the restructure take the same prefixes
+% (def:, lem:, rem:, ex:, tab:, eq:).
+% ---------------------------------------------------------------------------
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage[hidelinks]{hyperref}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\theoremstyle{definition}
+\newtheorem{assumption}{Assumption}
+\newtheorem{definition}{Definition}
+\newtheorem{example}{Example}
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}
+\newcommand{\Q}{\mathbb{Q}}
+\newcommand{\R}{\mathbb{R}}
+\DeclareMathOperator{\lcm}{lcm}
+\DeclareMathOperator{\den}{den}
+
+% Typography: long typewriter identifiers carry no break points, so a line
+% ending in one overflows the measure. Allow a break after each underscore,
+% and give TeX a third-pass stretch budget so an unbreakable token moves to
+% the next line instead of running past it. check_refs fails the build on any
+% overfull box wider than 2pt, so this must hold.
+% OT1's \_ is a drawn RULE, not a character, so identifiers extracted from the
+% PDF lost their underscores -- copy-paste and any text indexer saw the wrong
+% name. Emit the typewriter font's real underscore glyph and let pdftex map it
+% to U+005F. The glyph exists only in the typewriter font -- char 95 of cmr is
+% not an underscore -- so the roman case (QSopt\_ex) keeps the rule. The
+% fontdimen3 test is the standard "is this monospace" check: tt fonts have no
+% interword stretch.
+\input{glyphtounicode}
+\pdfgentounicode=1
+\renewcommand{\_}{\ifdim\fontdimen3\font=0pt\relax\char`\_\else\textunderscore\fi\hspace{0pt}}
+\emergencystretch=3em
+
+% Draft version. SINGLE SOURCE OF TRUTH for the version number: papers/build.sh
+% names the output <paper-dir>-v<paperversion>.pdf from this macro, and each
+% paper's verify/_common.py parses it to find the build products. Bump it here
+% and nowhere else; the title page carries it so a loose PDF names its version.
+\newcommand{\paperversion}{1}
+
+\title{Certifying Trajectory Optimality in Exact Arithmetic:\\
+An Exact-Rational Riccati Certificate for Penalty-Coupled Trajectory QCQPs}
+\author{Adi Oltean\thanks{Starcloud, Inc. \texttt{adi@starcloud.com}. Working draft.
+AI coding assistants were used for drafting, for the reference implementation and
+verification scripts, and for adversarial review; all results were checked by the author.}}
+\date{Version \paperversion{} --- August 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Trajectory optimization for spacecraft rendezvous under nonconvex keep-out
+(\emph{state}) constraints yields nonconvex quadratically constrained quadratic
+programs (QCQPs) whose global optimality is, in practice, certified only
+numerically, up to a solver tolerance; we treat the \emph{penalty-coupled}
+(soft-dynamics) subclass, in which the stage-to-stage dynamics enter the cost
+rather than as equality constraints and the decision variables are the stage
+states alone, with no control variable. For this class, the S-procedure
+positive-semidefiniteness (PSD) test restricted to the problem's band \emph{is}
+the discrete LQ Riccati (block-Schur) recursion, so running it in exact rational
+arithmetic gives a tolerance-free certified lower bound in $O(Nd^3)$ exact
+rational operations; the band identity is proved, while the border-carrying
+extension that delivers the scalar corner has its soundness asserted and
+test-pinned, its count
+read off the sweep's loop bounds. Under an aggregate-PSD condition at a
+constructed rational optimum the bracket closes exactly, upgrading the bound to
+a global-optimality certificate. The construction places the emitted certificate
+$(\lambda^\star,x^\star)$ at per-stage design height $L$ before any datum is
+derived from it, so the emitted pair has per-entry bit-size $O(L)$ independent
+of the horizon; the theorem's content is that this designed pair is the
+certified global optimum and that the verifier recovers it at that size. The
+certified value the verifier recomputes is not bounded by $L$, though: it is
+governed instead by the instance's assembled height together with the height of
+the placed coordinates and a $\log N$ term, with neither ordering between the
+assembled and design heights forced. No unconditional bound exists for quadratic
+optimization at large, which admits $2^n$-bit exact optima (whether such
+instances live in our class is open), so the guarantee is
+stated conditionally. Aggregate-PSD is implied by a solver-free
+weak-diagonal-dominance rule, and a counterexample certified in exact
+arithmetic shows it is a real assumption. The trusted core is machine-checked in
+Lean~\cite{leannote}, and the pipeline is demonstrated end-to-end on an
+inverse-designed Clohessy--Wiltshire-coupled keep-out stress instance, checked
+throughout by an exact implementation that refuses floats. The protocol is
+sound but not complete: acceptance is a theorem about the deployed numbers,
+and refusal asserts nothing.
+\end{abstract}
+
+\section{Introduction}\label{sec:intro}
+Guidance for spacecraft rendezvous, proximity operations, and docking (RPOD)
+plans a trajectory by solving optimal-control problems that, after
+discretization, are QCQPs: a quadratic cost (tracking, path smoothness) subject
+to quadratic keep-out constraints such as obstacles and abort-safety balls.
+Corridors and other convex tubes carry the opposite sign and are not instances
+of the class treated here. We treat throughout the \emph{penalty-coupled}
+(soft-dynamics) subclass, in which the stage-to-stage dynamics enter the cost
+rather than as equality constraints and the decision variables are the stage
+states alone, with no control variable; hard equality dynamics are outside the
+class treated here (\S\ref{sec:limits}).
+
+These QCQPs are nonconvex, and standard practice --- sequential convex
+programming, or numerical moment--SOS
+relaxations~\cite{lasserre2001,strom2024,yang2023perception} --- returns a
+solution whose global optimality is either not certified at all or certified in
+floating point, up to a tolerance. Lossless
+convexification~\cite{acikmese2011} does certify exactly and analytically, via
+the maximum principle, but for nonconvex \emph{control}-set constraints --- not
+the state constraints at issue here.
+
+We ask a different question: can the \emph{certificate} of global optimality of
+a trajectory QCQP be made \emph{exact}, checked in rational arithmetic with no
+tolerance, so that acceptance is a theorem about the deployed numbers rather
+than a numerical near-miss? For a single keep-out the answer is known --- the
+S-lemma is exact and its dual is one PSD
+test~\cite{polik2007,yakubovich1971}, with rational
+recovery~\cite{peyrl2008,kaltofen2012}; the open case is the \emph{trajectory},
+a chain of coupled primitives, where exact certification might fail (a duality
+gap) or explode (exponential-bit rationals~\cite{bienstock2020}).
+The question is about checking, not searching. A proposer supplies the
+candidate --- a numerical solver in general, the inverse design of
+\S\ref{sec:rpod} in our demonstrations --- and nothing in the certificate
+route replaces the search that produced it.
+
+\paragraph{The structural observation.} The S-procedure certificate for the
+chain is one bordered PSD condition $M(\lambda,t)\succeq0$ (\S\ref{sec:setup}).
+Its exact test is a rational $LDL^\top$ that eliminates within the problem's
+band and carries the affine column alongside; that test is precisely the
+discrete Riccati / block-Schur recursion of LQ optimal-control
+numerics~\cite{wright1993,rao1998}, and the recursion's terminal arrival cost
+delivers the single scalar corner condition. Run in exact $\Q$, acceptance
+becomes a tolerance-free theorem at the $O(Nd^3)$ operation count of one LQ
+Riccati sweep, modulo the border-carrying extension of \S\ref{sec:riccati}.
+
+\paragraph{Delta over the published technical note.} The published Podium
+technical note~\cite{oltean2026certnote} establishes the exact S-procedure
+bracket and the rational $LDL^\top$ PSD test for \emph{single} primitives; the
+mathematics there is classical and presented as such. This paper's delta is
+the \emph{trajectory} case:
+\begin{itemize}
+\item the identity between the band-restricted test and the Riccati recursion,
+carried out in $\Q$;
+\item conditional exact closure with a horizon-independent emitted certificate
+(Theorem~\ref{thm:main});
+\item the solver-free diagonal-dominance criterion, with a gap counterexample
+certified in exact arithmetic (\S\ref{sec:regime});
+\item band checkers shipped in the Podium library; and
+\item a machine-checked Lean core~\cite{leannote}.
+\end{itemize}
+
+\paragraph{Contributions.}
+\begin{enumerate}
+\item \textbf{Exact-$\Q$ soundness (\S\ref{sec:riccati}).} The band-restricted
+rational $LDL^\top$ equals the dense PSD test, with exact zero-pivot handling,
+in $O(Nd^3)$ rational operations (Lemma~\ref{lem:band}, \emph{proved}). The
+\emph{acceptance predicate} --- a nonnegative-pivot factorization exists iff
+the matrix is PSD --- is \emph{machine-checked} in Lean in both directions;
+that the shipped sweep computes such a factorization is not machine-checked
+(\S\ref{sec:riccati}, \cite{leannote}). The bordered sweep ships as a trusted
+checker in the Podium library.
+\item \textbf{Conditional closure (\S\ref{sec:theorem}).} Under aggregate-PSD
+(A1), a rational recoverable optimum (A2), and linear independence of the
+active constraint gradients (LICQ), the bracket closes exactly, with any
+number of keep-outs per stage; LICQ leaves at most $d$ active on each stage.
+For a \emph{penalty-coupled} constructed rational-sphere family
+(Definition~\ref{def:constructed}) the emitted certificate
+$(\lambda^\star,x^\star)$ has \emph{per-entry} bit-size $O(L)$ independent of
+$N$, by the design order of Definition~\ref{def:constructed} rather than by a
+measurement. The theorem's content is that the pair so placed is the certified
+global optimum and is recovered by the verifier at that size; both legs are
+\emph{proved}. The guarantee is conditional, and \S\ref{sec:theorem} says why
+no unconditional one is available.
+\item \textbf{A solver-free benign criterion (\S\ref{sec:regime}).} Weak
+diagonal dominance implies aggregate-PSD and is preserved along the sweep
+(Lemma~\ref{lem:dd}, \emph{proved}; core
+\emph{machine-checked}~\cite{leannote}). A duality-gap counterexample
+certified in exact arithmetic (Example~\ref{ex:gap}) shows aggregate-PSD is a
+real assumption, not automatic. The certification pipeline is \emph{demonstrated}
+end-to-end on an inverse-designed CW-coupled stress instance
+(\S\ref{sec:rpod}), where aggregate-PSD is verified by the general sweep
+rather than by this solver-free shortcut; every reported number is reproduced
+by an executable exact-arithmetic receipt (\S\ref{sec:rpod},
+\cite{leannote}).
+\end{enumerate}
+
+\section{Problem and certificate protocol}\label{sec:setup}
+Let $x=(x_1,\dots,x_N)$ with each $x_k\in\R^d$ and total dimension $n=Nd$; the
+optimization is over $\R$, while the problem \emph{data} and the
+\emph{certificate} are rational. Consider
+\begin{equation}\label{eq:qcqp}
+J^\star=\min_x\; f_0(x)\quad\text{s.t.}\quad f_j(x)\ge 0,\ j=1,\dots,m,
+\end{equation}
+with a block-tridiagonal objective coupling only neighbours,
+\[
+f_0(x)=\sum_{k=1}^{N-1} \lVert x_{k+1}-A_k x_k\rVert_{R_k}^2
+       +\sum_{k=1}^{N} (x_k-g_k)^\top W_k (x_k-g_k),
+\]
+with $R_k\succ0$ the stage-cost weight and $W_k$ the goal weight, and per-stage
+keep-outs
+\begin{equation}\label{eq:keepout}
+f_j(x)=\lVert \Pi_j x_{\sigma(j)}-c_j\rVert^2-\rho_j^2,\qquad \rho_j>0,
+\end{equation}
+each involving only the single stage $\sigma(j)\in\{1,\dots,N\}$; several
+keep-outs may guard the same stage. Here $\Pi_j$ is a fixed coordinate
+projection selecting the \emph{guarded} sub-block of the stage state:
+$\Pi_j=I$ is the full-stage keep-out ball, while a guidance keep-out typically
+guards the position sub-block of a position--velocity state (\S\ref{sec:rpod}).
+The neighbour-only coupling confines every nonzero entry to a scalar band of
+half-width $b=2d-1$, and that is the band the sweep of \S\ref{sec:riccati}
+uses.
+
+The certificate's shape can be read off the one-dimensional picture first.
+At the minimum of a parabola the tangent is horizontal: the derivative
+vanishes at the minimizer, and that first-order identity is an algebraic
+fact about the minimizer's own coordinates --- a claimed minimizer is
+checked by evaluating a derivative, not by rerunning any solver.
+When the minimum sits on the boundary of the feasible set ---
+here, on an active keep-out sphere --- the gradient need not vanish.
+Under a qualification on the active gradients (the theorem's LICQ), it is
+balanced by the active constraints' gradients with nonnegative weights, and
+those weights are the multipliers $\lambda$ of the KKT stationarity
+condition. The balance alone does not certify. With nonconvex keep-outs
+many points satisfy it: local minima, saddle points, contacts on the wrong
+branch of a sphere. And which keep-outs are active at the optimum is a
+combinatorial unknown. The S-procedure certificate $(\lambda,t)$ defined
+next is the object that closes the gap: acceptance upgrades ``these
+coordinates balance'' to the global statement $t\le J^\star$, and closure
+of the bracket (Definition~\ref{def:protocol}) upgrades it again, to global
+optimality of the claimed point --- checked in exact arithmetic throughout.
+
+Write $f_0(x)=x^\top P_0 x+q_0^\top x+r_0$ with $P_0$ block-tridiagonal, and
+$f_j(x)=x^\top P_j x+q_j^\top x+r_j$. Then $P_j=\Pi_j^\top\Pi_j\succeq0$ is
+supported on the single block $\sigma(j)$, and since $\Pi_j$ is a coordinate
+projection, $\lVert\nabla f_j\rVert=2\rho_j$ on the contact sphere. These are
+the structural properties of the keep-outs that the results below use;
+Lemma~\ref{lem:dd}'s sharp form additionally takes $A_k=I$, $R_k=I$, $W_k=w_kI$
+and $\Pi_j=I$. A multiplier vector $\lambda\in\Q_{\ge0}^m$ and a value $t\in\Q$
+certify the lower bound $t\le J^\star$ when
+\[
+M(\lambda,t)=\begin{bmatrix} H(\lambda) & \tfrac12(q_0-\textstyle\sum_j\lambda_j q_j)\\[2pt]
+\tfrac12(q_0-\sum_j\lambda_j q_j)^\top & r_0-\sum_j\lambda_j r_j-t\end{bmatrix}\succeq 0,
+\qquad H(\lambda):=P_0-\textstyle\sum_j\lambda_j P_j,
+\]
+by weak duality: $M\succeq0$ makes $f_0-\sum_j\lambda_j f_j-t$ globally
+nonnegative, so $t+\sum_j\lambda_j f_j$ is a global minorant of $f_0$. The
+converse fails: Example~\ref{ex:gap} exhibits true lower bounds admitting no
+level-one certificate. Acceptance of a certificate
+(Definition~\ref{def:protocol}) is therefore the sufficient direction.
+
+By a generalized Schur complement, $M(\lambda,t)\succeq0$ holds iff three
+conditions do:
+\begin{enumerate}
+\item[(i)] $H(\lambda)\succeq0$;
+\item[(ii)] the linear part $\tfrac12(q_0-\sum_j\lambda_j q_j)$ lies in
+$\mathrm{range}(H(\lambda))$ --- automatic when $H$ is nonsingular, and when
+$H$ is singular the sweep detects the condition as a consistent zero-pivot
+row;
+\item[(iii)] the scalar corner condition $t\le g(\lambda)$, where $g(\lambda)$
+is the Lagrangian dual function value at $\lambda$.
+\end{enumerate}
+
+\begin{remark}[Curvature convention]\label{rem:curvature}
+Block tridiagonality of $H(\lambda)$ is forced by the class rather than
+assumed: every summand of $f_0$ touches only $\{x_k,x_{k+1}\}$ or $x_k$ alone,
+each $P_j$ sits in the single block $\sigma(j)$, and block-tridiagonal
+matrices form a linear subspace. The structure is load-bearing: the band sweep
+cannot see out-of-band entries, and it returns a wrong verdict on a symmetric
+matrix that lacks the structure. Under the convention
+$f_0=x^\top P_0x+q_0^\top x+r_0$ used here, with no $\tfrac12$ factor,
+$H(\lambda)$ is half the Lagrangian Hessian:
+$\nabla^2_{xx}(f_0-\sum_j\lambda_jf_j)=2H(\lambda)$. We therefore call
+$H(\lambda)$ the \emph{Lagrangian curvature matrix}.
+The factor is fixed by that convention
+and is load-bearing wherever $H$ enters quantitatively: $H$, and not $2H$, is
+the curvature block of $M(\lambda,t)$, and the pivot bit-sizes
+\S\ref{sec:rpod} measures are those of $H$. What is invariant under a positive
+rescaling are the three verdict-level properties invoked below ---
+semidefiniteness, weak diagonal dominance, and pivot signs --- since the band
+pivots are homogeneous of degree one in $H$.
+\end{remark}
+
+\begin{definition}[Certificate protocol]\label{def:protocol}
+The \emph{S-procedure certificate} is the pair $(\lambda,t)$; its acceptance
+--- $\lambda\ge0$ and $M(\lambda,t)\succeq0$, checked in exact arithmetic ---
+proves $t\le J^\star$. The \emph{emitted certificate} is the object a prover
+transmits: the pair $(\lambda,\bar x)$ of multipliers and a witness. The
+verifier checks $\lambda\ge0$ and $f_j(\bar x)\ge0$ for every $j$.
+It then recomputes both bounds: a candidate $t$ as the Lagrangian
+value at $\bar x$, which is the route the shipped drivers take, with
+acceptance re-verifying $M(\lambda,t)\succeq0$ however $t$ was formed; and the
+upper bound as $f_0(\bar x)$. The certified value is therefore never
+transmitted or trusted.
+The two outcomes are asymmetric, in the standard sense that the protocol is
+\emph{sound} but not complete. Acceptance carries the bound as a theorem: no
+tolerance exists through which a false certificate could pass. A candidate
+failing any check is \emph{refused}, and a refusal asserts nothing --- in
+particular, it does not prove the candidate suboptimal (\S\ref{sec:regime}
+exhibits an instance whose true optimum admits no level-one certificate at
+all).
+Throughout, the verifier works in exact rational arithmetic, evaluating $f_0$
+and the $f_j$ and assembling $M(\lambda,t)$ from its own copy of the problem
+data: a certificate is meaningful only relative to agreed data. The interval $[t,f_0(\bar x)]$
+\emph{brackets} $J^\star$, and the bracket \emph{closes} when $t=f_0(\bar x)$.
+Every size or cost claim below names which object it concerns; for claims
+about a certificate, that is the S-procedure certificate or the emitted
+certificate.
+\end{definition}
+
+\subsection{Size measures}\label{sec:sizes}
+All data are rational, and every bit bound in this paper is stated against a
+height --- in the sense of Definition~\ref{def:height} --- of a tuple that the
+bound names. Two statements stand outside the scheme: the per-entry bit-size of
+the rationalized Clohessy--Wiltshire (CW) state-transition matrix in
+\S\ref{sec:rpod}, stated against the denominator cap that produces it, and the
+imported $2^n$-bit lower bound of~\cite{bienstock2020}, stated against the
+problem dimension.
+
+\begin{definition}[Height and bit-size]\label{def:height}\leavevmode
+\begin{enumerate}
+\item[(a)] For a finite tuple $T$ of rationals, its \emph{height}
+$\mathrm{ht}(T)$ is the least $h$ such that $T$ can be written over one common
+denominator, $T=(a_1/D,\dots,a_r/D)$ with $D$ a positive integer and the $a_i$
+integers, subject to $\lceil\log_2(D{+}1)\rceil\le h$ and
+$\lceil\log_2(|a_i|{+}1)\rceil\le h$. That least $h$ is attained at the least
+common multiple of the entries' reduced denominators, which is the $D$ the
+receipts compute. Clearing that denominator turns the tuple into integers of
+at most $h$ bits --- which is what Hadamard's and Edmonds' bounds require.
+\item[(b)] A single rational $p/q$ in lowest terms has bit-size
+$\mathrm{bit}(p/q)=\lceil\log_2(|p|{+}1)\rceil+\lceil\log_2(q{+}1)\rceil\le
+2\,\mathrm{ht}(p/q)$; that per-entry measure is what Table~\ref{tab:results}
+reports for the emitted certificate.
+\item[(c)] For a positive \emph{integer} $D$ we write
+$\mathrm{bitlen}(D)=\lceil\log_2(D{+}1)\rceil$ for its bit-length, the measure
+the receipts apply to denominators; read as a rational,
+$\mathrm{bit}(D)=\mathrm{bitlen}(D)+1$.
+\end{enumerate}
+\end{definition}
+
+\noindent Table~\ref{tab:heights} collects the named heights the bounds below
+are stated against; each is the height, in the sense of
+Definition~\ref{def:height}, of a different tuple, and \S\ref{sec:rpod}
+measures all four.
+
+\begin{table}[ht]\centering
+\caption{The named heights.}
+\label{tab:heights}
+\begin{tabular*}{6.1in}{@{}p{1.35in}p{2.35in}p{2.0in}@{}}
+\toprule
+Height & tuple measured & where used\\
+\midrule
+$L$ (\emph{per-stage design height}) & the design tuple
+Definition~\ref{def:constructed} places on a stage: that stage's placed
+coordinates, its active keep-out centres $c_j$, and its active multipliers
+$\lambda^\star_j$ & Theorem~\ref{thm:main}'s bit-size leg, stated against this
+tuple and no larger one\\
+\addlinespace
+$L_{\mathrm{asm}}$ (assembled height) & the assembled coefficients
+$P_0,q_0,r_0$, and the goals $g_k$ they are recovered from &
+Remark~\ref{rem:value}'s bounds on the certified value\\
+\addlinespace
+$L_M$ (bordered height) & the bordered matrix $M(\lambda,t)$ that the sweep
+eliminates: $L_M=\mathrm{ht}(M(\lambda,t))$ & Remark~\ref{rem:effective}'s
+pivot bit-size bound\\
+\addlinespace
+$\mathrm{ht}(x^\star)$ & the placed coordinates taken over \emph{all} stages
+at once & Remark~\ref{rem:value}'s sharper first inequality\\
+\bottomrule
+\end{tabular*}
+\end{table}
+
+\noindent These are different tuples and in general different numbers, and no
+ordering among $L$, $L_{\mathrm{asm}}$, $L_M$ and $\mathrm{ht}(x^\star)$ is
+forced, so each bound below names which height it uses. The corner
+$r_0-\sum_j\lambda_jr_j-t$ of the bordered matrix can cancel $r_0$'s
+denominator against $t$'s, and on the demonstration family of \S\ref{sec:rpod}
+it does. Nor is $\mathrm{ht}(x^\star)$ a renaming of $L$: $L$ bounds a stage's
+design tuple one stage at a time, while $\mathrm{ht}(x^\star)$ is taken over
+the placed coordinates of all stages at once.
+
+\section{The certificate is a Riccati sweep}\label{sec:riccati}
+$H=H(\lambda)$ is symmetric block-tridiagonal, with $d\times d$ blocks
+$H_{kk}$ and couplings $H_{k,k+1}=-A_k^\top R_k$. Its scalar bandwidth is at
+most $b=2d-1$. Equality holds whenever some coupling block has a nonzero
+$(1,d)$ entry, as it does on the family of \S\ref{sec:rpod}; structured
+couplings such as $A_k=R_k=I$ instead sit at half-width exactly $d$, strictly
+inside the band whenever $d\ge2$. The sweep uses the conservative $b$ in
+either case. Eliminating blocks in increasing order
+produces the pivots
+\begin{equation}\label{eq:riccati}
+S_1=H_{11},\qquad S_k=H_{kk}-H_{k,k-1}\,S_{k-1}^{-1}\,H_{k-1,k}
+\quad(\text{while } S_{k-1}\succ0),
+\end{equation}
+and, in the positive-definite interior, $H\succ0$ iff every $S_k\succ0$; the
+general semidefinite verdict, including singular boundary pivots, is delivered
+by the scalar band-$LDL^\top$ of Lemma~\ref{lem:band} with its zero-pivot
+handling.
+
+Equation~\eqref{eq:riccati} is the discrete \emph{Riccati / block-Schur}
+recursion of an LQ problem: $S_k$ is the accumulated (arrival-cost /
+information-form) curvature matrix after eliminating $x_1,\dots,x_{k-1}$ --- a
+Schur complement in $H$, so it inherits the same no-$\tfrac12$ convention as
+$H(\lambda)$ (Remark~\ref{rem:curvature}). That the block-banded KKT
+factorization equals the Riccati recursion is
+classical~\cite{wright1993,rao1998}; here it is run in exact $\Q$.
+
+The full certificate is $M(\lambda,t)\succeq0$, that is, the three conditions
+of \S\ref{sec:setup}. Carrying the affine term
+$\tfrac12(q_0-\sum_j\lambda_j q_j)$ through the same sweep makes the terminal
+corner pivot $g(\lambda)-t$; equivalently, run the sweep at $t=0$ and read off
+the arrival cost $g(\lambda)$. All three conditions are thus certified in one
+tolerance-free rational sweep of $O(Nd^3)$ operations. That sweep is an
+extension of Lemma~\ref{lem:band}; its \emph{soundness} is asserted and
+test-pinned rather than proved, and its operation count is read off the
+sweep's loop bounds (Remark~\ref{rem:bordered}).
+
+\begin{lemma}[Band-$LDL^\top$ soundness]\label{lem:band}
+For symmetric $H$ with bandwidth $b$, the $LDL^\top$ that eliminates only
+within the band yields the same pivots --- hence the same PSD verdict --- as
+the dense test, in $O(nb^2)=O(Nd^3)$ exact rational operations, with exact
+zero-pivot handling.
+\end{lemma}
+\noindent Band preservation is proved below; the content of the lemma is the
+exact-rational, zero-pivot-handling PSD \emph{verdict}.
+\begin{proof}
+Eliminating pivot $k$ updates $a_{ij}\mathrel{-}=(a_{ik}/a_{kk})a_{kj}$ for
+$i,j>k$. With bandwidth $b$, $a_{ik}\ne0\Rightarrow i\le k+b$ and
+$a_{kj}\ne0\Rightarrow j\le k+b$, so only entries with $i,j\in(k,k+b]$ change
+and the bandwidth is preserved; by induction all nonzero updates lie in the
+band, so eliminating only there is exact. At a zero pivot, positive
+semidefiniteness requires $a_{kj}=0$ for all $j>k$; bandwidth makes this
+automatic for $j>k+b$, so checking $j\in(k,k+b]$ suffices. Each pivot touches
+an $\le b\times b$ window, giving $O(nb^2)$.
+\end{proof}
+
+\begin{remark}[The bordered extension]\label{rem:bordered}
+$M(\lambda,t)$ has no bandwidth: its last row and column carry the generally
+dense $\tfrac12(q_0-\sum_j\lambda_jq_j)$, so Lemma~\ref{lem:band} applied to
+$M$ gives $O(n^3)$, not $O(Nd^3)$. The bordered sweep instead carries the
+border as a \emph{separate} column, at one rank-one corner update per pivot.
+That extension is \emph{asserted here, not proved}. Its soundness is pinned by
+test in two ways: at the verdict level against the dense $M$-test, and pivot
+by pivot against the dense $LDL^\top$ of $M$ at the shortest horizons of
+\S\ref{sec:rpod}'s family. Its $O(Nd^3)$ count is read off the shipped sweep's
+loop bounds --- each of the $n$ pivots touches a $\le b\times b$ band window
+plus $\le b$ border-column entries and one corner update. No test measures the
+bordered sweep's operation count; it is the band sweep's count that is
+measured against its loop bound. The companion note records the extension's
+status and catalogues the pinning receipts~\cite{leannote}.
+\end{remark}
+
+Both tests ship as trusted checkers in the Podium library. The
+checkers work in exact rational arithmetic, refuse floats, and reject
+malformed input --- non-rational entries, mismatched shapes, asymmetric
+blocks --- before any verdict. One entry point is the band Hessian test. The
+other is the corner-carrying bordered sweep: one band $LDL^\top$ carrying the
+affine column, with the singular-$H$ range condition detected as a consistent
+zero-pivot row, delivering the full $M(\lambda,t)\succeq0$ verdict in
+$O(Nd^3)$ exact rational operations. Both entry points materialize the
+$n\times n$ matrix before eliminating, so their memory --- and hence their
+total work --- is quadratic in $n$; the $O(Nd^3)$ of Lemma~\ref{lem:band}
+counts the sweep's rational \emph{operations}, which the assembly does not
+change. A fixed-seed test suite pins both checkers against their dense
+counterparts --- the band-$H$ sweep on the assembled $H$, the bordered sweep
+on the assembled $M$, the latter being the dense $M$-test the library's
+reference checker performs --- over randomized instances plus dedicated
+singular-$H$ and zero-pivot cases. The companion note names the checkers, the
+pinning suite, and the library commit that carries them~\cite{leannote}.
+
+\begin{remark}[Coarse effectiveness]\label{rem:effective}
+The sweep's pivots are ratios of consecutive leading minors of the bordered
+matrix; with zero pivots skipped, the $k$-th pivot is a ratio of two minors
+on the retained index set, so the identity survives the zero-pivot branch.
+Clearing the common denominator that
+$L_M=\mathrm{ht}\bigl(M(\lambda,t)\bigr)$ supplies, their bit-sizes are
+\[
+O\bigl((n{+}1)(L_M+\log(n{+}1))\bigr)
+\]
+by Hadamard's inequality and the classical exact-elimination argument of
+Edmonds~\cite{edmonds1967}, and exact verification runs in time polynomial in
+$n$ and $L_M$. The order $n{+}1$ is the worst case over the sweep, attained at
+the \emph{bordered} $(n{+}1)\times(n{+}1)$ matrix itself: only the terminal
+pivot's minors reach the border, the interior pivots' minors being leading
+minors of the $H$-block alone, so bounding every pivot at the bordered order
+and the bordered height is conservative. The implied constant is not $1$: a
+pivot is a ratio of two minors, so after clearing, the instantiation of the
+display is about twice the product. The height that governs here is the
+bordered matrix's, not a per-stage height, and the difference is not
+cosmetic. Assembly multiplies denominators across the coupling, so on the
+demonstration family of \S\ref{sec:rpod} the bordered height dwarfs the
+per-stage design height, and no per-stage height bounds even the
+\emph{entries} of the matrix the sweep eliminates, let alone its pivots.
+\S\ref{sec:rpod} measures those pivots inside the displayed expression formed
+with $L_M$ at every horizon, and outside the one formed with the design
+height $L$. Sharp growth laws are model-sensitive; \S\ref{sec:rpod} reports
+measured growth.
+\end{remark}
+
+\noindent Remark~\ref{rem:effective}'s displayed expression takes both the
+bordered height $L_M$ and the order $n{+}1$ of the bordered matrix because
+what the sweep costs is bounded through the two together, and through neither
+alone. Two admissible closing families witness this, each constructed by an
+executable receipt catalogued in the companion note~\cite{leannote}. The
+first family has bordered matrix entries all in $\{-1,0,1,2,3\}$,
+$x^\star=0$, unit keep-outs contacted at $c_k=-1$, and multipliers
+alternating $1$ and $0$. It holds $L_M=2$ at every horizon while its largest
+interior pivot grows without bound --- $12$ bits at $n{+}1=9$ and $483$ at
+$n{+}1=257$ --- so no function of $L_M$ alone bounds the cost. The second
+family fixes the order at $n{+}1=9$ while its multipliers' denominators
+grow: that raises $L_M$ from $10$ to $262$ bits and the largest interior
+pivot from $85$ to $4116$ with it, so no function of the order alone bounds
+the cost either.
+
+The acceptance predicate --- a factorization with nonnegative pivots exists
+iff the matrix is PSD --- is machine-checked in Lean in both directions; that
+the shipped sweep computes such a factorization is not, and the companion note
+records what is machine-checked and under which
+hypotheses~\cite{leannote}.
+
+\section{Conditional closure and the emitted certificate}\label{sec:theorem}
+\begin{assumption}[Aggregate-PSD exactness]\label{a:psd}
+At a KKT point $x^\star$ with multipliers $\lambda^\star\ge0$, the Lagrangian
+curvature matrix $H(\lambda^\star)\succeq0$; global optimality of $x^\star$ is
+then a \emph{conclusion} (Theorem~\ref{thm:main}), not a hypothesis, and A1 is
+a solver-free PSD check on $H(\lambda^\star)$ that needs no prior knowledge of
+optimality.
+\end{assumption}
+\begin{assumption}[Rational recoverable optimum]\label{a:rat}
+$x^\star$ is rational: the active keep-out surfaces
+$\lVert\Pi_jx_{\sigma(j)}-c_j\rVert=\rho_j$ meet the stationarity variety at a
+rational point.
+\end{assumption}
+
+\noindent Assumption~\ref{a:psd} (A1 below; A2 is Assumption~\ref{a:rat}) is
+the S-procedure exactness condition, and for the chain it is implied by the
+solver-free weak-diagonal-dominance rule of \S\ref{sec:regime}.
+
+\begin{remark}[Rational contact is designed, not generic]\label{rem:contact}
+A2 is arithmetic-geometric and is arranged by construction rather than assumed
+generically: when the active keep-out guards a sub-block of dimension greater
+than one, the stationarity variety meets that active sphere at a generically
+irrational point, so rational contact must be designed in. Designing it in
+requires $\rho_j\in\Q$, since the named constructions --- Pythagorean
+triples for $d=2$, stereographic projection of rational parameters for general
+$d$ --- reach rational points only when $\rho_j$ is rational. At guard
+dimension $2$ or $3$ a rational non-square $\rho_j^2$ can leave the sphere
+with no rational point to design in at all: $x^2+y^2=3$ and
+$x^2+y^2+z^2=7$ have none. Dimension $4$ or more always admits one, by
+Lagrange's four-square theorem. A keep-out guarding a single coordinate
+with rational radius $\rho_j\in\Q$ is the exception: contact there pins that
+coordinate to the rational value $c_j\pm\rho_j$ directly. What
+\eqref{eq:keepout}'s data fix is only $\rho_j^2\in\Q$: with $\rho_j^2$ a
+rational non-square, single-coordinate contact is always irrational, while a
+higher-dimensional sphere may still carry a rational point the named
+constructions do not reach, as $(1,1)$ does on $x^2+y^2=2$.
+Tolerance-free closure is thus a property of instances whose optimum is
+rational; \S\ref{sec:limits} states what survives without A2.
+\end{remark}
+
+\begin{definition}[Constructed rational-sphere family]\label{def:constructed}
+A \emph{constructed rational-sphere family} is a family of instances
+of~\eqref{eq:qcqp} carrying a distinguished rational point $x^\star$, the
+\emph{designed point} --- Theorem~\ref{thm:main}, not this definition, is what
+makes it the optimum --- in which the following four conditions hold.
+\begin{enumerate}
+\item[(i)] Every keep-out is \emph{active} at $x^\star$, with radius
+$\rho_j>0$, and each \emph{guarded} contact point $\Pi_jx^\star_{\sigma(j)}$
+is placed at a rational point of its keep-out sphere via a Pythagorean or
+stereographic parametrization, the remaining stage coordinates being placed
+rationally as well, so that each stage's placed coordinates have height at
+most $L$.
+\item[(ii)] At every stage the active constraint gradients
+$\nabla f_j(x^\star)$ are linearly independent. For one keep-out per stage
+this is automatic, since $\rho_j>0$; for several keep-outs per stage it is a
+condition on the contact geometry. Since those gradients are supported on the
+one block, it caps the number of active keep-outs on a stage at $d$.
+\item[(iii)] The multipliers $\lambda^\star_j\ge0$ are chosen rationally so
+that, together with the stage's placed coordinates and keep-out centres, they
+form a per-stage design tuple of height at most $L$, and so that
+aggregate-PSD (A1) holds.
+\item[(iv)] Every $W_k$ is invertible, and the goals $g_k$ are then recovered
+from stationarity, so the $g_k$ --- and with them $q_0$ and $r_0$ --- are
+\emph{derived} data, carried by the assembled height $L_{\mathrm{asm}}$
+rather than by $L$.
+\end{enumerate}
+The definition forces no ordering between $L$ and $L_{\mathrm{asm}}$: on the
+demonstration family (\S\ref{sec:rpod}) $L_{\mathrm{asm}}$ is by far the
+larger, while an executable receipt exhibits an \emph{inverted} family,
+admissible under this definition, on which it is the
+smaller~\cite{leannote}. No coordinate is left inactive to
+be solved for, so the emitted pair $(\lambda^\star,x^\star)$ is rational, of
+per-stage height at most $L$ and hence of per-entry bit-size at most $2L$
+(Definition~\ref{def:height}), by construction.
+\end{definition}
+
+\begin{theorem}\label{thm:main}\leavevmode
+\begin{enumerate}
+\item[(i)] \emph{Closure.} Under Assumptions~\ref{a:psd} and~\ref{a:rat},
+with linear independence of the active constraint gradients (LICQ) at
+$x^\star$, the exact-rational bracket closes: there exist rational
+$(\lambda^\star\ge0,\,t^\star=J^\star,\,x^\star)$ with
+$M(\lambda^\star,t^\star)\succeq0$, $f_j(x^\star)\ge0$ and
+$t^\star=f_0(x^\star)=J^\star$ --- an accepting certificate in the sense of
+Definition~\ref{def:protocol} --- with any number of keep-outs per stage, of
+which LICQ leaves at most $d$ active on each.
+\item[(ii)] \emph{Emitted size and recovery.} For a constructed
+rational-sphere family (Definition~\ref{def:constructed}) the emitted
+certificate $(\lambda^\star,x^\star)$ additionally has \emph{per-entry}
+bit-size $O(L)$, with a constant depending on $d$ but not on $N$, and a
+verifier holding the instance data and the transmitted witness $x^\star$
+recovers the same $\lambda^\star$ within that bound, so the transmitted
+$\lambda^\star$ need not be trusted.
+\end{enumerate}
+\end{theorem}
+\begin{proof}
+\emph{Closure.} By Assumption~\ref{a:psd}, $x^\star$ is a KKT point with
+multipliers $\lambda^\star\ge0$; for a constructed family they are supplied
+outright, by Definition~\ref{def:constructed}(iii)--(iv). A constraint
+qualification is not what produces them, since the theorem does not assume
+$x^\star$ is a local minimizer: optimality is the conclusion. By
+A1 the Lagrangian $\mathcal L(x)=f_0(x)-\sum_j\lambda^\star_jf_j(x)$ is
+convex and $x^\star$ is a stationary point, hence a global minimiser:
+$\min_x\mathcal L=\mathcal L(x^\star)=f_0(x^\star)$, the last step by
+complementary slackness. Thus $M(\lambda^\star,t^\star)\succeq0$ at
+$t^\star=f_0(x^\star)$, and weak duality gives $t^\star\le J^\star$, while
+feasibility gives $J^\star\le f_0(x^\star)=t^\star$. Hence
+$t^\star=J^\star=f_0(x^\star)$.\footnote{The mechanized counterparts of the
+weak-duality step and the attainment leg, and the hypotheses those theorems
+take, are itemized in the companion note~\cite{leannote}.} Nothing in this
+argument uses one keep-out per stage: with several active keep-outs on a
+stage the multipliers enter $\mathcal L$ additively and complementary
+slackness holds term by term. Two exact receipts with two active keep-outs
+on one stage accompany this~\cite{leannote}: one with disjoint-coordinate
+contacts, closing at $t^\star=169/320$, and one whose contacts' gradients
+share their whole support, closing at $t^\star=5773/3600$.
+
+\emph{Rationality of the multipliers.} The data and $x^\star$ are rational,
+so stationarity $\nabla f_0(x^\star)=\sum_j\lambda_j\nabla f_j(x^\star)$
+together with complementary slackness ($\lambda_j=0$ at every inactive $j$)
+is a rational linear system in the active multipliers, and under LICQ ---
+item (ii) of Definition~\ref{def:constructed} for the constructed families
+--- it has a unique solution, which is therefore rational.
+
+\emph{Bit-size of the emitted pair.} A2 alone does not bound the height: for
+quadratic optimization at large the KKT system is polynomial, and
+Bienstock-type gadgets satisfy A2 with $2^n$-bit
+optima~\cite{bienstock2020}. In a constructed family the design order of
+Definition~\ref{def:constructed} settles the emitted pair directly:
+$x^\star$ by (i) and $\lambda^\star$ by (iii) are \emph{placed} rationally at
+per-stage height at most $L$, and only then are the goals recovered by (iv).
+The placement leaves nothing to solve for: every keep-out being active, the
+guarded coordinates sit on their keep-out sphere and the rest are placed
+freely, with no inactive coordinate left over. So
+$(\lambda^\star,x^\star)$ has per-entry bit-size $O(L)$, independent of $N$.
+
+\emph{What the verifier reconstructs.} What needs an argument is that
+$\lambda^\star$ is exactly what a verifier holding the instance data and the
+transmitted witness $x^\star$ reconstructs. Fix a stage $s$, let $A_s$ be the
+keep-outs active there and $m_s=|A_s|$; their gradients
+$\nabla f_j(x^\star)=2\Pi_j^\top(\Pi_jx^\star_s-c_j)$ are supported on block
+$s$, hence live in $\Q^d$, and have Euclidean norm $2\rho_j>0$, and by (ii)
+they are linearly independent, so $m_s\le d$. Write $G_s\in\Q^{d\times m_s}$
+for their block-$s$ restrictions and $v_s=[\nabla f_0(x^\star)]_s$.
+Stationarity reads $G_s\lambda^\star_{A_s}=v_s$ with $G_s$ of full column
+rank, so the normal equations
+\[
+\bigl(G_s^\top G_s\bigr)\lambda^\star_{A_s}=G_s^\top v_s
+\]
+have $\lambda^\star_{A_s}$ as their unique solution, and the verifier
+reconstructs the emitted multipliers rather than trusting them. What it reconstructs is the
+\emph{placed} $\lambda^\star$ itself, so
+Definition~\ref{def:constructed}(iii) together with
+$\mathrm{bit}\le2\,\mathrm{ht}$ (Definition~\ref{def:height}) bounds it by
+$\mathrm{bit}(\lambda^\star_j)\le2L$ --- the design order, not the solve, is
+what makes the recovered object small. Nothing here asks the active gradients
+on a stage to have disjoint supports: the shared-support receipt above
+exhibits a Definition-\ref{def:constructed}-admissible stage on which they
+share every coordinate, and checks that the normal-equation solve
+recovers $\lambda^\star$ there. What that bound does \emph{not} cover is the
+cost of the same solve run from the assembled instance alone. That solve's
+\emph{operands} stay at the design height on every family measured, and not
+by accident: stationarity makes the objective gradient
+$[\nabla f_0(x^\star)]_s$ the multiplier combination of the active gradients
+$2\Pi_j^\top(\Pi_jx^\star_s-c_j)$, which are design-tuple data. What carries
+the assembled height is the \emph{formation}: a verifier holding only the
+assembled coefficients and the transmitted witness builds
+$[\nabla f_0(x^\star)]_s$ as $2(P_0x^\star)_s+q_0^{(s)}$. That formation is
+bounded through the assembled height together with the height of the placed
+coordinates and active centres, not through $L$ alone, and which of the two
+dominates it is a property of the instance; \S\ref{sec:rpod} reports the
+measured figures. Acceptance recomputes $t^\star$ and runs the exact
+$LDL^\top$; the size of those intermediates is a \emph{verification} cost
+(Remark~\ref{rem:effective}), not a property of the emitted pair.
+\end{proof}
+
+\begin{remark}[Size of the certified value]\label{rem:value}
+Write $\den(\cdot)$ for the lcm of the denominators of a tuple of rationals.
+At a \emph{closing} certificate --- where complementary slackness makes the
+Lagrangian value the verifier recomputes equal to $f_0(x^\star)$ --- the
+certified value $t^\star=f_0(x^\star)$ is a sum of $N$ stage terms, the
+$k$-th the quadratic form in $x^\star$ carried by the \emph{assembled} stage
+coefficients $(P_0^{(k)},q_0^{(k)},r_0^{(k)})$: block row $k$ of $P_0$,
+block $k$ of $q_0$, and a share $r_0^{(k)}$ of the constant,
+block-tridiagonality making that row reach only stages $k{-}1$, $k$ and
+$k{+}1$. A merely bracketing $t$ additionally carries $\den(\lambda)$ and the
+keep-out coefficients' $\den(q_j)$ and $\den(r_j)$, with
+$q_j=-2\Pi_j^\top c_j$ and $r_j=\lVert c_j\rVert^2-\rho_j^2$ read
+off~\eqref{eq:keepout}, so that $\den(r_j)=\den(\rho_j^2)$ for the
+origin-centred keep-outs of \S\ref{sec:rpod} and not in general. Any
+splitting of the constant with $\sum_kr_0^{(k)}=r_0$ and
+$\den(r_0^{(k)})\mid\den(r_0)$ serves --- for instance carrying all of $r_0$
+on one stage --- and the receipt takes the conservative $\den(r_0)$ at every
+stage. In four steps:
+\begin{enumerate}
+\item[(1)] Each summand's denominator divides
+$\den(P_0^{(k)},q_0^{(k)},r_0^{(k)})\cdot\den(x^\star)^2$, the form being
+quadratic in the witness, and a finite sum's denominator divides the lcm of
+the summands', so
+\[
+\den(t^\star)\ \Big|\ \lcm_{k\le N}
+\den\bigl(P_0^{(k)},q_0^{(k)},r_0^{(k)}\bigr)\cdot\den(x^\star)^2;
+\]
+hence $\den(t^\star)$ is bounded in $N$ whenever those denominators come
+from a bounded set, as all families of Table~\ref{tab:results} do.
+\item[(2)] Stated against the heights of \S\ref{sec:sizes} --- the
+\emph{coefficient} height $L_{\mathrm{asm}}$, not the bordered $L_M$, since
+it is the coefficient denominators that appear above --- the right-hand side
+divides the common denominator that $L_{\mathrm{asm}}$ supplies times
+$\den(x^\star)^2$, so
+$\mathrm{bitlen}(\den(t^\star))\le L_{\mathrm{asm}}+2\,\mathrm{ht}(x^\star)$.
+Here $\mathrm{ht}(x^\star)$ is taken over all stages at once, whereas $L$
+bounds a stage's design tuple one stage at a time, so the more compact
+$\mathrm{bitlen}(\den(t^\star))\le L_{\mathrm{asm}}+2L$ additionally asks
+that the placed coordinates share one denominator along the horizon --- as
+they do on the family of \S\ref{sec:rpod}.
+\item[(3)] The numerator adds only the $\log N$ of the sum over stages and
+the log of the number of monomials one block row contributes --- at most
+$3d^2{+}d{+}1$, since block-tridiagonality leaves block row $k$ at most $3d$
+nonzero columns across its $d$ rows, plus $q_0$'s block of $d$ and the
+constant --- giving
+$\mathrm{bit}(t^\star)\le2(L_{\mathrm{asm}}+2L)+\lceil\log_2N\rceil
++\lceil\log_2(3d^2{+}d{+}1)\rceil=O(L_{\mathrm{asm}}+L+\log N)$, so whenever
+$L_{\mathrm{asm}}$ is bounded in $N$, as it is on the demonstration family
+of \S\ref{sec:rpod}, the value's size grows at most logarithmically along
+the horizon.
+\item[(4)] The governing quantity is \emph{not} the lcm of the raw data
+denominators, and cannot be: the assembled coefficients are products and
+quotients of the data --- $A_k^\top R_kA_k$ multiplies two denominators, and
+recovering $g_k$ from stationarity (Definition~\ref{def:constructed}(iv))
+divides by $W_k$, so a data \emph{numerator} can become a coefficient
+denominator --- after which the goal term squares them. On the CW family of
+\S\ref{sec:rpod} the raw-data lcm is $130$ bits while $\den(t^\star)$ is
+$450$--$526$ bits; the displayed divisibility holds at every one of the $23$
+horizons $N=2,\dots,24$, and $\den(t^\star)$ divides the raw-data lcm at
+none of them.
+\end{enumerate}
+\S\ref{sec:rpod} checks all three inequalities, and the divisibility step
+behind them, at every horizon of the demonstration family.
+\end{remark}
+
+\noindent Why Remark~\ref{rem:value} is stated against the heights it names,
+and why its bit bound carries a horizon term, is settled by admissible
+closing families, each constructed by an executable receipt~\cite{leannote}.
+The certified value's \emph{denominator} is bounded through
+$L_{\mathrm{asm}}$ together with the height of the placed coordinates, but
+its \emph{bit-size} additionally needs the horizon: an admissible closing
+family holds $L_{\mathrm{asm}}=2$ and $\mathrm{ht}(x^\star)=1$ at every
+horizon while $t^\star=N$ exactly. Nor is either quantity bounded through
+$L$ alone: integer goal weights of growing magnitude take $\den(t^\star)$
+unbounded at fixed $L=1$, since goal recovery divides by $W_k$ and the
+weight's numerator lands in the value's denominator.
+
+No unconditional polynomial bit bound exists: quadratic optimization
+\emph{at large} can force $2^n$-bit exact solutions~\cite{bienstock2020},
+and small-rational-solution existence is strongly NP-hard. What we
+\emph{can} support is Theorem~\ref{thm:main}'s guarantee for the constructed
+families, and the reason it is supportable is the design order of
+Definition~\ref{def:constructed}: $(\lambda^\star,x^\star)$ is placed at
+per-stage height $O(L)$ before any datum is derived from it, so no solve
+stands between the design tuple and the emitted pair.
+
+\section{Diagonal dominance as a solver-free benign criterion}\label{sec:regime}
+We call an instance \emph{benign} when aggregate-PSD (A1) holds at its optimum
+--- the S-procedure is then exact and the bracket can close. This is a
+property of the instance, not of a solver; this section gives a sufficient,
+solver-free condition checkable stage-by-stage along the sweep.
+
+\begin{lemma}[Solver-free benign criterion]\label{lem:dd}
+Call $H$ \emph{weakly diagonally dominant} (WDD) when
+$H_{ii}\ge\sum_{j\ne i}|H_{ij}|$ on the \emph{scalar} entries of the
+assembled $H$, not its $d\times d$ blocks; the left side is $H_{ii}$, not
+$|H_{ii}|$, so the inequality already forces a nonnegative diagonal. If $H$
+is symmetric and WDD, then $H\succeq0$, and the Schur complement after each
+scalar pivot of the sweep is again WDD, so every pivot along the sweep is
+nonnegative.
+
+For the identity-coupled chain ($A_k=I$, $R_k=I$) with full-stage keep-outs
+($\Pi_j=I$), WDD is exactly the per-stage condition $w_k\ge\lambda_k$, where
+$w_k$ is the scalar goal weight ($W_k=w_kI$) and $\lambda_k$ the total
+multiplier load on stage $k$: the goal weight dominates the keep-out
+multipliers. Under a projection $\Pi_j$ the load falls only on the guarded
+coordinates, so WDD becomes the per-coordinate condition
+$w_k\ge\max_i\lambda_{k,i}$, with $\lambda_{k,i}$ the summed multipliers of
+the keep-outs guarding coordinate $i$ of stage $k$. The stage condition
+$w_k\ge\lambda_k$ remains sufficient, and remains sharp whenever some
+coordinate is guarded by every keep-out on the stage --- in particular for a
+single projected keep-out; it is strictly conservative exactly when the
+guarded sets of the keep-outs carrying \emph{positive} multipliers share no
+coordinate, which, those sets being nonempty, forces at least two positive
+multipliers.
+\end{lemma}
+\begin{proof}
+A symmetric WDD matrix is PSD by Gershgorin (machine-checked;
+\cite{leannote}). The Schur complement of a strictly diagonally dominant
+matrix is strictly diagonally dominant~\cite{carlson1979}; the weak case
+follows by perturbing the diagonal by $\varepsilon\to0^+$, zero pivots having
+zero rows in the symmetric WDD case and being skipped, as in
+Lemma~\ref{lem:band}. Applying this one pivot at a time keeps every Schur
+complement WDD, hence every pivot nonnegative; $H\succeq0$ itself is the
+Gershgorin step above. In the identity-coupled scalar specialization the whole
+check reduces to the local test $w_k\ge\lambda_k$ on each row of $H$ ---
+interior rows $[-1,\,2+w_k-\lambda_k,\,-1]$ and the two boundary rows
+$[\,1+w_k-\lambda_k,\,-1\,]$ --- with no block pivot $S_k$ computed, which
+also avoids presuming the nonsingularity that $S_k$'s recursion would need.
+\end{proof}
+
+WDD is sufficient, not necessary. The one case where it is also necessary is
+special: for the identity-coupled free-endpoint chain with \emph{uniform}
+excess $w_k-\lambda_k\equiv c$, the path-Laplacian critical mode is the
+constant vector, so $H\succeq0$ iff $c\ge0$. That is a boundary statement,
+and its hypotheses --- identity coupling, uniform excess --- are
+load-bearing.
+
+Nor does one keep-out per stage guarantee A1:
+\begin{example}[Certified duality gap]\label{ex:gap}
+A $d{=}1$, $N{=}2$ instance of~\eqref{eq:qcqp} with one
+keep-out per stage, stage-coupling coefficient $-3/2$, and nonzero goals has
+$J^\star=212/13$, by exact enumeration of the branch-KKT candidates. A
+rational moment point caps \emph{every} level-one certificate at $815/64$ by
+weak duality. The level-one gap is thus certified $\ge2973/832\approx3.57$,
+entirely over $\Q$.
+\end{example}
+\noindent The same receipt discharges the step from a gap to a failure of A1
+rather than leaving it to the reader: $x^\star$ is rational (A2) and exactly
+one keep-out is active there, so LICQ is automatic and Theorem~\ref{thm:main}
+would close the bracket if A1 held. It does not: stationarity recovers
+$\lambda^\star=24/13$ and $H(\lambda^\star)$ has determinant $-7/4$, so
+$H(\lambda^\star)\not\succeq0$. This is why aggregate-PSD (A1) is a real
+assumption and not automatic: the block-banded smoothness coupling is not
+itself a gap source under WDD, but general coupling with nonzero goals can
+break it.
+
+\paragraph{Hard dynamics.} Hard equality dynamics $x_{k+1}=A_kx_k+B_ku_k$ are
+outside~\eqref{eq:qcqp} by definition: they add control variables to a
+decision vector \S\ref{sec:setup} takes to be the stage states alone, and an
+equality to a class that carries only inequalities.
+Lemma~\ref{lem:dd}'s criterion is likewise stated for the penalty-coupled
+assembly only. The \emph{closure} argument is less fragile than that: an
+affine equality contributes nothing to the Lagrangian curvature matrix and
+enters weak duality with a free multiplier, so wherever the analogue of
+aggregate-PSD holds at a rational KKT point the same constant-multiplier
+bracket closes. An exact receipt certifies both halves over
+$\Q$ on $d{=}1$ instances with one keep-out and one
+equality~\cite{leannote}. On the first, the best constant-multiplier bound is
+exactly $1$ while $J^\star=3/2$, a certified gap of $1/2$. The diagnosis,
+though, is Example~\ref{ex:gap}'s, not a statement about hard coupling:
+stationarity there recovers $\lambda^\star=3/2$ against a unit curvature, so
+$H(\lambda^\star)=\mathrm{diag}(-1/2,1,1)$ is not PSD and A1 fails, with A2
+and LICQ intact. On its sibling --- the same variables and the same equality,
+with the goal moved and the keep-out radius doubled --- stationarity recovers
+$\lambda^\star=3/4$ and $H(\lambda^\star)=\mathrm{diag}(1/4,1,1)\succeq0$, so
+A1 holds and the constant-multiplier bracket closes exactly at
+$t^\star=J^\star=9/4$: the same trusted dense $M$-test accepts $t^\star$ and
+refuses $t^\star+10^{-6}$. The exhibited gap therefore measures A1, as
+Example~\ref{ex:gap}'s does, and no conclusion about Theorem~\ref{thm:main}
+follows from it.
+
+\section{Demonstration: an inverse-designed CW-coupled instance}\label{sec:rpod}
+We instantiate~\eqref{eq:qcqp} as a \emph{certification stress instance with
+Clohessy--Wiltshire structure} --- not a flyable maneuver. Consecutive stages
+are coupled through the planar CW state-transition matrix $\Phi$ (mean motion
+$n_0=10^{-3}$\,rad/s and sampling phase $\tau=n_0\,\Delta t=1/2$, so
+$\Delta t=500$\,s) via the soft-dynamics \emph{full-state penalty}
+$\lVert x_{k+1}-\Phi x_k\rVert^2_R$:
+there is no control variable and no thrust model, the keep-out radius cycles
+$\{1/2,1,3/2\}$ per stage, and the instance is \emph{constructed by inverse
+design} (each
+stage's guarded contact placed on a rational keep-out-sphere point, goals
+recovered from stationarity, benign multipliers chosen so A1 holds). The stage
+state is $x_k=(x,y,v_x,v_y)\in\Q^4$ and the keep-out guards its \emph{position}
+sub-block: $\Pi_k$ in~\eqref{eq:keepout} selects $(x,y)$, giving
+$\lVert\Pi_kx_k\rVert^2-\rho_k^2\ge0$ about the target at the LVLH origin, with
+the two velocity coordinates placed rationally by the design. It demonstrates
+the certification pipeline on a rational-optimum instance whose \emph{coupling
+matrix} is a genuine CW state-transition matrix; the \emph{trajectory} is not
+CW-consistent and is not meant to be.
+
+A stage is one sampled state: the horizon variable $N$ counts state samples
+taken $\Delta t=500$\,s apart, and one sampling step advances the reference
+orbit's phase by $\tau=1/2$\,rad, so about $12.6$ steps span one orbit. The
+$N$ stage states are joined by $N-1$ coupling residuals, so a horizon spans
+$(N-1)\,\Delta t$. At the largest demonstrated horizon, $N=24$, that is
+$11500$\,s: about $3.2$\,h, or $1.8$ orbits in the model's units. The same
+horizon carries $n=Nd=96$ scalar variables at $d=4$ per stage. The translation to
+time is specific to the CW-coupled family: the shared-state families of
+Table~\ref{tab:results} are abstract chains with no sampling interval.
+
+The design places the optimum where stationarity requires it: at $N{=}24$ the
+per-step dynamics residual $\lVert x^\star_{k+1}-\Phi x^\star_k\rVert$ runs
+$134.8$--$244.1$ against states of norm $0.559$--$1.572$, and the goals
+recovered from stationarity reach $\lVert g_k\rVert\approx1.01\times10^{5}$.
+Units are nominal --- positions in metres,
+velocities in metres per second --- so $R=I_4$ and $W_k=w_kI_4$ are not
+dimensionally homogeneous weights and the norms just quoted mix the two,
+consistent with the instance not being a flyable maneuver. So this does not
+discover an optimum for an operational CW problem, and the goal term is a
+goal-attraction penalty, not a tracking objective. The CW state-transition
+matrix is rationalized entrywise to denominators at most $10^5$, giving
+per-entry bit-size at most $42$. The rationalization breaks the symplectic
+structure: after rounding, $\det\Phi=1+1.2\times10^{-8}$ exactly, against
+$\det\Phi=1$ for the CW flow. The certificate is therefore a theorem about
+the \emph{rational model only}: it certifies optimality and keep-out
+satisfaction for the rationalized dynamics, not for the continuous CW flow.
+The rounding moves each entry by at most $2.8\times10^{-10}$ in absolute
+value and $2.0\times10^{-7}$ relative; it is the $10^5$ denominator cap, not
+the $42$-bit entry size, that sets those figures.
+
+Everything is checked in $\Q$ by the three sweeps of \S\ref{sec:riccati} ---
+the band-$H$ test, the corner-carrying bordered sweep on the full $M$, and the
+dense $M$-test --- which agree on every row of Table~\ref{tab:results}. At
+every one of the $23$ horizons $N=2,\dots,24$ the bracket closes, so weak
+duality already forces $g(\lambda^\star)=t^\star$ and a terminal corner pivot
+of exactly $0$; as a sanity check the bordered sweep refuses $t^\star+10^{-6}$
+at every horizon, and the guarded position sub-blocks of the optima lie
+exactly on the keep-out spheres.
+
+\begin{table}[t]\centering
+\caption{Exact-rational trajectory certificates (all verdicts exact over $\Q$).
+``emitted bits'' is the worst-entry bit-size of the emitted
+$(\lambda^\star,x^\star)$; ``value bits'' is the size of the certified value
+$t^\star$ the verifier recomputes (Remark~\ref{rem:value}). The size column
+carries both units: $N$ is the number of stages, $d$ the per-stage state
+dimension, and $n=Nd$ the number of scalar variables. The regime column
+places each family in the vocabulary of \S\ref{sec:regime}: \emph{benign}
+means A1 holds at the optimum, \emph{A1 violated} means it fails and the
+checker refuses. Rows 2 and 3 are constructed rational-sphere families
+(Definition~\ref{def:constructed}); row 1 is not --- the scalar shared-state
+family leaves inactive stages with solved coordinates. It is benign, and
+covered by Theorem~\ref{thm:main}'s closure leg, but not by its $O(L)$
+bit-size bound, which is stated only for constructed families; so its two bit
+columns are empirical measurements. The CW row's ranges are over all $23$
+horizons $N=2,\dots,24$; rows 1 and 2 are over the horizons the measurement
+receipt samples, up to the max size shown.}
+\label{tab:results}
+% \small + tighter \tabcolsep: the dual-unit size column pushed the natural
+% width past the measure (38pt overfull); check_refs fails on any overfull
+% box, so the table must fit.
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}llcccc@{}}
+\toprule
+Family & regime & max size & closes & emitted bits & value bits\\
+\midrule
+Scalar shared-state & benign & $N{=}129$ ($n{=}129$) & yes & $13$--$18$ & $13$--$26$\\
+Vector shared-state ($d=1..4$) & benign & $n{=}Nd{=}96$ & yes & $3$--$4$ & $15$--$32$\\
+CW-coupled keep-out & benign & $N{=}24$ ($n{=}96$) & yes & $6$--$8$ & $931$--$1089$\\
+Aggregate-PSD violated & A1 violated & --- & no (refuses) & --- & ---\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The emitted pair is small in every family --- $18$ bits or fewer --- while the
+recomputed CW \emph{value} ($\sim\!10^3$ bits) comes from the inverse design,
+not from the raw data. The goal term $r_0=\sum_kw_k\lVert g_k\rVert^2$
+\emph{squares} the denominators recovered from stationarity: $\den(t^\star)$
+and $\den(r_0)$ coincide at every horizon $N\ge6$ (both $519$ bits at
+$N{=}24$), and $\den(t^\star)$ divides $\den(r_0)$ at $22$ of the $23$
+horizons --- the exception is $N{=}5$, where the two differ by a factor $6$
+the other way. Per Remark~\ref{rem:value} it is the \emph{denominator} that
+is bounded in $N$: $\den(t^\star)$ stays inside $450$--$526$ bits at every
+horizon out to $N=6143$. The bit-size keeps the remark's residual $\log N$
+drift, measured at $931$--$1089$ bits over all $23$ demonstration horizons.
+The verifier's multiplier reconstruction
+(Theorem~\ref{thm:main}) shows the same split between the design and assembled
+heights. The solve's \emph{operands} stay at the design height: $5$--$6$
+bits against $L=6$ on this family, and $259$ bits against $L=258$ on the
+inverted family noted after Definition~\ref{def:constructed}. They stay
+there because stationarity makes the objective gradient the multiplier
+combination of the active keep-out gradients, which are design-tuple data.
+The \emph{formation} of that gradient
+from the assembled coefficients carries the assembled height instead: on this
+family its two terms run $242$--$276$ bits against $L=6$ and cancel to the
+design height, while on the inverted family they do not cancel, the formed
+gradient staying at $259$ bits against $L_{\mathrm{asm}}=3$--$8$.
+
+\paragraph{The heights, measured.} The four separate heights of
+\S\ref{sec:sizes} are ``in general different numbers'' on this family in the
+strongest sense: at every one of the $23$ horizons its four tuples carry four
+pairwise distinct heights, in the strict order
+$\mathrm{ht}(x^\star)<L<L_M<L_{\mathrm{asm}}$; Table~\ref{tab:measured}
+reports the measured ranges.
+
+\begin{table}[ht]\centering
+\caption{The four heights of \S\ref{sec:sizes}, measured on the CW-coupled
+demonstration family over all $23$ horizons $N=2,\dots,24$; they are pairwise
+distinct at every horizon, in the strict order
+$\mathrm{ht}(x^\star)<L<L_M<L_{\mathrm{asm}}$.}
+\label{tab:measured}
+\begin{tabular*}{6.1in}{@{}p{1.15in}p{2.35in}p{2.2in}@{}}
+\toprule
+Height & measured & what it governs here\\
+\midrule
+$\mathrm{ht}(x^\star)$ & $5$ bits at every horizon &
+Remark~\ref{rem:value}'s sharper first inequality\\
+\addlinespace
+$L$ & $6$ bits, attained at every horizon (per-stage values $3$, $5$ or $6$)
+& Theorem~\ref{thm:main}'s $O(L)$ leg; Table~\ref{tab:results}'s emitted
+$6$--$8$ bits\\
+\addlinespace
+$L_M$ & $277$--$284$ bits & Remark~\ref{rem:effective}'s pivot expression\\
+\addlinespace
+$L_{\mathrm{asm}}$ & $483$--$563$ bits & Remark~\ref{rem:value}'s bounds on
+the certified value; carries the $519$-bit $\den(r_0)$\\
+\bottomrule
+\end{tabular*}
+\end{table}
+
+The per-stage \emph{design} tuple of Definition~\ref{def:constructed}(iii) ---
+a stage's placed coordinates, its keep-out centre (the LVLH origin here) and
+its multiplier --- has height at most $L=6$ bits at every stage of every
+horizon, the maximum attained at every one of them. Table~\ref{tab:results}'s
+emitted $6$--$8$ bits sit next to that figure by construction rather than by
+measurement: the emitted pair is part of the very tuple $L$ is taken over, so
+$\mathrm{bit}(\cdot)\le2L$ (Definition~\ref{def:height}) holds identically,
+here and on any constructed family. What the horizons do show is the point
+actually at issue: neither figure grows with $N$. The assembled
+coefficients $(P_0,q_0,r_0,g)$ have height $L_{\mathrm{asm}}=483$--$563$ bits,
+consistent with Definition~\ref{def:constructed}(iv), which makes $r_0$
+derived data of the assembled height rather than of $L$: the $519$-bit
+$\den(r_0)$ above is carried by $L_{\mathrm{asm}}$ and could be carried by
+neither the design height nor $L_M$. And the assembled bordered matrix
+$M(\lambda^\star,t^\star)$ that the sweep eliminates has height
+$L_M=277$--$284$ bits, the smaller of the two assembled figures because its
+corner $r_0-\sum_j\lambda^\star_jr_j-t^\star$ cancels those two large
+denominators against each other.
+
+Instantiating Remark~\ref{rem:effective}'s expression at the bordered order
+$n{+}1$ gives $(n{+}1)\bigl(L_M+\lceil\log_2(n{+}1)\rceil\bigr)$, running
+$2529$--$28227$ bits over the horizons. The measured pivots run from $777$
+bits at $N{=}2$ to $17893$ at $N{=}24$ and stay inside that expression at
+all $23$ horizons. Because the
+bracket closes, the terminal corner pivot $g(\lambda^\star)-t^\star$ is
+exactly $0$ at every horizon, so the figure reported is the largest
+\emph{interior} pivot of the corner-carrying sweep. The same expression formed
+with the design height $L$ runs only $90$--$1261$ bits and is exceeded at all
+$23$ horizons. The pair of measurements $L_M=277$--$284$ bits against $L=6$
+already says that on this family no per-stage height bounds even the
+\emph{entries} of the bordered matrix, let alone its pivots. Here it is the
+bordered height, and not a per-stage height, that
+Remark~\ref{rem:effective}'s expression must be instantiated with.
+
+That ordering is a property of the CW assembly and not of
+Definition~\ref{def:constructed}, which forces neither direction: an exact
+receipt exhibits an admissible family, closing on all three trusted
+checkers, on which $L_M\le8$ bits stands against a design height
+$L=257$--$258$, so there the per-stage design height bounds every entry of
+the bordered matrix~\cite{leannote}. Remark~\ref{rem:value}'s three inequalities hold at all
+$23$ horizons as well --- the compact
+$\mathrm{bitlen}(\den(t^\star))\le L_{\mathrm{asm}}+2L$, the value bound
+$\mathrm{bit}(t^\star)\le2(L_{\mathrm{asm}}+2L)+\lceil\log_2N\rceil
++\lceil\log_2(3d^2{+}d{+}1)\rceil$, and the sharper first form
+$\mathrm{bitlen}(\den(t^\star))\le L_{\mathrm{asm}}+2\,\mathrm{ht}(x^\star)$
+--- as does the divisibility step behind them. The pivots themselves grow
+measurably linearly in the horizon --- $780$ bits at $N{=}2$ to $17889$ at
+$N{=}24$, measured over the blocks $S_k$ of~\eqref{eq:riccati} rather than
+over the scalar pivots, hence a few bits either side of the bordered figures
+above; this is reported as data.
+
+\paragraph{Reproducibility.} Each row of Table~\ref{tab:results} is
+constructed by a named driver in exact rational arithmetic --- the three
+closing rows certified, the refusal row refused --- and each driver
+verifies its emitted certificate through the exact dense $M$-test. The
+refusal row's instance takes $\lambda_k>w_k$ at $N{=}4$, $d{=}2$.
+Measurement receipts recompute both bit columns at the sizes
+Table~\ref{tab:results} headlines, re-verify every closing row through all
+three trusted routes (dense $M$-test, band-$H$ sweep, bordered-$M$ sweep),
+and recompute every denominator statistic quoted in this section at all $23$
+horizons; a shipped test suite executes each receipt and asserts its
+published constants. The trusted checkers refuse floats, and the CW
+state-transition matrix alone is synthesized in floating point and
+rationalized before any certification, as above. The receipts accompany this
+record as supplementary material, and the trusted checkers ship in the
+Podium repository~\cite{oltean2026podiumsw}, described
+in~\cite{oltean2026podium}. The companion note catalogues every receipt by
+role and records the bundle's conventions, including the bit-size convention
+and the library commit that carries the band checkers~\cite{leannote}.
+
+\section{Related work and positioning}\label{sec:related}
+\paragraph{Exact-rational certificates for optimization.} The direct
+antecedent of tolerance-free certificates for optimization outputs is the
+exact rational LP/MIP line: VIPR's machine-verifiable exact certificates for
+integer-programming results~\cite{cheung2017vipr}, exact rational MIP solving
+in SCIP~\cite{eifler2021exact}, and the exact LP solver
+QSopt\_ex~\cite{applegate2007qsopt}; the bit-size control of exact
+elimination goes back to Edmonds~\cite{edmonds1967}. Certificates measured by
+their verification complexity are the program of~\cite{dumas2014}. Ours
+extends the exact-certificate discipline from linear to a structured
+nonconvex quadratic class, with the banded-KKT/Riccati structure doing the
+work.
+
+\paragraph{Trajectory SDP relaxations and tightness.} Sparse moment--SOS for
+trajectory optimization~\cite{strom2024} and
+perception~\cite{yang2023perception} is the closest numerical program:
+floating-point, tolerance-based certificates --- STROM reports certified
+suboptimality below $1\%$ for most of its five trajectory problems, near
+$1\%$ for the hardest (car back-in), and Yang and Carlone report a sparse
+relaxation that is \emph{empirically exact}, deeming a rounded solution
+globally optimal at a relative suboptimality below $10^{-3}$ --- obtained
+from level-two (sparse second-order) relaxations that close gaps left open at
+level one, with tightness observed rather than proved. The two lines are
+complementary: exact-arithmetic acceptance on benign, rational-optimum
+(constructed) instances versus broad numerical coverage. On the same
+constraint geometry as \S\ref{sec:regime}, Graesdal et
+al.~\cite{graesdal2026} give necessary \emph{and} sufficient tightness
+conditions for a \emph{single}-sphere-obstacle trajectory SDP relaxation;
+tightness in their own many-obstacle experiments is measured empirically, not
+obtained from that theorem. Ours is only sufficient and holds with any number
+of keep-outs per stage --- of which LICQ leaves at most $d$ active on each
+--- but is solver-free and checkable in exact arithmetic along the sweep, and
+their single-obstacle conditions delimit what a sharp benign boundary could
+look like. In the adjacent domain of spacecraft conjunction avoidance, Vega
+et al.~\cite{vega2025} solve collision-avoidance exclusion QCQPs via a Shor
+relaxation observed empirically tight --- on a different formulation, with
+control variables and conjunction-derived constraints, so not a measurement
+of A1 on our class. We share no benchmark with any of these, so this
+paragraph is positioning, not comparison. A general tightness framework for
+QCQP SDP relaxations~\cite{wang2021tightness}, graph-structural exactness
+conditions~\cite{sojoudi2014}, exactness on forest
+structures~\cite{azuma2020}, and local-to-global exactness from clique-wise
+sub-SDPs~\cite{kojima2026} position A1 within a broader theory (a path is a
+tree, but our concave keep-outs need not satisfy their hypotheses); chordal
+conversion and PSD completion~\cite{zhang2023,grone1984} address the
+structural SDP side. Lossless convexification~\cite{acikmese2011} exactly
+convexifies nonconvex \emph{control}-set constraints via the maximum
+principle --- complementary in mechanism to exact certificates for nonconvex
+\emph{state} constraints.
+
+\paragraph{Rational recovery and exact SDP.} Exact rational SOS/PSD
+certificate recovery is due to~\cite{peyrl2008,kaltofen2012}, with
+RealCertify the standard tool~\cite{magron2018realcertify}: its multivariate
+route computes an approximate decomposition of a perturbed input with an
+\emph{arbitrary-precision} SDP solver (SDPA-GMP) and recovers an exact
+rational one symbolically, while its univariate \texttt{univsos1} uses no SDP
+at all --- a recursive construction over $\Q$ from root isolation and
+quadratic under-approximations. Exact algorithms for LMIs and the SPECTRA
+library are the exact-SDP lineage~\cite{henrion2019spectra}. Bit-size bounds
+for exact SOS certificates --- univariate~\cite{magron2018},
+multivariate~\cite{magron2021multivariate,davispapp2023} --- do not exploit
+band structure, an orthogonal axis to Theorem~\ref{thm:main};
+machine-checkable SOS certification is developed in~\cite{magron2015formal},
+the Coq-interfaced companion to the template method of~\cite{allamigeon2014}.
+
+\paragraph{Verified solvers and a-posteriori numerics.} A complementary line
+proves the \emph{solver} correct before it runs (credible autocoding and
+verified convex-optimization codes~\cite{wang2014,davy2018,cohen2020}); Roux
+et al.~\cite{roux2018} validate solver output a posteriori via a
+floating-point Cholesky with proved rounding-error bounds --- rigorous but
+tolerance-based. The a-priori and a-posteriori guarantees compose with ours
+rather than compete. On \emph{why exactness}: a rigorous inequality
+certificate need not be exact. Interval arithmetic or a verified
+Cholesky~\cite{jansson2009,roux2018} certifies $H(\lambda)\succ0$ with a
+positive margin, hence a rigorous lower bound, at fixed precision. A
+positive-margin criterion cannot reach the semidefinite boundary, and the
+closing certificates of Theorem~\ref{thm:main} sit exactly there: at closure
+the corner Schur complement is exactly $0$, and singular $H$ is the case
+\S\ref{sec:setup} handles through the consistent zero-pivot row. Fixed
+precision reaches the boundary only in a narrow case: the operations
+witnessing the boundary contact must be exact in the working precision, so
+that the boundary quantity is enclosed with zero width. Pivots away from the
+boundary may round, their positive-width enclosures absorbed by their
+positive margins. Even in that case a Cholesky does not certify the
+boundary, because it stops at an exactly computed zero pivot: on the
+singular $H$ with rows $(1,-1)$ and $(-1,1)$, where an $LDL^\top$ and the
+symmetric eigensolver are exact, LAPACK's \texttt{dpotrf} declines the
+factorization, reporting the order-2 leading minor not positive definite.
+The rationalized CW instance of \S\ref{sec:rpod} is not of that
+boundary-case kind at all: its entry denominators are not powers of two.
+Exact receipts pin each of these boundary facts; the companion note
+catalogues them~\cite{leannote}. Exact rational
+arithmetic is likewise essential for the \emph{equality} deliverables,
+decidable closure $t^\star=J^\star$ and exact contact $f_j(x^\star)=0$. Both
+are $\Q$-decidable and auditable, but no finite-precision enclosure of
+positive width can establish them: such an enclosure can bound a gap below
+$\varepsilon$, never certify it is $0$. A zero-width enclosure can, and
+fixed precision delivers one only in the exact-witness case named above. We
+claim exactness for auditability and decidable equality, not as the only
+route to a rigorous bound.
+
+\section{Scope and limitations}\label{sec:limits}
+
+\paragraph{Without A2, the deliverable is a bound, not closure.} Without A2,
+closure is unattainable; the failure of A2 is generic when the active
+keep-out guards a sub-block of dimension greater than one
+(Remark~\ref{rem:contact}). The deliverable does not collapse: the sweep
+still returns an exact, tolerance-free rational \emph{lower bound}, since
+weak duality needs no rationality of the optimum. A keep-out guarding a
+single coordinate with rational radius instead pins the active coordinate to
+a rational value, leaving the remaining coordinates a rational linear solve.
+Quantifying the resulting bracket (rates in the rationalization budget,
+behaviour at the relaxation-gap floor) is outside this paper's scope.
+
+\paragraph{Verification bit-complexity is measured and coarsely bounded, not
+sharply bounded.} This paper \emph{measures} verification cost --- the linear
+pivot growth of \S\ref{sec:rpod} --- and bounds it coarsely
+(Remark~\ref{rem:effective}); sharp growth laws and their model sensitivity
+are outside scope. That verification cost can grow along the horizon while
+the emitted certificate stays bounded is visible in the demonstration of
+\S\ref{sec:rpod}.
+
+\paragraph{The demonstration family's mildness is tied to its shared
+transition matrix.} The CW-coupled family couples every stage through one
+shared rationalized transition matrix, computed for a circular reference
+orbit. An eccentric-reference variant of the same construction --- the
+Yamanaka--Ankersen transition matrix, a different matrix at every stage ---
+reproduces the CW pivot sequence bit for bit at $e=0$. At the probed
+eccentricities $e\in\{0.1,0.3,0.5\}$, rationalized to the same realized
+fidelity, its sweep pivots
+grow at $\approx1000$--$1050$ bits per stage against the CW family's
+$\approx778$, and the driver is the per-stage time-variance of the
+transition matrix rather than the eccentricity magnitude. On the CW family
+the certified value's denominator is horizon-bounded (\S\ref{sec:rpod}); on
+the variant the value's bit-size grows at $\approx1000$ bits per stage, so
+the compactness of the recomputed value does not carry over. An executable
+receipt catalogued in the companion note pins these
+figures~\cite{leannote}.
+
+\paragraph{The per-stage Hadamard/Cramer reconstruction bound is not
+included.} A per-stage Hadamard/Cramer bound on the verifier's multiplier
+reconstruction is weaker than the $2L$ bound the design order gives, a
+consequence of the design order rather than a route to it, and not needed
+for either leg of Theorem~\ref{thm:main}.
+
+\paragraph{Bienstock realizability inside the class is not established.}
+Quadratic optimization at large admits $2^n$-bit
+optima~\cite{bienstock2020}; whether such a gadget can be realised as an
+instance of~\eqref{eq:qcqp} is not settled either way. That is why
+Theorem~\ref{thm:main} is stated conditionally, and why this paper does not
+claim conditioning is unavoidable.
+
+\paragraph{Hard equality dynamics are outside the class.} Hard equality
+dynamics are outside~\eqref{eq:qcqp} by definition (\S\ref{sec:regime});
+readers of the banded-KKT literature will recognise that Wright and
+Rao--Wright--Rawlings~\cite{wright1993,rao1998} factorize precisely that
+equality-constrained system, in floating point. The exact-certificate
+treatment of hard dynamics itself is outside scope.
+
+\paragraph{A1-failing keep-out geometry needs level two.} Under A1, multiple
+keep-outs per stage already close (Theorem~\ref{thm:main}); when a stage's
+keep-out geometry itself violates A1 --- several exclusion balls on one
+stage, two quadratic constraints where the S-lemma wants one, the
+sign-flipped analogue of the two-\emph{inclusion}-constraint CDT
+subproblem~\cite{celis1985,aizhang2009} --- level-one certification gaps,
+and an exact level-two treatment is outside scope.
+
+\section{Conclusion}\label{sec:conclusion}
+The exact-rational certification of a \emph{penalty-coupled} block-banded
+trajectory QCQP is an LQ Riccati sweep run in $\Q$. The sweep is sound at the
+band-Hessian test (Lemma~\ref{lem:band}); the border-carrying extension's
+soundness is asserted and test-pinned, its count read off the sweep's loop
+bounds (\S\ref{sec:riccati}); the trusted path is
+machine-checked~\cite{leannote}; and at a constructed rational optimum the
+bracket closes under an aggregate-PSD condition implied by a local
+diagonal-dominance rule (Theorem~\ref{thm:main}, Lemma~\ref{lem:dd}).
+
+Operationally, exactness buys \emph{auditability}: the certificate is a
+finite rational object that \emph{any} independent implementation \emph{can}
+re-verify bit-for-bit, with no tolerance to agree on and no dependence on
+platform rounding. Three conditions govern that re-verification --- exact
+rational arithmetic, unbounded integers, and the transmitted data; they are
+the re-verifier's and not the certificate's, and each is load-bearing. The
+same sweep transcribed operation for operation into IEEE-754 doubles
+\emph{refuses} a published closing certificate --- the disjoint-contact
+two-keep-out instance of \S\ref{sec:theorem} --- its terminal corner coming
+out $-4.44\times10^{-16}$ rather than exactly $0$: a tolerance-free test has
+no tolerance to absorb its own rounding. The $t^\star$ the verifier recomputes on the
+demonstration family of \S\ref{sec:rpod} runs $931$--$1089$ bits, which no
+fixed-width arithmetic can hold, while the emitted pair itself stays at
+$6$--$8$ bits. And Definition~\ref{def:protocol} conditions the certificate
+on agreed data, so a re-verifier that re-derives the rationalized $\Phi$ of
+\S\ref{sec:rpod} instead of reading the transmitted rationals certifies a
+different instance. So conditioned, the acceptance of a penalty-coupled
+trajectory QCQP in the certified class becomes a reproducible theorem about
+the deployed numbers rather than a solver verdict that must itself be
+trusted.
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}

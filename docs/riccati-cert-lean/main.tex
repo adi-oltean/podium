@@ -1,0 +1,513 @@
+% ---------------------------------------------------------------------------
+% riccati-cert-lean/main.tex -- the VERIFICATION COMPANION NOTE.
+%
+% CONTENT CONTRACT: verify/plan-map.json (23 planned claims, PLAN-L-001..023)
+% for the original Lean-corpus sections, plus the 2026-08-18 widening (Adi
+% directive, papers/PUBLISHING-PROMPTS.md Trigger): the companion also carries
+% the executable-receipts catalogue and the PodiumNote.lean mechanization of
+% the PUBLISHED technical note's theorems. Claims of the two new sections mint
+% at extraction (LCLAIM-024+) and are anchored by summarizes/context pointers
+% into the full paper's register or by summarizes-allowlist.json entries.
+% Section labels:
+%   sec:what           N1  (PLAN-L-001, -002; opening widened 2026-08-18)
+%   sec:corpus         N2  (PLAN-L-003, -004, -005, -006)
+%   sec:acceptance     N3  (PLAN-L-007, -008, -009)
+%   sec:bridge         N3.1 subsection of N3 (PLAN-L-010, -011)
+%   sec:soundness      N4  (PLAN-L-012, -013, -014, -015, -016)
+%   sec:wdd            N5  (PLAN-L-017)
+%   sec:receipts       N6  (2026-08-18 widening: the executable receipts)
+%   sec:published-note N7  (2026-08-18 widening: PodiumNote.lean)
+%   sec:scope          N8  (PLAN-L-018..-023)
+% Theorem statements are given in prose + math with exact Lean identifiers in
+% \texttt{}; no transliterated Lean listings (the source uses Unicode syntax
+% that the pinned pdflatex/Computer Modern stack does not carry, and an
+% ASCII-transliterated quotation would not be the corpus's actual text).
+% Lean-core tokens that are not corpus declarations (#print axioms, propext,
+% Classical.choice, Quot.sound, sorryAx) are set with \verb so check_lean.py's
+% cited-identifier scan ranges over corpus declarations only.
+% Preamble conventions carried from papers/riccati-cert-simple/main.tex so the
+% note matches the paper family; title and author line per the simplified
+% paper's leannote bibliography entry and author block.
+% ---------------------------------------------------------------------------
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage[hidelinks]{hyperref}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\theoremstyle{definition}
+\newtheorem{assumption}{Assumption}
+\newtheorem{definition}{Definition}
+\newtheorem{example}{Example}
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}
+\newcommand{\Q}{\mathbb{Q}}
+\newcommand{\R}{\mathbb{R}}
+\DeclareMathOperator{\lcm}{lcm}
+\DeclareMathOperator{\den}{den}
+
+% Typography: long typewriter identifiers (border\_band\_psd,
+% podium.verify.riccati) carry no break points, so a line ending in one
+% overflows the measure. Allow a break after each underscore, and give TeX a
+% third-pass stretch budget so an unbreakable token moves to the next line
+% instead of running past it. check_refs fails the build on any overfull box
+% wider than 2pt, so this must hold.
+% OT1's \_ is a drawn RULE, not a character, so every identifier extracted
+% from the PDF lost its underscores (border_band_psd came out "border band
+% psd") -- copy-paste and any text indexer saw the wrong name. Emit the
+% typewriter font's real underscore glyph instead and let pdftex map it to
+% U+005F. The glyph exists only in the typewriter font -- char 95 of cmr is not
+% an underscore -- so a roman \_ keeps the rule. The fontdimen3 test is the
+% standard "is this monospace" check: tt fonts have no interword stretch.
+\input{glyphtounicode}
+\pdfgentounicode=1
+\renewcommand{\_}{\ifdim\fontdimen3\font=0pt\relax\char`\_\else\textunderscore\fi\hspace{0pt}}
+\emergencystretch=3em
+
+% Draft version. SINGLE SOURCE OF TRUTH for the version number: papers/build.sh
+% names the output <paper-dir>-v<paperversion>.pdf from this macro, and
+% verify/_common.py parses it to find the build products. Bump it here and
+% nowhere else; the title page carries it so a loose PDF names its version.
+\newcommand{\paperversion}{1}
+
+\title{Machine-Checked Foundations for the Exact-Rational Riccati Certificate:\\
+A Lean Companion Note}
+\author{Adi Oltean\thanks{Starcloud, Inc. \texttt{adi@starcloud.com}. Working draft.
+AI coding assistants were used for drafting, for the reference implementation and
+verification scripts, and for adversarial review; all results were checked by the author.}}
+\date{Version \paperversion{} --- August 2026}
+
+\begin{document}
+\maketitle
+
+\section{What this note is}\label{sec:what}
+This note is the verification companion to the paper on exact-rational
+certification of block-banded trajectory QCQPs~\cite{riccatipaper}, and it
+does three jobs. It documents the Lean~4 formalization behind the
+machine-checked results cited there: each such citation resolves to the
+numbered section here that states the corresponding declaration and its
+hypotheses. It catalogues the executable receipts behind the paper's
+measured and instance-level results (\S\ref{sec:receipts}). It records the
+mechanization of the published Podium technical note's theorems
+(\S\ref{sec:published-note}).
+
+The corpus machine-checks classical facts along the paper's trusted path
+rather than new mathematics: what it supplies is a tolerance-free,
+mechanically verified chain, not novelty in the individual lemmas.
+
+\section{The corpus and its pin}\label{sec:corpus}
+The trusted path is mechanized in eighteen top-level Lean~4 files, all
+\texttt{sorry}-free, in the Lean corpus of the Podium project
+(\texttt{github.com/adi-oltean/podium}). Every declaration this note cites is
+named explicitly, so a reader can locate it by name in any copy of the corpus.
+The formalization is also available from the author at
+\texttt{adi@starcloud.com}.
+
+Every file type-checks against a pinned project built from
+\texttt{leanprover/lean4:v4.33.0} and Mathlib at revision \texttt{v4.33.0}.
+A per-file regression script drives the build: it reports pass or fail for
+each file and surfaces \verb|#print axioms| for the headline declarations.
+The axiom audit admits only \verb|propext|, \verb|Classical.choice| and
+\verb|Quot.sound|, and never \verb|sorryAx|.
+
+\section{The acceptance predicate, both directions}\label{sec:acceptance}
+\texttt{ldlt\_isPSD} (\texttt{LDLTSound.lean}): if
+$M=L^\top\,\mathrm{diagonal}(d)\,L$ and every pivot $d_i\ge0$, then $M$ is PSD
+in the quantifier sense $\forall v,\ 0\le v^\top Mv$. This is the acceptance
+direction; it holds at any order and over any linear ordered field, by the
+expansion $v^\top Mv=\sum_i d_i(Lv)_i^2$.
+
+\texttt{ldlt\_complete} (\texttt{SchurStep.lean}): a symmetric PSD matrix of
+any order $m$ admits weights $d_j\ge0$ and vectors $v_j$ with
+$M=\sum_j d_jv_jv_j^\top$. The induction peels one nonnegative-weighted
+rank-one term per pivot, and it passes through singular pivots because a zero
+pivot forces a zero border (\texttt{headBordered\_border\_zero}). This is the
+converse of \texttt{ldlt\_isPSD} up to padding the factor to square; the
+residual difference is purely dimensional ($k\le m$).
+
+\texttt{isPSD\_iff\_ldlt} (same file) packages the two directions as one
+equivalence: for symmetric $M$, $M$ is PSD if and only if such a
+nonnegative-weight decomposition exists. This is the machine-checked form of
+accept $\Leftrightarrow$ PSD, with \emph{accept} being exactly that
+existential.
+
+\subsection{The bridge to the library-standard notion}\label{sec:bridge}
+\texttt{posSemidef\_iff\_isPSD} (\texttt{PosSemidefBridge.lean}): for a
+rational $n\times n$ matrix $M$, Mathlib's \texttt{Matrix.PosSemidef}\,$M$
+holds exactly when $M^\top=M$ and $\texttt{IsPSD}\,M$, the quantifier form
+$\forall v,\ 0\le v^\top Mv$. Symmetry is derived by the equivalence, not
+assumed of $M$. So the quantifier form is the library-standard notion
+rather than a bespoke one. That bridge is compiled on its own and is not
+linked inside Lean to the predicate the acceptance lemmas above are stated
+against; the condition is stated in \S\ref{sec:scope}.
+
+\section{Certificate soundness and closure}\label{sec:soundness}
+\texttt{general\_sprocedure\_sound} (\texttt{GeneralLifting.lean}) takes
+three hypotheses:
+\begin{enumerate}
+\item the bordered matrix built from Hessian $P$, half-linear part $b$ and
+corner $c$ is PSD;
+\item every multiplier $\lambda_i\ge0$;
+\item the form identity: for every point, the bordered quadratic form at the
+lift equals $f_0-\sum_i\lambda_if_i-t$.
+\end{enumerate}
+From these it concludes $t\le f_0(y)$ at every $y$ with all $f_i(y)\ge0$.
+The theorem holds at any order $n$, at any number $m$ of constraints, and
+over any linear ordered field.
+
+Of those three, the form identity is the one not mechanized in general. The
+abstract lifting identity \texttt{bordered\_lifting} (same file) is proved at
+general $n$: the bordered matrix's quadratic form at $(x,1)$ equals
+$x^\top Px+2b^\top x+c$. Its instantiation to a specific S-procedure assembly
+is discharged per instance by \texttt{ring}, and the capstone theorems carry
+that instantiation as a hypothesis too.
+
+\texttt{certified\_global\_optimum} (\texttt{ClosureOptimum.lean}): given
+multipliers $\lambda\ge0$, a witness $\bar x$ that minimizes the Lagrangian
+$f_0-\sum_i\lambda_if_i$ over all points, and complementary slackness
+$\sum_i\lambda_if_i(\bar x)=0$, the witness satisfies $f_0(\bar x)\le f_0(y)$
+at every feasible $y$ --- the attainment leg, over any linear ordered field.
+Its companion \texttt{bracket\_exact} (same file) adds feasibility of $\bar x$
+and a supplied lower bound --- that $t\le f_0$ on the feasible set --- and
+concludes both $t\le f_0(\bar x)$ and global optimality of $\bar x$. The
+equality $t^\star=f_0(x^\star)$ that closes the bracket is by construction of
+$t^\star$ and is not separately mechanized.
+
+\texttt{certified\_optimum\_pipeline} (\texttt{Certificate.lean}) assembles
+the chain as one theorem. Its hypotheses are an accepted exact factorization
+$M=L^\top DL$ with pivots $\ge0$, multipliers $\lambda\ge0$, the form
+identity, and a feasible Lagrangian-minimizing witness $\bar x$ with
+complementary slackness. It returns three conclusions: $t$ lower-bounds
+$f_0$ on the feasible set; $\bar x$ is a global optimum; and
+$t\le f_0(\bar x)$. From these, $f_0(\bar x)=J^\star$ follows because
+$\bar x$ is feasible and minimal. Two fully worked exact-$\Q$ instances, a
+one-dimensional keep-out and a two-dimensional disk, run through the
+verdict-level twin \texttt{certified\_optimum\_of\_verdict}, which starts
+from the PSD verdict rather than from a factorization.
+
+\section{The diagonal-dominance leg}\label{sec:wdd}
+\texttt{isPSD\_of\_wdd} (\texttt{GershgorinPSD.lean}): symmetry together with
+row dominance $\sum_{j\ne i}|M_{ij}|\le M_{ii}$ implies PSD at general $n$
+over any linear ordered field, and the declaration takes exactly those two
+hypotheses. This is the Gershgorin leg of the paper's diagonal-dominance
+lemma.
+
+\section{The executable receipts}\label{sec:receipts}
+The paper's measured and instance-level results rest on a set of executable
+receipts: exact-arithmetic Python scripts that construct the instances, run
+them through the trusted checkers, and assert what the paper reports. This
+section catalogues those receipts by role. Every receipt below ships in the
+paper's supplementary bundle, together with the supporting modules the
+drivers import, with one exception: \texttt{test\_riccati} is part of the
+Podium library's own test suite. The bundle's own \texttt{README.md} gives the
+exact setup and invocation for every receipt below: the library commit to
+clone, the dependencies, and the command line for each script and for the
+pytest suite. Throughout the receipts, the
+bit-size of a rational is
+\texttt{numerator.bit\_length()}${}+{}$\texttt{denominator.bit\_length()}.
+
+The trusted checkers are not bundle contents: they live in the Podium
+repository at \texttt{github.com/adi-oltean/podium}, and the receipts import
+them from there (the library import requires NumPy). The band checkers are
+\texttt{border\_band\_psd} and \texttt{block\_tridiag\_psd} in
+\texttt{podium.verify.riccati}; retrieving them together with
+\texttt{test\_riccati} requires commit \texttt{c96fcb5} of that repository. The archived Zenodo
+release of the library, v0.8.1 (DOI 10.5281/zenodo.21302775), predates
+\texttt{podium.verify.riccati}: it carries \texttt{podium.verify.bracket}
+(the dense $M$-test) and \texttt{podium.verify.barrier}, but not the band
+sweeps.
+
+\paragraph{The family drivers.} Three drivers construct the families of the
+paper's results table in exact \texttt{Fraction} arithmetic, and each
+verifies its emitted certificate through the exact dense $M$-test. The
+trusted checkers refuse floats; the CW state-transition matrix alone is
+synthesized in floating point and rationalized before any certification.
+\begin{description}
+\item[\texttt{shared\_state\_exact.py}] constructs the scalar shared-state
+family; it pins the results table's scalar row.
+\item[\texttt{vector\_state.py}] constructs the vector shared-state family
+($d=1..4$) and pins the table's vector row. Its probe \texttt{gap\_probe}
+($\lambda_k>w_k$ at $N{=}4$, $d{=}2$) is the aggregate-PSD-violated instance
+of the table's refusal row, on which the checker returns no certificate.
+\item[\texttt{rpod\_cw.py}] constructs the CW-coupled keep-out family of the
+paper's demonstration section and pins the table's CW row. The family's
+data are mean motion $n_0=10^{-3}$\,rad/s, sampling phase
+$\tau=n_0\,\Delta t=1/2$, weights $R=I_4$ and $W_k=w_kI_4$, per-stage radii
+cycling $\{1/2,1,3/2\}$, and STM denominators capped at $10^5$. The driver
+also prints the block pivots $S_k$, which grow measurably linearly in the
+horizon: $780$ bits at $N{=}2$ to $17889$ at $N{=}24$.
+\end{description}
+
+\paragraph{The measurement engines.}
+\begin{description}
+\item[\texttt{cert\_metrics.py}] recomputes both bit columns of the results
+table for the three closing families at the headline sizes, and re-verifies
+each of those rows through all three trusted routes: the dense $M$-test, the
+band-$H$ sweep, and the bordered-$M$ sweep.
+\item[\texttt{cw\_anatomy.py}] recomputes, at all $23$ horizons
+$N=2,\dots,24$, every denominator statistic the paper quotes for the
+CW-coupled family, together with the closure verdicts and both bit columns.
+It asserts the divisibility law behind the certified value's denominator,
+and the value's size inequalities, at every horizon. It measures the
+entrywise rationalization error of the CW state-transition matrix. Its
+bordered-sweep section pins the corner-carrying sweep pivot by pivot against
+the dense $LDL^\top$ of $M$ at the shortest horizons, which is the
+test-pinning leg of the paper's bordered-extension remark.
+\end{description}
+
+\paragraph{The exact instance receipts.} Four receipts certify the paper's
+named instances entirely over $\Q$; the fourth certifies two sibling
+instances in one run.
+\begin{description}
+\item[\texttt{single\_keepout\_coupling\_gap.py}] is the paper's certified
+duality-gap example. It asserts $J^\star=212/13$ by exact enumeration of the
+branch-KKT candidates, certifies through a rational moment point that every
+level-one certificate is capped at $815/64$, and certifies the level-one gap
+$\ge2973/832$. The same receipt discharges the diagnosis: stationarity
+recovers $\lambda^\star=24/13$, and $H(\lambda^\star)$ has determinant
+$-7/4$, so aggregate-PSD fails there.
+\item[\texttt{two\_keepout\_stage.py}] closes the bracket at
+$t^\star=169/320$ on a stage with two active keep-outs whose contacts touch
+disjoint coordinates; this is one half of the main theorem's multi-keep-out
+generality. Its published certificate is also the paper's floating-point
+counterexample object: the same sweep transcribed into IEEE-754 doubles
+refuses it, the terminal corner coming out $-4.44\times10^{-16}$ rather than
+exactly $0$.
+\item[\texttt{overlap\_keepout\_stage.py}] closes the bracket at
+$t^\star=5773/3600$ on a stage whose two active contact gradients share
+their whole support; this is the other half of the multi-keep-out
+generality, and the receipt checks that the verifier's normal-equation
+solve recovers $\lambda^\star$ on exactly that stage.
+\item[\texttt{hard\_dynamics\_gap.py}] certifies both halves of the paper's
+hard-dynamics discussion over $\Q$, on $d{=}1$ instances with one keep-out
+and one equality. On the first instance the best constant-multiplier bound
+is exactly $1$ against $J^\star=3/2$, a certified gap of $1/2$ whose
+diagnosis is an aggregate-PSD failure. On its sibling the aggregate-PSD
+analogue holds and the constant-multiplier bracket closes exactly at
+$t^\star=J^\star=9/4$.
+\end{description}
+
+\paragraph{The pytest pins.}
+\begin{description}
+\item[\texttt{test\_bracket\_scaling.py}] ships in the bundle and pins the
+receipts above: it executes each of the four exact instance receipts and
+asserts its published constants, runs \texttt{cw\_anatomy.py}, and checks
+\texttt{cert\_metrics.py}'s results-table rows at the headline sizes.
+\item[\texttt{test\_riccati}] ships in the Podium library and pins the band
+checkers themselves: the band-$H$ sweep on the assembled $H$ and the
+bordered sweep on the assembled $M$ are checked against the dense reference
+predicate \texttt{is\_psd} of \texttt{podium.verify.barrier}, on randomized
+fixed-seed instances plus dedicated singular-$H$ and zero-pivot cases.
+\end{description}
+
+\paragraph{The height receipts.} These receipts pin the paper's size
+measures and the separations among its named heights.
+\begin{description}
+\item[\texttt{height\_measure\_check.py}] pins the paper's height and
+bit-size definition: the enumerated least height is attained at the
+common-denominator form over the lcm of the reduced denominators, per-entry
+bit-size obeys $\mathrm{bit}\le2\,\mathrm{ht}$, and a positive integer $D$
+read as a rational obeys $\mathrm{bit}(D)=\mathrm{bitlen}(D)+1$.
+\item[\texttt{heights\_enumerated.py}] asserts that on the CW-coupled
+family the four height-bearing tuples carry four pairwise distinct heights
+at every one of the $23$ horizons, in the strict order
+$\mathrm{ht}(x^\star)<L<L_M<L_{\mathrm{asm}}$.
+\item[\texttt{height\_inversion.py}] exhibits a family admissible under the
+paper's constructed-family definition on which the assembled height
+$L_{\mathrm{asm}}$ is the \emph{smaller} of the two design-side heights ---
+the receipt behind the statement that the definition forces no ordering
+between $L$ and $L_{\mathrm{asm}}$.
+\item[\texttt{height\_governance.py}] exhibits an admissible family,
+closing on all three trusted checkers, with $L_M\le8$ bits against a design
+height $L=257$--$258$, so that there the per-stage design height bounds
+every entry of the bordered matrix --- the ordering opposite to the CW
+family's.
+\item[\texttt{claim311\_recheck.py}] extends the certified-value
+measurements past the demonstration window by an exhaustive exact sweep of
+every horizon $N=2,\dots,6143$: $\den(t^\star)$ stays inside $450$--$526$
+bits at every horizon, while $\mathrm{bit}(t^\star)$ keeps the residual
+$\log N$ drift.
+\item[\texttt{claim258\_const\_lm\_witness.py}] constructs the
+constant-$L_M$ witness: an admissible closing family with $L_M=2$ at every
+horizon whose largest interior pivot grows without bound, so no function of
+$L_M$ alone bounds the sweep's cost.
+\item[\texttt{attackb\_scope.py}] constructs the fixed-order witness ---
+at order $n{+}1=9$, multipliers of growing denominator raise $L_M$ and the
+largest interior pivot together, so no function of the order alone bounds
+the cost either. It also separates the multiplier-recovery solve's operand
+heights from its formation heights on the demonstration and inverted
+families.
+\item[\texttt{attack2\_scope.py} and \texttt{attackb\_scope.py}] measure the
+recovery solve's operands at the design height: $5$--$6$ bits against $L=6$
+on the CW family (\texttt{attackb\_scope.py}), and $259$ bits against
+$L=258$ on \texttt{height\_inversion.py}'s inverted family
+(\texttt{attack2\_scope.py}).
+\item[\texttt{claim235\_thirdcheck.py} and \texttt{claim306\_attack.py}]
+jointly pin the two witnesses for why the certified value's bit bound
+carries a horizon term and is not stated against $L$ alone: an admissible
+closing family with $L_{\mathrm{asm}}=2$, $\mathrm{ht}(x^\star)=1$ and
+$t^\star=N$ exactly, and integer goal weights of growing magnitude taking
+$\den(t^\star)$ unbounded at fixed $L=1$.
+\end{description}
+
+\paragraph{The class-structure and sweep-scope receipts.} These receipts
+pin structural facts about the class and the scope of the band sweep.
+\begin{description}
+\item[\texttt{bandwidth\_scope.py}] pins the scalar bandwidth: the
+neighbour-only coupling confines every nonzero entry to half-width
+$b=2d-1$, attained whenever some coupling block has a nonzero $(1,d)$
+entry, while structured couplings such as $A_k=R_k=I$ sit at half-width
+exactly $d$.
+\item[\texttt{tridiag\_structure\_scope.py}] pins that block tridiagonality
+of $H(\lambda)$ is forced by the class rather than assumed, with a negative
+control: the band sweep returns a wrong verdict on a symmetric matrix that
+lacks the structure.
+\item[\texttt{curvature\_factor\_check.py}] pins the curvature convention
+$\nabla^2_{xx}(f_0-\sum_j\lambda_jf_j)=2H(\lambda)$ under the paper's
+no-$\tfrac12$ convention, and enumerates which downstream uses of $H$ are
+invariant under positive rescaling.
+\item[\texttt{band\_lemma\_scope.py}] extends the band-$LDL^\top$ soundness
+and zero-pivot checks to general bandwidth, including even $b$, which is
+the generality at which the paper states its band lemma.
+\item[\texttt{band\_opcount.py}] instruments the shipped band sweep and
+pins its $O(nb^2)=O(Nd^3)$ operation count against its loop bounds. It is
+the band sweep's count that is measured; the bordered sweep's count is read
+off its loop bounds, as the paper's bordered-extension remark states.
+\item[\texttt{wdd\_row\_reduction\_check.py}] pins the identity-coupled row
+shapes of the paper's diagonal-dominance lemma and the reduction of WDD to
+the local test $w_k\ge\lambda_k$; the checks cover the singular boundary,
+including the case where the guarded pivot recursion is silent but the
+local test is not.
+\item[\texttt{riccati\_margin.py}] demonstrates that WDD is sufficient but
+not necessary for the PSD verdict: on the identity-coupled chain, PSD
+persists below the WDD threshold $c=2$, down to $2\cos(\pi/(N{+}1))$.
+\item[\texttt{ya\_scope.py}] pins the boundary of the demonstration
+family's growth behaviour: its mild pivot growth and its compact
+recomputed value are properties of the family's shared transition matrix.
+Swapping the shared CW matrix for the per-stage Yamanaka--Ankersen
+transition matrix, with everything else unchanged, reproduces the CW pivot
+sequence bit for bit at $e=0$. At the probed eccentricities
+$e\in\{0.1,0.3,0.5\}$, with the stage
+matrices rationalized to the CW family's realized per-entry fidelity, the
+pivots grow at $\approx1000$--$1050$ bits per stage against CW's
+$\approx778$, and $\mathrm{bit}(t^\star)$ grows at $\approx1000$ bits per
+stage instead of staying horizon-bounded. The penalty is already present
+at $e=10^{-4}$: the driver is the transition matrix's per-stage
+time-variance, not the eccentricity magnitude.
+\end{description}
+
+\paragraph{The boundary receipts.} Five receipts pin the fixed-precision
+boundary analysis of the paper's related-work discussion.
+\begin{description}
+\item[\texttt{claim269\_recheck.py}, \texttt{claim305\_recheck.py} and
+\texttt{claim305\_deepchain.py}] pin the positive-margin case: pivots away
+from the semidefinite boundary may round, their positive-width enclosures
+absorbed by their positive margins.
+\item[\texttt{claim305\_recheck2.py}] pins the exactly-computed-zero-pivot
+scope of the Cholesky clause: LAPACK's \texttt{dpotrf} declines the
+factorization of the singular $H$ with rows $(1,-1)$ and $(-1,1)$. That an
+$LDL^\top$ and the symmetric eigensolver are exact there is pinned by
+\texttt{attack3\_scope.py} and \texttt{claim269\_recheck.py}.
+\item[\texttt{attack3\_scope.py}] pins the floating-point transcription the
+paper's conclusion reports --- the IEEE-754 double sweep refusing
+\texttt{two\_keepout\_stage.py}'s certificate at a terminal corner of
+$-4.44\times10^{-16}$ --- and the zero-pivot branch on which the bordered
+and band-$H$ pivot sequences diverge.
+\end{description}
+
+\section{Mechanization of the published note's theorems}\label{sec:published-note}
+The exact S-procedure bracket and the rational $LDL^\top$ PSD test for
+single primitives are established in the published Podium technical note,
+\emph{Exact-Rational Certificates in Podium: Constructions, Proofs, and
+Prior Art}~\cite{oltean2026certnote}. Its soundness core is mechanized in
+\texttt{PodiumNote.lean}, which sits in a \texttt{note/} subdirectory beside
+the eighteen top-level files and is unchanged since commit \texttt{91fb1fa}
+of the same tree. The regression script of \S\ref{sec:corpus} type-checks
+the file as its nineteenth entry, under the same toolchain pin, and surfaces
+the axiom audit for \texttt{note\_thm\_sound}, \texttt{note\_thm\_multi} and
+\texttt{note\_lem\_schur}. The declarations are stated over any linear
+ordered field, like the corpus's, and mechanize the note's Theorem~1, the
+lower-bound leg of its Theorem~4 with the accompanying bracket, and the
+scalar case of its Schur-complement lemma.
+
+\texttt{note\_thm\_sound} (the note's Theorem~1, the lower bound, at one
+constraint): if $\lambda\ge0$ and the minorant condition
+$t\le f_0(x)-\lambda f_1(x)$ holds at every point $x$, then $t\le f_0(x)$
+at every $x$ with $f_1(x)\ge0$, hence $t\le J^\star$. The minorant
+condition is where $M(\lambda,t)\succeq0$ enters: the published note
+derives it from PSD of the bordered matrix by the lifting expansion, and
+the declaration takes the minorant itself as its hypothesis. Within the
+corpus, the same step is carried at general order by
+\texttt{general\_sprocedure\_sound}'s form-identity hypothesis
+(\S\ref{sec:soundness}).
+
+\texttt{note\_thm\_multi} (the note's Theorem~4, the certified duality gap,
+at any number $m$ of constraints): if every $\lambda_i\ge0$ and
+$t\le f_0(x)-\sum_i\lambda_if_i(x)$ at every point, then $t\le f_0(x)$ at
+every $x$ with all $f_i(x)\ge0$ --- the theorem's opening statement, that
+Theorem~1's minorant argument uses nothing of $m=1$. The declaration is
+stated at one fixed $(\lambda,t)$; the theorem's supremum characterization
+of the Shor value $d^\star$, and the strictness of the gap for $m\ge2$, are
+outside it.
+
+\texttt{note\_bracket} (the same theorem's closing observation): a lower
+bound $t\le f_0$ over a feasible set, supplied as a hypothesis, together
+with a feasible witness $\bar x$, yields $t\le f_0(\bar x)$ and, at every
+feasible $x$, $f_0(\bar x)-(f_0(\bar x)-t)\le f_0(x)$ --- the form in which
+the width $f_0(\bar x)-t$ of the bracket $[t,f_0(\bar x)]$ bounds the
+suboptimality of $\bar x$. Feasibility enters as an abstract predicate, so
+the statement is independent of the constraint form.
+
+\texttt{note\_lem\_schur} (the note's Schur-complement lemma, scalar case):
+for $a>0$, the bordered matrix
+$M=\bigl[\begin{smallmatrix}a&b/2\\b/2&c-t\end{smallmatrix}\bigr]$ is PSD in
+the quantifier sense $\forall v,\ 0\le v^\top Mv$ if and only if
+$t\le c-b^2/(4a)$; the right-hand side is the dual value
+$\inf_x(ax^2+bx+c)$. The equivalence is mechanized in both directions.
+The published lemma is stated for a matrix block $A(\lambda)\succ0$ with
+$g(\lambda)=c-\tfrac14b^\top A(\lambda)^{-1}b$; the declaration is its
+$1\times1$ instance.
+
+\section{Scope: what the theorems take as hypotheses}\label{sec:scope}
+The shipped sweeps are not the mechanized object: the corpus proves the
+acceptance predicate's equivalence with positive semidefiniteness. The claim
+that the concrete band elimination in \texttt{podium.verify.riccati} computes
+such a factorization is a refinement hypothesis, taken rather than proved.
+The same holds for the dense reference $M$-test of
+\texttt{podium.verify.barrier}, which pins the band elimination and against
+which every emitted certificate is checked.
+
+Three things are outside the mechanized perimeter: the border-carrying
+sweep; the band-restriction equality (band pivots equal dense pivots); and
+the operation count. The paper pins the first by test against the dense
+$M$-test and reads the count off the shipped loop bounds; the corpus
+contains none of the three.
+
+The form identity is discharged per instance:
+\texttt{general\_sprocedure\_sound}'s third hypothesis and the capstone's
+matching hypothesis are proved by \texttt{ring} for each concrete assembly,
+never once in general.
+
+Lagrangian minimality is supplied from outside the corpus:
+\texttt{certified\_global\_optimum} takes it as a hypothesis, and the
+quadratic-convexity step that produces it in the paper's proof is not
+mechanized.
+
+The bridge is compiled separately: \texttt{PosSemidefBridge.lean},
+\texttt{LDLTSound.lean} and \texttt{SchurStep.lean} each declare their own
+top-level \texttt{IsPSD} under the same unnamespaced name, and the three files
+import none of one another. So no compiled artifact links the bridge to the
+predicate the acceptance lemmas decide. The three formulas are definitionally
+identical over $\Q$; the match is read off by inspection.
+
+The second leg of the paper's diagonal-dominance lemma is the
+Schur-complement preservation of weak diagonal dominance, resting on
+Carlson--Markham~\cite{carlson1979} together with the limiting argument in
+that proof. That leg is outside the corpus; only the Gershgorin leg is
+machine-checked.
+
+\bibliographystyle{plain}
+\bibliography{references}
+\end{document}
