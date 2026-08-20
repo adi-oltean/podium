@@ -28,7 +28,17 @@ Constructions, Proofs, and Prior Art\\
 exact-arithmetic certificates in \texttt{podium.verify} and their proofs; the
 underlying certificate mathematics is standard, with a modest original analysis of
 the rational-rounding degradation (see the positioning at the end of
-Section~\ref{sec:discipline}). Cite as \url{https://doi.org/10.5281/zenodo.21247380}.}}
+Section~\ref{sec:intro}). AI coding assistants were used for drafting, for the
+reference implementation and verification scripts, and for adversarial review; all
+results were checked by the author. Theorem~\ref{thm:sound}, the lower-bound leg of
+Theorem~\ref{thm:multi} with its closing bracket observation, and the scalar case of
+Lemma~\ref{lem:schur} have machine-checked counterparts in a Lean~4 corpus
+(\texttt{note\_thm\_sound}, \texttt{note\_thm\_multi}, \texttt{note\_bracket},
+\texttt{note\_lem\_schur}); the companion note~\cite{oltean2026leannote} maps each
+declaration to its result here and records its scope limits --- in particular, the
+mechanization takes the PSD-to-minorant lifting step as a hypothesis rather than
+proving it, and the note's remaining results are not mechanized. Cite as
+\url{https://doi.org/10.5281/zenodo.21247380}.}}
 \date{July 2026}
 
 \begin{document}
@@ -78,6 +88,7 @@ result is accompanied by a verifying test in the reference implementation.
 \end{abstract}
 
 \section{Introduction}
+\label{sec:intro}
 
 Software increasingly makes consequential decisions by solving optimization
 problems numerically. A spacecraft plans a fuel-optimal approach; a controller
@@ -90,7 +101,7 @@ return a value that is subtly wrong. Where a mistake is costly and cannot be
 undone after the fact, as in spaceflight, it is desirable for the solver's
 answer to carry a \emph{certificate}: a small, separate object that an
 independent program can verify exactly, so that correctness rests on the
-verifier rather than on the solver. This paper constructs such certificates for
+verifier rather than on the solver. This note constructs such certificates for
 guidance and control, and studies in particular the problem of certifying that a
 computed trajectory is close to the best one achievable.
 
@@ -102,7 +113,7 @@ convergence \cite{elango2025}. The method returns a feasible
 trajectory, but that trajectory is only locally optimal, and the solver reports
 its cost as a floating-point number rather than a bound on the global optimum.
 The method thus provides no bound on the distance between the computed cost and
-the global optimum. This paper supplies such a bound: an exact-arithmetic
+the global optimum. This note supplies such a bound: an exact-arithmetic
 certificate that brackets the global optimum, so that the suboptimality of a
 computed solution is certified rather than assumed, and, when the bracket
 closes, the solution is certified globally optimal. The certificate requires
@@ -142,7 +153,7 @@ carry (Section~\ref{sec:scvx}).
 value at second order in the rounding denominator in the nonsingular case
 (Theorem~\ref{thm:recovery}) and at first order in the trust-region hard case
 (Theorem~\ref{thm:hard}), with soundness retained in both, and the bracket
-certifies an exact duality gap when the S-procedure is not tight
+certifies a strictly positive suboptimality gap when the S-procedure is not tight
 (Theorem~\ref{thm:multi}).
 \item An open reference implementation whose trusted checker uses no floating
 point, in which each result is exercised by a test that reconstructs the
@@ -463,7 +474,7 @@ recovery in the singular case remains open.
 \begin{theorem}[Certified duality gap]\label{thm:multi}
 Theorem~\ref{thm:sound} and the closing observation hold for every $m$. Let
 $d^\star$ be the Shor relaxation value of \eqref{eq:qcqp}, that is, the supremum
-of $t$ over rational $\lambda \ge 0$ and $t$ with $M(\lambda, t) \succeq 0$. Then
+of $t$ over $\lambda \ge 0$ and $t$ with $M(\lambda, t) \succeq 0$. Then
 $d^\star \le J^\star$ always, and for $m \ge 2$ this inequality may be strict.
 When it is, any certified lower bound $t \le d^\star$ and any exactly feasible
 $\bar x$ give an interval $[t, f_0(\bar x)]$ that contains $J^\star$, with both
@@ -481,7 +492,7 @@ $\lambda_k \ge 0$, so
   f_0(x) - t \;\ge\; \sum_{k=1}^{m} \lambda_k\, f_k(x) \;\ge\; 0,
 \]
 hence $t \le f_0(x)$ for every feasible $x$, and therefore $t \le J^\star$.
-Taking the supremum over rational $\lambda \ge 0$ and $t$ with
+Taking the supremum over $\lambda \ge 0$ and $t$ with
 $M(\lambda, t) \succeq 0$ gives $d^\star \le J^\star$.
 
 That the inequality can be strict for $m \ge 2$ is classical: exactness of the
@@ -515,8 +526,8 @@ Celis--Dennis--Tapia problem minimizes a quadratic over the intersection of two
 quadratic constraints; it is the standard example in which the Shor relaxation
 can be inexact.} a trust-region hard case in which the largest certifiable lower
 bound $d^\star = -3$ lies strictly below the optimum $J^\star \approx -1.476$; the
-bracket $[-3,\,-17520/11881]$ then encloses this nonconvex optimum, which has no
-closed form, with both endpoints verified over $\Q$.
+bracket $[-3,\,-17520/11881]$ then encloses this nonconvex optimum, which is
+irrational, with both endpoints verified over $\Q$.
 
 \subsection{Relation to successive convexification}
 \label{sec:scvx}
@@ -524,7 +535,7 @@ closed form, with both endpoints verified over $\Q$.
 Nonconvex trajectory optimization in guidance is commonly addressed by successive
 convexification and sequential convex programming, which solve a nonconvex
 program by repeatedly convexifying about the current iterate and solving a convex
-subproblem \cite{elango2025,acikmese2011}. Such methods return a feasible
+subproblem \cite{elango2025}. Such methods return a feasible
 trajectory that is locally optimal, without a bound on its distance from the
 global optimum. The bracket supplies that bound. A converged iterate $\bar x$ is
 a feasible point, hence a certified upper bound $u = f_0(\bar x)$; the
@@ -621,7 +632,7 @@ nonsingular recovery of Theorem~\ref{thm:recovery} are complete. An exact
 rational recovery in the singular case (Theorem~\ref{thm:hard}) and an exact
 higher-level moment certificate for the multi-constraint gap
 (Theorem~\ref{thm:multi}) remain open. The $LDL^\top$ PSD test is $O(n^3)$; on the
-per-primitive problems these checkers target the rational entries stay small, and
+per-primitive problems these checkers target, the rational entries stay small, but
 they grow with problem size under exact elimination, which is why the certificates
 are applied per primitive rather than to arbitrary sizes.
 
@@ -634,9 +645,9 @@ Lyapunov stability, and sum-of-squares set containment. Its technical content
 specializes exact rational SDP-certificate recovery to the S-procedure dual of a
 nonconvex QCQP, and characterizes the rounding rate of the certified lower bound,
 which is second-order in the nonsingular case and first-order in the trust-region
-hard case, with soundness retained in both, and a certified exact duality gap
-when the relaxation is not tight. The constructions are realized in an open
-reference implementation.
+hard case, with soundness retained in both, and a certified strictly positive
+suboptimality gap when the relaxation is not tight. The constructions are
+realized in an open reference implementation.
 
 \bibliographystyle{unsrt}
 \bibliography{references}

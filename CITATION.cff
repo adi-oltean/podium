@@ -34,6 +34,28 @@ keywords:
   - barrier certificates
   - CompCert
   - Frama-C
+references:
+  - type: article
+    title: "Certifying Trajectory Optimality in Exact Arithmetic: An Exact-Rational Riccati Certificate for Penalty-Coupled Keep-Out Problems"
+    authors:
+      - family-names: Oltean
+        given-names: Adi
+    year: 2026
+    doi: 10.5281/zenodo.22035915
+  - type: article
+    title: "Machine-Checked Foundations for the Exact-Rational Riccati Certificate: A Lean Companion Note"
+    authors:
+      - family-names: Oltean
+        given-names: Adi
+    year: 2026
+    doi: 10.5281/zenodo.22035917
+  - type: article
+    title: "Exact-Rational Certificates in Podium: Constructions, Proofs, and Prior Art"
+    authors:
+      - family-names: Oltean
+        given-names: Adi
+    year: 2026
+    doi: 10.5281/zenodo.22035918
 preferred-citation:
   type: article
   title: "Podium: An Open-Source Library for Rendezvous and Docking Guidance, Navigation, and Control with Integrated Formal Verification"
