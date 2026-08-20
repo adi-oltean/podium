@@ -1,0 +1,3 @@
+# The pinned Mathlib project setup.sh builds. Reproducible from ci/ pins;
+# never committed (Mathlib's build tree is gigabytes).
+.leanwork/
