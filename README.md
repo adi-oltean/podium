@@ -104,7 +104,7 @@ dv1, dv2 = cw.two_impulse(x0, np.zeros(6), n, 1500.0)
 | [`docs/comparative-analysis.md`](docs/comparative-analysis.md) | Survey of existing simulators; build-on vs interop decisions |
 | [`docs/paper/podium-paper.pdf`](docs/paper/podium-paper.pdf) | The tool paper describing the library (DOI [10.5281/zenodo.21225267](https://doi.org/10.5281/zenodo.21225267)) |
 | [`docs/exact-arithmetic-certificates/note.pdf`](docs/exact-arithmetic-certificates/note.pdf) | Technical note: constructions, proofs, and prior art for the exact-rational certificates (DOI [10.5281/zenodo.21247380](https://doi.org/10.5281/zenodo.21247380); this revision [10.5281/zenodo.22035918](https://doi.org/10.5281/zenodo.22035918)) |
-| [`docs/riccati-cert-simple/riccati-cert-simple.pdf`](docs/riccati-cert-simple/riccati-cert-simple.pdf) | The exact-rational Riccati certificate for penalty-coupled keep-out problems (DOI [10.5281/zenodo.22035915](https://doi.org/10.5281/zenodo.22035915)) |
+| [`docs/riccati-cert-simple/riccati-cert-simple.pdf`](docs/riccati-cert-simple/riccati-cert-simple.pdf) | The Riccati-sweep paper: auditable exact lower bounds for penalty-coupled trajectory QCQPs (DOI [10.5281/zenodo.22035915](https://doi.org/10.5281/zenodo.22035915), resolves to the latest version) |
 | [`docs/riccati-cert-lean/riccati-cert-lean.pdf`](docs/riccati-cert-lean/riccati-cert-lean.pdf) | Lean companion note: each mechanized result mapped to its declaration, with the scope limits (DOI [10.5281/zenodo.22035917](https://doi.org/10.5281/zenodo.22035917)) |
 | [`proofs/`](proofs/) | The Lean 4 corpus itself — ~60 theorems, no `sorry`, with `setup.sh`/`check-all.sh` to rebuild and re-check it |
 | [`docs/optimality-gap-certificates.md`](docs/optimality-gap-certificates.md) | Index of the optimality-gap results mapped to code and tests |
@@ -125,7 +125,7 @@ The mathematics behind the exact-rational certificates — the constructions, pr
 
 The Riccati certificate — the band S-procedure dual as a discrete Riccati recursion, decided by an exact-rational LDLᵀ sweep — has its own paper and a machine-checked companion:
 
-> Adi Oltean. *Certifying Trajectory Optimality in Exact Arithmetic: An Exact-Rational Riccati Certificate for Penalty-Coupled Keep-Out Problems.* 2026. DOI: [10.5281/zenodo.22035915](https://doi.org/10.5281/zenodo.22035915).
+> Adi Oltean. *Auditable Exact Lower Bounds for Trajectory QCQPs via a Rational Riccati Sweep.* 2026. DOI: [10.5281/zenodo.22035915](https://doi.org/10.5281/zenodo.22035915).
 
 > Adi Oltean. *Machine-Checked Foundations for the Exact-Rational Riccati Certificate: A Lean Companion Note.* 2026. DOI: [10.5281/zenodo.22035917](https://doi.org/10.5281/zenodo.22035917).
 

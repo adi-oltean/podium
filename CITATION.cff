@@ -36,7 +36,7 @@ keywords:
   - Frama-C
 references:
   - type: article
-    title: "Certifying Trajectory Optimality in Exact Arithmetic: An Exact-Rational Riccati Certificate for Penalty-Coupled Keep-Out Problems"
+    title: "Auditable Exact Lower Bounds for Trajectory QCQPs via a Rational Riccati Sweep"
     authors:
       - family-names: Oltean
         given-names: Adi
