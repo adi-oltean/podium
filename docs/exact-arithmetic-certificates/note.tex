@@ -24,67 +24,47 @@
 Constructions, Proofs, and Prior Art\\
 {\large A technical note}}
 \author{Adi Oltean\thanks{Starcloud, Inc. Companion to the repository
-\texttt{github.com/adi-oltean/podium}. This technical note documents the
-exact-arithmetic certificates in \texttt{podium.verify} and their proofs; the
-underlying certificate mathematics is standard, with a modest original analysis of
-the rational-rounding degradation (see the positioning at the end of
-Section~\ref{sec:intro}). AI coding assistants were used for drafting, for the
-reference implementation and verification scripts, and for adversarial review; all
-results were checked by the author. Theorem~\ref{thm:sound}, the lower-bound leg of
-Theorem~\ref{thm:multi} with its closing bracket observation, and the scalar case of
-Lemma~\ref{lem:schur} have machine-checked counterparts in a Lean~4 corpus
-(\texttt{note\_thm\_sound}, \texttt{note\_thm\_multi}, \texttt{note\_bracket},
-\texttt{note\_lem\_schur}); the companion note~\cite{oltean2026leannote} maps each
-declaration to its result here and records its scope limits --- in particular, the
-mechanization takes the PSD-to-minorant lifting step as a hypothesis rather than
-proving it, and the note's remaining results are not mechanized. Cite as
+\texttt{github.com/adi-oltean/podium}. AI coding assistants were used for
+drafting, for the reference implementation and verification scripts, and for
+adversarial review; all results were checked by the author. Cite as
 \url{https://doi.org/10.5281/zenodo.21247380}.}}
-\date{July 2026}
+\date{Revised August 2026}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
-This note collects the constructions, proofs, and prior-art positioning behind
-the exact-rational certificates in the Podium library (\texttt{podium.verify}):
-barrier certificates for abort safety, Karush--Kuhn--Tucker certificates for the
-online convex solves, control-Lyapunov certificates, sum-of-squares certificates,
-and an optimality-gap bracket for nonconvex quadratically constrained quadratic
-programs. None of the underlying mathematics is new; the note documents the exact
-instantiation, its verification, and its relation to the
-exact-SOS/moment, rational-SDP-recovery, and QCQP-duality literature, so that a
-math-inclined reader can audit the certificate layer directly. Each result is
-exercised by a test in the repository. In detail, guidance and control software
-relies on numerical optimization and floating-point synthesis whose executions
-are difficult to verify directly. We study the problem of verifying solver
-\emph{outputs}: given a certificate produced by an untrusted floating-point
-solver, we re-verify it in exact rational arithmetic, so that acceptance
-constitutes a proof that carries no rounding error. We apply this method to four
-properties: abort safety, via
-barrier certificates; optimality of the online convex solves, via
-Karush--Kuhn--Tucker (KKT) conditions for quadratic and second-order cone
-programs; closed-loop stability, via Lyapunov ellipsoids from a discrete-time
+Guidance and control software relies on numerical optimization and
+floating-point synthesis whose executions are difficult to verify directly. We
+study the problem of verifying solver \emph{outputs}: given a certificate
+produced by an untrusted floating-point solver, we re-verify it in exact rational
+arithmetic, so that acceptance constitutes a proof that carries no rounding
+error. This note documents the exact-rational certificates in the Podium library
+(\texttt{podium.verify}) and applies the method to four properties: abort safety,
+via barrier certificates; optimality of the online convex solves, via
+Karush--Kuhn--Tucker conditions for quadratic and second-order cone programs;
+closed-loop stability, via Lyapunov ellipsoids from a discrete-time
 linear-quadratic regulator; and polynomial set containment, via sum-of-squares
-certificates. These certificates are standard; we give exact re-verification
-procedures --- tolerance-free for the barrier, Lyapunov, sum-of-squares, and
-optimality-gap certificates, and an exact suboptimality bound for the KKT
-re-check of an approximate online solve --- and a reference implementation.
+certificates. These certificates are standard; what we give is exact
+re-verification --- tolerance-free for all but the KKT re-check of an
+approximate online solve, which yields an exact suboptimality bound --- together
+with their prior-art positioning and a reference implementation in which every
+result is exercised by a test.
 
-For nonconvex quadratically constrained quadratic programs (QCQPs), we specialize
-the exact rational recovery of a semidefinite certificate, developed for
-polynomial optimization by Peyrl and Parrilo and by Kaltofen et al., to the
-S-procedure dual. This yields a tolerance-free, machine-checkable optimality-gap
-bracket: a rational lower bound from the S-procedure dual and a rational upper
-bound from a feasible point, coinciding exactly at a global optimum. Our analytic
-contribution is a characterization of how the certified lower bound degrades
-under rational rounding of the dual multiplier: the value loss is second-order in
-the rounding denominator in the nonsingular case and first-order in the
-trust-region hard case, with soundness retained in both, and it vanishes when the
-optimal multiplier is rational (Theorems~\ref{thm:recovery} and~\ref{thm:hard}).
-For several constraints the S-procedure need not be tight, and the bracket then
-encloses $J^\star$ between exact rational bounds, certifying a strictly positive
-suboptimality gap on a Celis--Dennis--Tapia instance (Theorem~\ref{thm:multi}). Each
-result is accompanied by a verifying test in the reference implementation.
+For nonconvex QCQPs we specialize the exact rational recovery of a semidefinite
+certificate, developed for polynomial optimization by Peyrl and Parrilo and by
+Kaltofen et al., to the S-procedure dual. This yields a tolerance-free,
+machine-checkable optimality-gap bracket: a rational lower bound from the dual
+and a rational upper bound from a feasible point, coinciding exactly at a global
+optimum. Our analytic contribution characterizes how that lower bound loses
+value under rational rounding of the dual multiplier --- at second order in the
+rounding denominator in the nonsingular case, at first order in the trust-region
+hard case, sound in both, and vanishing when the optimal multiplier is rational
+(Theorems~\ref{thm:recovery} and~\ref{thm:hard}). For several constraints the
+S-procedure need not be tight; the bracket then encloses $J^\star$ between exact
+rational bounds that need not coincide, as on the Celis--Dennis--Tapia instance
+where $[-3,\,-17520/11881]$ bounds both the suboptimality of the feasible point
+and the duality gap (Theorem~\ref{thm:multi}).
 \end{abstract}
 
 \section{Introduction}
@@ -123,9 +103,12 @@ The underlying idea is general. A guidance and control stack executes a large
 amount of untrusted
 numerical code: convex solvers compute commands, semidefinite programs (SDPs)
 synthesize safety and stability certificates, and floating-point routines emit
-actuator signals. Verifying the \emph{execution} of these components, including
-worst-case iteration counts and bitwise solver behavior, is difficult and often
-impractical \cite{arnstrom2022}. We instead verify the \emph{answer}: an
+actuator signals. Verifying the \emph{execution} of these components is possible
+only in narrow settings --- for active-set quadratic-programming methods on
+multiparametric problems, the exact worst-case iteration count can be certified
+offline \cite{arnstrom2022} --- and such analyses are specific to one solver and
+one problem family, leaving the floating-point behavior of the routines
+themselves uncovered. We instead verify the \emph{answer}: an
 untrusted floating-point tool proposes a certificate, and a trusted checker
 re-establishes the property in exact rational arithmetic, without floating-point
 computation of its own. Because the check is a short, deterministic computation,
@@ -153,7 +136,7 @@ carry (Section~\ref{sec:scvx}).
 value at second order in the rounding denominator in the nonsingular case
 (Theorem~\ref{thm:recovery}) and at first order in the trust-region hard case
 (Theorem~\ref{thm:hard}), with soundness retained in both, and the bracket
-certifies a strictly positive suboptimality gap when the S-procedure is not tight
+yields a certified upper bound on the suboptimality of the feasible point, and hence on the duality gap, when the S-procedure is not tight
 (Theorem~\ref{thm:multi}).
 \item An open reference implementation whose trusted checker uses no floating
 point, in which each result is exercised by a test that reconstructs the
@@ -259,8 +242,7 @@ cone contains a given sublevel set, is verified as an identity
 $p(x) = z(x)^\top G\, z(x)$ with $G$ symmetric positive semidefinite, where
 $z(x)$ is a vector of monomials and $G$ is the associated Gram matrix. Such a
 representation exhibits $p$ as a sum of squares, and hence as nonnegative. The Gram matrix is recovered from an approximate SDP
-solution by the rational rounding of Peyrl and Parrilo \cite{peyrl2008} and Roux
-et al.\ \cite{roux2018}.
+solution by the rational rounding of Peyrl and Parrilo \cite{peyrl2008}.
 
 \section{Optimality-gap bounds for nonconvex QCQPs}
 \label{sec:bracket}
@@ -428,15 +410,20 @@ $100$ recovers $\lambda^\star = 2/5$ and $t = 4 = J^\star$ exactly.
 \subsection{The singular case}
 
 \begin{theorem}[Singular recovery]\label{thm:hard}
-Suppose $A(\lambda^\star)$ is positive semidefinite but singular, the
-trust-region hard case \cite{moresorensen1983}. Then:
+Suppose $A(\lambda^\star)$ is positive semidefinite but singular, $b\in
+\mathrm{range}\,A(\lambda^\star)$, and the limiting minimizer
+$\bar x=\lim_{\lambda\downarrow\lambda^\star}\bigl(-\tfrac12A(\lambda)^{-1}b\bigr)$
+satisfies $f_1(\bar x)\ne0$. When $\ker A(\lambda^\star)$ is invariant under $P_1$ ---
+in particular in the trust-region case $P_1=-I$ --- one has
+$\bar x=-\tfrac12A(\lambda^\star)^\dagger b$ and $f_1(\bar x)>0$ is the classical
+hard case \cite{moresorensen1983}. Then:
 (a) if $\lambda^\star$ and $J^\star$ are rational, $(\lambda^\star, J^\star)$ is
 an exact certificate, since $M$ is a rank-deficient PSD matrix that the exact
 test accepts, so soundness is unaffected;
 (b) approaching $\lambda^\star$ from within $U$ gives certified rational lower
 bounds that converge to $J^\star$ linearly;
 (c) exact closure requires $\lambda^\star$ and $J^\star$ to be rational, which
-does not hold generically, as $J^\star$ may be algebraic of degree greater
+need not hold, as $J^\star$ may be algebraic of degree greater
 than one.
 \end{theorem}
 \begin{proof}
@@ -447,10 +434,10 @@ the elimination continues with a nonnegative $D$.
 (b) Since $A \succ 0$ on $U$ and $A(\lambda^\star)$ is singular, $\lambda^\star$
 lies on the boundary of $U$. On $U$, $g$ is the smooth concave function of
 Lemma~\ref{lem:schur}, and $J^\star = \sup_{\lambda \ge 0} g$ is attained at
-$\lambda^\star$ on that boundary. A boundary maximizer need not be stationary, so
-the right derivative
-$g'_+(\lambda^\star) := \lim_{\lambda \downarrow \lambda^\star} g'(\lambda)$ is
-generically nonzero, and a first-order expansion gives
+$\lambda^\star$ on that boundary. A boundary maximizer need not be stationary; here the right derivative
+$g'_+(\lambda^\star) := \lim_{\lambda \downarrow \lambda^\star} g'(\lambda) =
+-f_1(\bar x)$ is nonzero by hypothesis --- by Danskin, $g'(\lambda)=-f_1(x^\star(\lambda))$
+along the smooth branch --- and a first-order expansion gives
 $J^\star - g(\lambda) = |g'_+(\lambda^\star)| \, |\lambda - \lambda^\star| +
 o(|\lambda - \lambda^\star|)$, which is linear. This contrasts with
 Theorem~\ref{thm:recovery}, where an interior maximizer forces
@@ -471,7 +458,7 @@ recovery in the singular case remains open.
 
 \subsection{Several constraints}
 
-\begin{theorem}[Certified duality gap]\label{thm:multi}
+\begin{theorem}[Certified bound on the duality gap]\label{thm:multi}
 Theorem~\ref{thm:sound} and the closing observation hold for every $m$. Let
 $d^\star$ be the Shor relaxation value of \eqref{eq:qcqp}, that is, the supremum
 of $t$ over $\lambda \ge 0$ and $t$ with $M(\lambda, t) \succeq 0$. Then
@@ -525,9 +512,14 @@ $\lVert x+(1,0)\rVert \le 2$,\footnote{The
 Celis--Dennis--Tapia problem minimizes a quadratic over the intersection of two
 quadratic constraints; it is the standard example in which the Shor relaxation
 can be inexact.} a trust-region hard case in which the largest certifiable lower
-bound $d^\star = -3$ lies strictly below the optimum $J^\star \approx -1.476$; the
-bracket $[-3,\,-17520/11881]$ then encloses this nonconvex optimum, which is
-irrational, with both endpoints verified over $\Q$.
+bound is $d^\star = -3$. What the checker establishes over $\Q$ is the enclosure:
+the bracket $[-3,\,-17520/11881]$ contains this nonconvex optimum, which is
+irrational, with both endpoints verified exactly, so the suboptimality of the
+feasible point and the duality gap are bounded above by
+$-17520/11881 - (-3)$. That the gap is strictly positive here --- that
+$d^\star < J^\star$ --- is a known property of the instance, observed
+numerically ($J^\star \approx -1.476$); no exact computation in this note
+certifies it, and Theorem~\ref{thm:multi} bounds the gap only from above.
 
 \subsection{Relation to successive convexification}
 \label{sec:scvx}
@@ -583,6 +575,15 @@ verifies feasibility of $\bar x$ over the rationals, since a point feasible only
 within a tolerance may have objective value below $J^\star$. Second, the closing
 criterion draws its two bounds from a single problem instance, since bounds
 computed for different instances cannot be compared.
+
+\paragraph{Mechanization.} Theorem~\ref{thm:sound}, the lower-bound leg of
+Theorem~\ref{thm:multi} with its closing bracket observation, and the scalar case
+of Lemma~\ref{lem:schur} have machine-checked counterparts in a Lean~4 corpus
+(\texttt{note\_thm\_sound}, \texttt{note\_thm\_multi}, \texttt{note\_bracket},
+\texttt{note\_lem\_schur}). The companion note~\cite{oltean2026leannote} maps each
+declaration to its result here and records the scope limits: the mechanization
+takes the PSD-to-minorant lifting step as a hypothesis rather than proving it, and
+the note's remaining results are not mechanized.
 
 \section{Related work}
 
@@ -645,7 +646,7 @@ Lyapunov stability, and sum-of-squares set containment. Its technical content
 specializes exact rational SDP-certificate recovery to the S-procedure dual of a
 nonconvex QCQP, and characterizes the rounding rate of the certified lower bound,
 which is second-order in the nonsingular case and first-order in the trust-region
-hard case, with soundness retained in both, and a certified strictly positive
+hard case, with soundness retained in both, and a certified upper bound on the
 suboptimality gap when the relaxation is not tight. The constructions are
 realized in an open reference implementation.
 
